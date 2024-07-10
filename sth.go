@@ -115,8 +115,8 @@ func ScanDir(dir string) {
 				return err
 			}
 
-			//	fi, _ := info.Info()
-			if filepath.Ext(info.Name()) == ".pdf" {
+			ext := filepath.Ext(info.Name())
+			if ext == ".pdf" || ext == ".cbz" || ext == ".cbr" {
 				InsertToDb(path)
 			}
 			return nil
@@ -134,9 +134,8 @@ func SearchComic(name string, issueId string) string {
 	volsUrl := "https://comicvine.gamespot.com/api/search/?api_key=38f4732067d47702b21621d27a828a5b7a51dde1&format=json&resources=volume&query=" + url.PathEscape(name)
 	getJson(volsUrl, volsResponse)
 
-	for _, el := range volsResponse.Results {
-		fmt.Println("----- " + el.ApiDetailUrl)
-	}
+	fmt.Printf("Found %v series", len(volsResponse.Results))
+
 	singleVolUrl := volsResponse.Results[0].ApiDetailUrl + "?api_key=38f4732067d47702b21621d27a828a5b7a51dde1&format=json"
 	singleVolResponse := new(VolumeResponse)
 	getJson(singleVolUrl, singleVolResponse)
@@ -149,11 +148,11 @@ func SearchComic(name string, issueId string) string {
 			fmt.Println("----- " + singleVolResponse.Results.Name)
 			fmt.Println("----- " + singleVolResponse.Results.ApiDetailUrl)
 
-			fmt.Println("kurde na bank nie " + issueResp.Results.Name)
-			fmt.Println("kurde na bank nie " + issueResp.Results.IssueNumber)
-			fmt.Println("kurde na bank nie " + issueResp.Results.Image.SmallUrl)
-			fmt.Println("kurde na bank nie " + issueResp.Results.StoreDate)
-			fmt.Println("kurde na bank nie " + issueResp.Results.Description)
+			/*			fmt.Println("kurde na bank nie " + issueResp.Results.Name)
+						fmt.Println("kurde na bank nie " + issueResp.Results.IssueNumber)
+						fmt.Println("kurde na bank nie " + issueResp.Results.Image.SmallUrl)
+						fmt.Println("kurde na bank nie " + issueResp.Results.StoreDate)
+						fmt.Println("kurde na bank nie " + issueResp.Results.Description)*/
 			url = issueResp.Results.Image.SmallUrl
 
 			break
