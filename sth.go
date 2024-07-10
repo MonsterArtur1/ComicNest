@@ -11,13 +11,14 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
-var templates = template.Must(template.ParseFiles("tmpl/sth.html"))
+var templates = template.Must(template.ParseFiles("tmpl/sth.html", "tmpl/sth2.html"))
 
 const dbName = "database.sqlite"
 
@@ -27,10 +28,11 @@ func main() {
 	if _, err := os.Stat(dbName); errors.Is(err, os.ErrNotExist) {
 		CreateDatabase()
 	}
-	//ScanDir("D:\\Documents")
+	ScanDir("D:\\Library")
 
 	fmt.Println("server started")
-	http.HandleFunc("/", handler)
+	http.Handle("/tmpl/css/", http.StripPrefix("/tmpl/css", http.FileServer(http.Dir("./tmpl/css"))))
+	http.HandleFunc("/", mainMenuHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
@@ -44,16 +46,32 @@ func getJson(url string, target interface{}) error {
 	return json.NewDecoder(r.Body).Decode(target)
 }
 
+func mainMenuHandler(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("hoł1")
+	filenames := SelectFromDb()
+	var c []IssueEntry
+	for _, filename := range filenames {
+		c = append(c, SearchComic(strings.Split(filename, "#")[0], strings.Split(filename, "#")[1]))
+	}
+	//c = append(c, IssueEntry{Name: "test", IssueNumber: "5", Image: ImageEntry{ThumbUrl: ""}})
+
+	p1 := &MainMenuPage{Comics: c}
+
+	templates.ExecuteTemplate(w, "sth2.html", p1)
+	//fmt.Println("tutaj " + c)
+}
+
 func handler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("hoł")
 	title := r.FormValue("ftitle")
-	issue := r.FormValue("fissue")
+	//issue := r.FormValue("fissue")
 	p1 := &Page{Title: "TestPage", Body: "", ImageUrl: ""}
 
 	if title != "" {
-		url := SearchComic(title, issue)
-		p1 = &Page{Title: "TestPage", Body: "", ImageUrl: url}
+		//url := SearchComic(title, issue)
+		//p1 = &Page{Title: "TestPage", Body: "", ImageUrl: url.ApiDetailUrl}
 	}
 
 	templates.ExecuteTemplate(w, "sth.html", p1)
@@ -64,6 +82,9 @@ type Page struct {
 	Title    string
 	Body     string
 	ImageUrl string
+}
+type MainMenuPage struct {
+	Comics []IssueEntry
 }
 
 func CreateDatabase() {
@@ -85,6 +106,22 @@ func CreateDatabase() {
 	db.Close()
 }
 
+func SelectFromDb() []string {
+	db, _ := sql.Open("sqlite3", dbName)
+	response, err := db.Query("SELECT path from foo")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer response.Close()
+	var paths []string
+	for response.Next() {
+		var path string
+		_ = response.Scan(&path)
+		paths = append(paths, strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
+	}
+	db.Close()
+	return paths
+}
 func InsertToDb(name string) {
 	db, _ := sql.Open("sqlite3", dbName)
 	tx, err := db.Begin()
@@ -126,7 +163,7 @@ func ScanDir(dir string) {
 	}
 }
 
-func SearchComic(name string, issueId string) string {
+func SearchComic(name string, issueId string) IssueEntry {
 
 	volsResponse := new(VolumesResponse)
 	//volsUrl := "https://comicvine.gamespot.com/api/volumes/?api_key=38f4732067d47702b21621d27a828a5b7a51dde1&format=json&filter=name:" + name
@@ -139,7 +176,6 @@ func SearchComic(name string, issueId string) string {
 	singleVolUrl := volsResponse.Results[0].ApiDetailUrl + "?api_key=38f4732067d47702b21621d27a828a5b7a51dde1&format=json"
 	singleVolResponse := new(VolumeResponse)
 	getJson(singleVolUrl, singleVolResponse)
-	url := ""
 	for _, element := range singleVolResponse.Results.Issues {
 		if element.IssueNumber == issueId {
 			issueRespUrl := element.ApiDetailUrl + "?api_key=38f4732067d47702b21621d27a828a5b7a51dde1&format=json"
@@ -153,13 +189,12 @@ func SearchComic(name string, issueId string) string {
 						fmt.Println("kurde na bank nie " + issueResp.Results.Image.SmallUrl)
 						fmt.Println("kurde na bank nie " + issueResp.Results.StoreDate)
 						fmt.Println("kurde na bank nie " + issueResp.Results.Description)*/
-			url = issueResp.Results.Image.SmallUrl
-
-			break
+			return issueResp.Results
 		}
 	}
 
-	return url
+	var i IssueEntry
+	return i
 }
 
 type VolumesResponse struct {
