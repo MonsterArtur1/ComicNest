@@ -21,7 +21,13 @@
 				</div>
 
 				<div id ="folder-subheader2">
-					<a class="pat" href="/">Libraries</a> <img class="indicator" src="/images/indicator@2x.png" style="width: 5px"/> <a class="path" href="/library/1/folder/1">komiksy</a> 
+					<a class="pat" href="/menu">Menu</a> 
+					<a class="pat" href="/scan_directory">Scan library</a> 
+					<a class="pat" href="/analyze_library">Analyze library</a> 
+					<div id ="folder-subheader2"></div>
+					<img class="indicator" src="/images/indicator@2x.png" style="width: 5px"/> <a class="path" href="/menu?filter=all">All</a> 
+					<img class="indicator" src="/images/indicator@2x.png" style="width: 5px"/> <a class="path" href="/menu?filter=all">Scraped</a> 
+					<img class="indicator" src="/images/indicator@2x.png" style="width: 5px"/> <a class="path" href="/menu?filter=unprocessed">Unscraped</a> 
 				</div>
 				<div id ="header-combos">
 					
@@ -37,12 +43,16 @@
 					{{range $val := .Comics}}
 					<li>
 						<div class="cover">
-							 <img style="width: 80px" src="{{$val.Image.ThumbUrl}}"/> 
+							{{if $val.ImageUri}}
+							 <img style="width: 80px" src="{{$val.ImageUri}}"/> 
+							 {{else}}
+							 <img style="width: 80px" src="./tmpl/css/empty.jpg"/> 
+							 {{end}}
 						</div>
 						<div class="info">
-							<div class="title"><p>{{$val.Name}}</p>
+							<div class="title"><p>{{$val.VolumeName}}</p><div class="subtitle"><p>{{$val.Name}}</p></div>
 							</div>
-							<div class="elementInfo"> <span class="numPages">{{$val.IssueNumber}} issue</span> <span class="comicSize">X Mb</span>
+							<div class="elementInfo"> <span class="numPages">issue #{{$val.IssueNumber}}</span> <span class="comicSize">{{$val.DiskSize}}</span>
 							</div>
 							<div class="buttons"> <a onclick="this.innerHTML='IMPORTING';this.className='importedButton';" class ="importButton" href="/library/1/comic/1">IMPORT</a> <a class ="readButton" href="/library/1/comic/1/remote">READ</a> 
 							</div>
