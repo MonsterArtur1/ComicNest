@@ -6,11 +6,17 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"text/template"
 )
 
+var config conf
+
 func main() {
-	if _, err := os.Stat(dbName); errors.Is(err, os.ErrNotExist) {
+
+	config.getConf()
+
+	if _, err := os.Stat(config.Database); errors.Is(err, os.ErrNotExist) {
 		CreateDatabase()
 	}
 	//ScanDir("D:\\Library")
@@ -20,9 +26,9 @@ func main() {
 	http.HandleFunc("/scan_directory", scanDirectoryHandler)
 	http.HandleFunc("/analyze_library", analyzeLibraryHandler)
 
-	fmt.Println("server started, visit: http://localhost:8080/menu")
+	fmt.Printf("server started, visit: http://localhost:%v/menu", config.Port)
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(config.Port), nil))
 }
 
 func analyzeLibraryHandler(w http.ResponseWriter, r *http.Request) {
@@ -42,8 +48,8 @@ func analyzeLibraryHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func scanDirectoryHandler(w http.ResponseWriter, r *http.Request) {
-	ScanDir("D:\\Library")
-	fmt.Fprint(w, "Database scan complete")
+	ScanDir(config.Library)
+	fmt.Fprint(w, "Library scan complete")
 }
 
 func mainMenuHandler(w http.ResponseWriter, r *http.Request) {

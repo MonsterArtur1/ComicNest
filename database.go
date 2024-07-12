@@ -7,10 +7,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const dbName = "database.sqlite"
-
 func CreateDatabase() {
-	db, err := sql.Open("sqlite3", dbName)
+	db, err := sql.Open("sqlite3", config.Database)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -29,7 +27,7 @@ func CreateDatabase() {
 }
 
 func SelectFromDb(onlyUnprocessed bool, groupByVolume bool) []IssueEntry {
-	db, _ := sql.Open("sqlite3", dbName)
+	db, _ := sql.Open("sqlite3", config.Database)
 	query := "select * from foo where processed"
 
 	if onlyUnprocessed {
@@ -55,7 +53,7 @@ func SelectFromDb(onlyUnprocessed bool, groupByVolume bool) []IssueEntry {
 }
 
 func SelectSingleIssueFromDb(id string) IssueEntry {
-	db, _ := sql.Open("sqlite3", dbName)
+	db, _ := sql.Open("sqlite3", config.Database)
 	query := "SELECT * from foo where id=?"
 
 	response, err := db.Query(query, id)
@@ -96,7 +94,7 @@ func SelectSingleIssueFromDb(id string) IssueEntry {
 // }
 
 func (issueEntry IssueEntry) InsertToDb() {
-	db, _ := sql.Open("sqlite3", dbName)
+	db, _ := sql.Open("sqlite3", config.Database)
 	tx, err := db.Begin()
 	if err != nil {
 		log.Fatal(err)
@@ -119,7 +117,7 @@ func (issueEntry IssueEntry) InsertToDb() {
 }
 
 func (issueEntry IssueEntry) UpdateIntoDb() {
-	db, _ := sql.Open("sqlite3", dbName)
+	db, _ := sql.Open("sqlite3", config.Database)
 	tx, err := db.Begin()
 	if err != nil {
 		log.Fatal(err)

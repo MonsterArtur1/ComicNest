@@ -1,0 +1,3 @@
+database: database.sql
+library: "C:\\Users\\mctech\\OneDrive\\ebooki\\Komiksy"
+port: 8080
