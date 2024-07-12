@@ -15,11 +15,13 @@ func main() {
 	}
 	//ScanDir("D:\\Library")
 
-	fmt.Println("server started")
 	http.Handle("/tmpl/css/", http.StripPrefix("/tmpl/css", http.FileServer(http.Dir("./tmpl/css"))))
 	http.HandleFunc("/menu", mainMenuHandler)
 	http.HandleFunc("/scan_directory", scanDirectoryHandler)
 	http.HandleFunc("/analyze_library", analyzeLibraryHandler)
+
+	fmt.Println("server started, visit: http://localhost:8080/menu")
+
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
