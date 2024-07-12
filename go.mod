@@ -1,4 +1,4 @@
-module Sth
+module ComicNest
 
 go 1.22
 

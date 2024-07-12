@@ -1,38 +1,43 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
 <head>
 	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
 	<link rel="stylesheet" href="./tmpl/css/reset.css" type="text/css" />
 	<link rel="stylesheet" href="./tmpl/css/styles_ipad.css" type="text/css" />
 	<title>Folder</title>
 </head>
+
 <body>
 	<div id="content">
 		<div>
 
 			<div id="folder-header">
-				<div id="topIndex">   <a class="up" href="/">up</a>  </div>
+				<div id="topIndex"> <a class="up" href="/">up</a> </div>
 
 
 				<div id="folder-subheader1">
-				
+
 					<h1>komiksy</h1>
-				
+
 				</div>
 
-				<div id ="folder-subheader2">
-					<a class="pat" href="/menu">Menu</a> 
-					<a class="pat" href="/scan_directory">Scan library</a> 
-					<a class="pat" href="/analyze_library">Analyze library</a> 
-					<div id ="folder-subheader2"></div>
-					<img class="indicator" src="/images/indicator@2x.png" style="width: 5px"/> <a class="path" href="/menu?filter=all">All</a> 
-					<img class="indicator" src="/images/indicator@2x.png" style="width: 5px"/> <a class="path" href="/menu?filter=all">Scraped</a> 
-					<img class="indicator" src="/images/indicator@2x.png" style="width: 5px"/> <a class="path" href="/menu?filter=unprocessed">Unscraped</a> 
+				<div id="folder-subheader2">
+					<a class="pat" href="/menu">Menu</a>
+					<a class="pat" href="/scan_directory">Scan library</a>
+					<a class="pat" href="/analyze_library">Analyze library</a>
+					<div id="folder-subheader2"></div>
+					<img class="indicator" src="/images/indicator@2x.png" style="width: 5px" /> <a class="path"
+						href="/menu?filter=all">All</a>
+					<img class="indicator" src="/images/indicator@2x.png" style="width: 5px" /> <a class="path"
+						href="/menu?filter=all">Scraped</a>
+					<img class="indicator" src="/images/indicator@2x.png" style="width: 5px" /> <a class="path"
+						href="/menu?filter=unprocessed">Unscraped</a>
 				</div>
-				<div id ="header-combos">
-					
+				<div id="header-combos">
 
-					
+
+
 
 				</div>
 			</div>
@@ -44,36 +49,47 @@
 					<li>
 						<div class="cover">
 							{{if $val.ImageUri}}
-							 <img style="width: 80px" src="{{$val.ImageUri}}"/> 
-							 {{else}}
-							 <img style="width: 80px" src="./tmpl/css/empty.jpg"/> 
-							 {{end}}
+							<img style="width: 80px" src="{{$val.ImageUri}}" />
+							{{else}}
+							<img style="width: 80px" src="./tmpl/css/empty.jpg" />
+							{{end}}
 						</div>
 						<div class="info">
-							<div class="title"><p>{{$val.VolumeName}}</p><div class="subtitle"><p>{{$val.Name}}</p></div>
+							<div class="title">
+								<p>{{$val.VolumeName}}</p>
+								<div class="subtitle">
+									<p>{{$val.Name}}</p>
+								</div>
 							</div>
-							<div class="elementInfo"> <span class="numPages">issue #{{$val.IssueNumber}}</span> <span class="comicSize">{{$val.DiskSize}}</span>
+							<div class="elementInfo"> <span class="numPages">issue #{{$val.IssueNumber}}</span> <span
+									class="comicSize">{{$val.DiskSize}}</span>
 							</div>
-							<div class="buttons"> <a onclick="this.innerHTML='IMPORTING';this.className='importedButton';" class ="importButton" href="/library/1/comic/1">IMPORT</a> <a class ="readButton" href="/library/1/comic/1/remote">READ</a> 
+							<div class="buttons"> 
+								{{if $val.Processed}}
+								<a onclick="this.innerHTML='ANALYZING';this.className='importedButton';" class="importButton" href="/analyze_library?id={{$val.Id}}">Update</a> <a class="readButton" href="/library/1/comic/1/remote">READ</a>
+								{{else}}
+								<a onclick="this.innerHTML='ANALYZING';this.className='importedButton';" class="importButton" href="/analyze_library?id={{$val.Id}}">SCRAP!</a> <a class="readButton" href="/library/1/comic/1/remote">READ</a>
+								{{end}}
 							</div>
 						</div>
-						
+
 					</li>
 					{{end}}
-					
-					
+
+
 				</ul>
 				<div class="clear">&nbsp;</div>
 			</div>
 		</div>
 
-		
+
 
 		<script type="text/javascript">
-		function navigateTo(sel, target) {
-			window[target].location.href = sel.options[sel.selectedIndex].value;
-		}
+			function navigateTo(sel, target) {
+				window[target].location.href = sel.options[sel.selectedIndex].value;
+			}
 		</script>
 
-	</body>
-	</html>
+</body>
+
+</html>

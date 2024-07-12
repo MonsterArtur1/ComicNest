@@ -24,15 +24,17 @@ func main() {
 }
 
 func analyzeLibraryHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.FormValue("id")
+	issue := SelectSingleIssueFromDb(id)
 
-	issues := SelectFromDb(true)
+	//	issues := SelectFromDb(true)
 	//var c []IssueEntry
-	for _, issue := range issues {
-		//c = append(c, SearchComic(strings.Split(filename, "#")[0], strings.Split(filename, "#")[1]))
-		SearchComic(&issue)
-		issue.UpdateIntoDb()
+	//	for _, issue := range issues {
+	//c = append(c, SearchComic(strings.Split(filename, "#")[0], strings.Split(filename, "#")[1]))
+	SearchComic(&issue)
+	issue.UpdateIntoDb()
 
-	}
+	//	}
 
 	fmt.Fprint(w, "Database scan complete")
 }
@@ -54,7 +56,7 @@ func mainMenuHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Println("hoł1 ")
-	issues := SelectFromDb(onlyUnprocessed)
+	issues := SelectFromDb(onlyUnprocessed, false)
 	// var c []IssueEntry
 	// for _, filename := range filenames {
 	// 	//c = append(c, SearchComic(strings.Split(filename, "#")[0], strings.Split(filename, "#")[1]))

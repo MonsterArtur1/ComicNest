@@ -28,12 +28,15 @@ func CreateDatabase() {
 	db.Close()
 }
 
-func SelectFromDb(onlyUnprocessed bool) []IssueEntry {
+func SelectFromDb(onlyUnprocessed bool, groupByVolume bool) []IssueEntry {
 	db, _ := sql.Open("sqlite3", dbName)
-	query := "SELECT * from foo"
+	query := "select * from foo where processed"
 
 	if onlyUnprocessed {
 		query = "select * from foo where not processed"
+	}
+	if groupByVolume {
+		query = "select id, path, processed, volume_name, name, min(issue_number), image_uri, disk_size from foo group by volume_name"
 	}
 
 	response, err := db.Query(query)
@@ -49,6 +52,24 @@ func SelectFromDb(onlyUnprocessed bool) []IssueEntry {
 	}
 	db.Close()
 	return issues
+}
+
+func SelectSingleIssueFromDb(id string) IssueEntry {
+	db, _ := sql.Open("sqlite3", dbName)
+	query := "SELECT * from foo where id=?"
+
+	response, err := db.Query(query, id)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer response.Close()
+	for response.Next() {
+		var issue IssueEntry
+		_ = response.Scan(&issue.Id, &issue.Path, &issue.Processed, &issue.VolumeName, &issue.Name, &issue.IssueNumber, &issue.ImageUri, &issue.DiskSize)
+		return issue
+	}
+	db.Close()
+	return IssueEntry{}
 }
 
 // func InsertToDb(name string, title string, issue string) {

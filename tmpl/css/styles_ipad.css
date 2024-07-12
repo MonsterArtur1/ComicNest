@@ -292,7 +292,7 @@ width: 158px;
 .importButton
 {
 	width: 60px;
-	background: url("/images/download.png") no-repeat scroll 0 0 transparent;
+	background: url("/tmpl/css/empty.jpg") no-repeat scroll 0 0 transparent;
 	background-position: 3px 5px;
 	background-size: 7px 8px;
 	border: none;
