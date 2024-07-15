@@ -16,7 +16,7 @@ func CreateDatabase() {
 	defer db.Close()
 
 	sqlStmt := `
-	create table foo (id integer not null primary key, path text, processed bool, volume_name text, name text, issue_number text, image_uri text, store_date text, description text, disk_size text, UNIQUE(path));
+	create table foo (id integer not null primary key, path text, processed bool, volume_name text, name text, issue_number text, image_uri text, store_date text, description text, disk_size text, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(path));
 	delete from foo;
 	`
 	_, err = db.Exec(sqlStmt)
@@ -31,7 +31,7 @@ func SelectFromDb(sess db.Session, querry db.Cond) []IssueEntry {
 
 	var issues []IssueEntry
 	coll := sess.Collection("foo")
-	res := coll.Find(querry).OrderBy("-volume_name")
+	res := coll.Find(querry).OrderBy("-created_at")
 	res.All(&issues)
 	return issues
 }

@@ -48,4 +48,5 @@ type IssueEntry struct {
 	ImageUri     string     `json:"image_uri" db:"image_uri"`
 	Processed    bool       `json:"processed" db:"processed"`
 	DiskSize     string     `json:"disk_size" db:"disk_size"`
+	CreatedAt    string     `json:"created_at" db:"created_at,omitempty"`
 }
