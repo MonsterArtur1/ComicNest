@@ -36,16 +36,16 @@ type VolumeEntry struct {
 }
 
 type IssueEntry struct {
-	Id           int        `json:"id"`
-	VolumeName   string     `json:"volume_name"`
-	Name         string     `json:"name"`
+	Id           int        `json:"id" db:"id,omitempty"`
+	VolumeName   string     `json:"volume_name" db:"volume_name"`
+	Name         string     `json:"name" db:"name"`
 	ApiDetailUrl string     `json:"api_detail_url"`
-	IssueNumber  string     `json:"issue_number"`
+	IssueNumber  string     `json:"issue_number" db:"issue_number"`
 	Image        ImageEntry `json:"image"`
-	Description  string     `json:"description"`
-	StoreDate    string     `json:"store_date"`
-	Path         string     `json:"path"`
-	ImageUri     string     `json:"image_uri"`
-	Processed    bool       `json:"processed"`
-	DiskSize     string     `json:"disk_size"`
+	Description  string     `json:"description" db:"description"`
+	StoreDate    string     `json:"store_date" db:"store_date"`
+	Path         string     `json:"path" db:"path"`
+	ImageUri     string     `json:"image_uri" db:"image_uri"`
+	Processed    bool       `json:"processed" db:"processed"`
+	DiskSize     string     `json:"disk_size" db:"disk_size"`
 }

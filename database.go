@@ -4,10 +4,11 @@ import (
 	"database/sql"
 	"log"
 
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/upper/db/v4"
 )
 
 func CreateDatabase() {
+
 	db, err := sql.Open("sqlite3", config.Database)
 	if err != nil {
 		log.Fatal(err)
@@ -15,7 +16,7 @@ func CreateDatabase() {
 	defer db.Close()
 
 	sqlStmt := `
-	create table foo (id integer not null primary key, path text, processed bool, volume_name text, name text, issue_number text, image_uri text, disk_size text, UNIQUE(path));
+	create table foo (id integer not null primary key, path text, processed bool, volume_name text, name text, issue_number text, image_uri text, store_date text, description text, disk_size text, UNIQUE(path));
 	delete from foo;
 	`
 	_, err = db.Exec(sqlStmt)
@@ -26,115 +27,46 @@ func CreateDatabase() {
 	db.Close()
 }
 
-func SelectFromDb(onlyUnprocessed bool, groupByVolume bool) []IssueEntry {
-	db, _ := sql.Open("sqlite3", config.Database)
-	query := "select * from foo where processed"
+func SelectFromDb(sess db.Session, querry db.Cond) []IssueEntry {
 
-	if onlyUnprocessed {
-		query = "select * from foo where not processed"
-	}
-	if groupByVolume {
-		query = "select id, path, processed, volume_name, name, min(issue_number), image_uri, disk_size from foo group by volume_name"
-	}
-
-	response, err := db.Query(query)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer response.Close()
 	var issues []IssueEntry
-	for response.Next() {
-		var issue IssueEntry
-		_ = response.Scan(&issue.Id, &issue.Path, &issue.Processed, &issue.VolumeName, &issue.Name, &issue.IssueNumber, &issue.ImageUri, &issue.DiskSize)
-		issues = append(issues, issue)
-	}
-	db.Close()
+	coll := sess.Collection("foo")
+	res := coll.Find(querry).OrderBy("-volume_name")
+	res.All(&issues)
 	return issues
 }
 
-func SelectSingleIssueFromDb(id string) IssueEntry {
-	db, _ := sql.Open("sqlite3", config.Database)
-	query := "SELECT * from foo where id=?"
+func SelectSingleIssueFromDb(sess db.Session, id string) IssueEntry {
 
-	response, err := db.Query(query, id)
+	coll := sess.Collection("foo")
+
+	res := coll.Find(db.Cond{"id": id})
+	count, _ := res.Count()
+	isse := IssueEntry{}
+	if count > 0 {
+		res.One(&isse)
+	}
+	return isse
+
+}
+func (issueEntry IssueEntry) InsertOnlyNew(sess db.Session) {
+
+	coll := sess.Collection("foo")
+
+	res := coll.Find(db.Cond{"path": issueEntry.Path})
+	count, err := res.Count()
+	if count == 0 {
+		_, err = coll.Insert(issueEntry)
+	}
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
-	defer response.Close()
-	for response.Next() {
-		var issue IssueEntry
-		_ = response.Scan(&issue.Id, &issue.Path, &issue.Processed, &issue.VolumeName, &issue.Name, &issue.IssueNumber, &issue.ImageUri, &issue.DiskSize)
-		return issue
-	}
-	db.Close()
-	return IssueEntry{}
 }
 
-// func InsertToDb(name string, title string, issue string) {
-// 	db, _ := sql.Open("sqlite3", dbName)
-// 	tx, err := db.Begin()
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	stmt, err := tx.Prepare("insert or ignore into foo(id, path, processed, title, issue,thumbnailName) values(NULL, ?, false,?,?,'')")
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	defer stmt.Close()
+func (issueEntry *IssueEntry) UpdateIntoDb(sess db.Session) {
 
-// 	_, err = stmt.Exec(name, title, issue)
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	err = tx.Commit()
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	db.Close()
-// }
+	coll := sess.Collection("foo")
 
-func (issueEntry IssueEntry) InsertToDb() {
-	db, _ := sql.Open("sqlite3", config.Database)
-	tx, err := db.Begin()
-	if err != nil {
-		log.Fatal(err)
-	}
-	stmt, err := tx.Prepare("insert or ignore into foo(id, path, processed, volume_name, name, issue_number, image_uri, disk_size) values(null, ?, ?,?,?,?,?, ?)")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(issueEntry.Path, issueEntry.Processed, issueEntry.VolumeName, issueEntry.Name, issueEntry.IssueNumber, issueEntry.ImageUri, issueEntry.DiskSize)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = tx.Commit()
-	if err != nil {
-		log.Fatal(err)
-	}
-	db.Close()
-}
-
-func (issueEntry IssueEntry) UpdateIntoDb() {
-	db, _ := sql.Open("sqlite3", config.Database)
-	tx, err := db.Begin()
-	if err != nil {
-		log.Fatal(err)
-	}
-	stmt, err := tx.Prepare("insert or replace into foo(id, path, processed, volume_name, name, issue_number, image_uri, disk_size) values(?,?, ?, ?,?,?,?, ?)")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(issueEntry.Id, issueEntry.Path, issueEntry.Processed, issueEntry.VolumeName, issueEntry.Name, issueEntry.IssueNumber, issueEntry.ImageUri, issueEntry.DiskSize)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = tx.Commit()
-	if err != nil {
-		log.Fatal(err)
-	}
-	db.Close()
+	res := coll.Find(db.Cond{"id": issueEntry.Id})
+	res.Update(issueEntry)
 }

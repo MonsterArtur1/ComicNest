@@ -8,6 +8,9 @@ import (
 	"os"
 	"strconv"
 	"text/template"
+
+	"github.com/upper/db/v4"
+	"github.com/upper/db/v4/adapter/sqlite"
 )
 
 var config conf
@@ -19,7 +22,6 @@ func main() {
 	if _, err := os.Stat(config.Database); errors.Is(err, os.ErrNotExist) {
 		CreateDatabase()
 	}
-	//ScanDir("D:\\Library")
 
 	http.Handle("/tmpl/css/", http.StripPrefix("/tmpl/css", http.FileServer(http.Dir("./tmpl/css"))))
 	http.HandleFunc("/menu", mainMenuHandler)
@@ -33,16 +35,18 @@ func main() {
 
 func analyzeLibraryHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.FormValue("id")
-	issue := SelectSingleIssueFromDb(id)
+	settings := sqlite.ConnectionURL{Database: config.Database}
 
-	//	issues := SelectFromDb(true)
-	//var c []IssueEntry
-	//	for _, issue := range issues {
-	//c = append(c, SearchComic(strings.Split(filename, "#")[0], strings.Split(filename, "#")[1]))
+	sess, err := sqlite.Open(settings)
+	if err != nil {
+		log.Fatal("Open: ", err)
+	}
+	defer sess.Close()
+
+	issue := SelectSingleIssueFromDb(sess, id)
+
 	SearchComic(&issue)
-	issue.UpdateIntoDb()
-
-	//	}
+	issue.UpdateIntoDb(sess)
 
 	fmt.Fprint(w, "Database scan complete")
 }
@@ -53,43 +57,30 @@ func scanDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func mainMenuHandler(w http.ResponseWriter, r *http.Request) {
+	settings := sqlite.ConnectionURL{Database: config.Database}
+
+	sess, err := sqlite.Open(settings)
+	if err != nil {
+		log.Fatal("Open: ", err)
+	}
+	defer sess.Close()
+
 	var templates = template.Must(template.ParseFiles("tmpl/sth.html", "tmpl/sth2.html"))
 
 	filter := r.FormValue("filter")
-	onlyUnprocessed := false
+	dbCond := db.Cond{}
+
 	if filter == "all" {
-		onlyUnprocessed = false
+
 	} else if filter == "unprocessed" {
-		onlyUnprocessed = true
+		dbCond = db.Cond{"processed": false}
+	} else if filter == "processed" {
+		dbCond = db.Cond{"processed": true}
 	}
 
-	fmt.Println("hoł1 ")
-	issues := SelectFromDb(onlyUnprocessed, false)
-	// var c []IssueEntry
-	// for _, filename := range filenames {
-	// 	//c = append(c, SearchComic(strings.Split(filename, "#")[0], strings.Split(filename, "#")[1]))
-	// 	c = append(c, IssueEntry{Name: strings.Split(filename, "#")[0], IssueNumber: strings.Split(filename, "#")[1], Image: ImageEntry{ThumbUrl: "tmpl/css/empty.jpg"}})
-	// }
-	//c = append(c, IssueEntry{Name: "test", IssueNumber: "5", Image: ImageEntry{ThumbUrl: ""}})
+	issues := SelectFromDb(sess, dbCond)
 
 	p1 := &MainMenuPage{Comics: issues}
 
 	templates.ExecuteTemplate(w, "sth2.html", p1)
-	//fmt.Println("tutaj " + c)
-}
-
-func handler(w http.ResponseWriter, r *http.Request) {
-
-	fmt.Println("hoł")
-	title := r.FormValue("ftitle")
-	//issue := r.FormValue("fissue")
-	p1 := &Page{Title: "TestPage", Body: "", ImageUrl: ""}
-
-	if title != "" {
-		//url := SearchComic(title, issue)
-		//p1 = &Page{Title: "TestPage", Body: "", ImageUrl: url.ApiDetailUrl}
-	}
-
-	templates.ExecuteTemplate(w, "sth.html", p1)
-	//fmt.Println("tutaj " + c)
 }

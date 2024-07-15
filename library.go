@@ -7,10 +7,21 @@ import (
 	"math"
 	"path/filepath"
 	"strings"
+
+	"github.com/upper/db/v4/adapter/sqlite"
 )
 
 func ScanDir(dir string) {
-	err := filepath.WalkDir(dir,
+
+	settings := sqlite.ConnectionURL{Database: config.Database}
+
+	sess, err := sqlite.Open(settings)
+	if err != nil {
+		log.Fatal("Open: ", err)
+	}
+	defer sess.Close()
+
+	err = filepath.WalkDir(dir,
 		func(path string, dirEntry fs.DirEntry, err error) error {
 			if err != nil {
 				return err
@@ -20,7 +31,7 @@ func ScanDir(dir string) {
 				info, _ := dirEntry.Info()
 
 				newIssue := IssueEntry{Path: path, VolumeName: title, IssueNumber: issue, DiskSize: prettyByteSize(info.Size())}
-				newIssue.InsertToDb()
+				newIssue.InsertOnlyNew(sess)
 			}
 			return nil
 		})
