@@ -20,6 +20,10 @@
     <label>Opis
         <textarea name="description" rows="5">{{.Series.Description}}</textarea>
     </label>
+    <label class="check-label">
+        <input type="checkbox" name="one_shot" value="1" {{if .Series.OneShot}}checked{{end}}>
+        Wydanie jednorazowe (one-shot) — pojedyncza pozycja, nie seria
+    </label>
     <p class="hint">Zapis blokuje metadane serii przed nadpisaniem przez skan i ComicVine.</p>
     <div class="form-actions">
         <button type="submit" class="btn-primary">Zapisz</button>

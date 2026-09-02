@@ -11,11 +11,12 @@ type Series struct {
 	Description       string
 	ComicVineVolumeID sql.NullInt64
 	MetadataLocked    bool
+	OneShot           bool // single publication, not part of any series
 	CreatedAt         string
 	UpdatedAt         string
 
 	IssueCount   int   // number of issues in the series
-	CoverIssueID int64 // issue whose cover represents the series; 0 = none
+	CoverIssueID int64 // first issue of the series (used for cover + one-shot links)
 }
 
 // GetSeries returns the series by id (with its issue count), or nil.
@@ -23,12 +24,13 @@ func (s *Store) GetSeries(id int64) (*Series, error) {
 	var sr Series
 	err := s.db.QueryRow(`
 		SELECT s.id, s.name, s.folder_path, s.publisher, s.description,
-		       s.comicvine_volume_id, s.metadata_locked, s.created_at, s.updated_at,
+		       s.comicvine_volume_id, s.metadata_locked, s.one_shot,
+		       s.created_at, s.updated_at,
 		       (SELECT COUNT(*) FROM issues i WHERE i.series_id = s.id)
 		FROM series s WHERE s.id = ?`, id).
 		Scan(&sr.ID, &sr.Name, &sr.FolderPath, &sr.Publisher, &sr.Description,
-			&sr.ComicVineVolumeID, &sr.MetadataLocked, &sr.CreatedAt, &sr.UpdatedAt,
-			&sr.IssueCount)
+			&sr.ComicVineVolumeID, &sr.MetadataLocked, &sr.OneShot,
+			&sr.CreatedAt, &sr.UpdatedAt, &sr.IssueCount)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -38,13 +40,13 @@ func (s *Store) GetSeries(id int64) (*Series, error) {
 	return &sr, nil
 }
 
-// UpdateSeriesManual saves a user edit of series metadata and locks the
-// series against automated overwrites.
-func (s *Store) UpdateSeriesManual(id int64, name, publisher, description string) error {
+// UpdateSeriesManual saves a user edit of series metadata (including the
+// one-shot flag) and locks the series against automated overwrites.
+func (s *Store) UpdateSeriesManual(id int64, name, publisher, description string, oneShot bool) error {
 	_, err := s.db.Exec(`
-		UPDATE series SET name = ?, publisher = ?, description = ?,
+		UPDATE series SET name = ?, publisher = ?, description = ?, one_shot = ?,
 			metadata_locked = 1, updated_at = datetime('now')
-		WHERE id = ?`, name, publisher, description, id)
+		WHERE id = ?`, name, publisher, description, oneShot, id)
 	return err
 }
 
@@ -53,6 +55,38 @@ func (s *Store) SetSeriesLocked(id int64, locked bool) error {
 	_, err := s.db.Exec(`
 		UPDATE series SET metadata_locked = ?, updated_at = datetime('now')
 		WHERE id = ?`, locked, id)
+	return err
+}
+
+// SetSeriesOneShot applies an automated one-shot signal (scan or ComicVine).
+// The flag is also user-editable in the series form, so locked series keep
+// the user's choice.
+func (s *Store) SetSeriesOneShot(id int64, oneShot bool) error {
+	_, err := s.db.Exec(`
+		UPDATE series SET one_shot = ?, updated_at = datetime('now')
+		WHERE id = ? AND metadata_locked = 0`, oneShot, id)
+	return err
+}
+
+// ReconcileOneShots derives the one-shot flag from library contents after a
+// scan: a lone unnumbered issue marks its series as a one-shot, while a
+// series that gained a second issue stops being one. Scraped one-shots (one
+// issue that received a number from ComicVine) are left untouched.
+func (s *Store) ReconcileOneShots() error {
+	if _, err := s.db.Exec(`
+		UPDATE series SET one_shot = 1
+		WHERE one_shot = 0 AND metadata_locked = 0 AND id IN (
+			SELECT series_id FROM issues GROUP BY series_id
+			HAVING COUNT(*) = 1 AND MAX(issue_number) = ''
+		)`); err != nil {
+		return err
+	}
+	_, err := s.db.Exec(`
+		UPDATE series SET one_shot = 0
+		WHERE one_shot = 1 AND metadata_locked = 0 AND id IN (
+			SELECT series_id FROM issues GROUP BY series_id
+			HAVING COUNT(*) >= 2
+		)`)
 	return err
 }
 
@@ -135,13 +169,16 @@ func (s *Store) ListSeries(nameFilter string, sort SeriesSort) ([]Series, error)
 		order = "MAX(i.created_at) DESC"
 	}
 
+	// The cover endpoint falls back to a placeholder on its own, so the
+	// representative issue is simply the series' first one.
 	query := `
 		SELECT s.id, s.name, s.folder_path, s.publisher, s.description,
-		       s.comicvine_volume_id, s.metadata_locked, s.created_at, s.updated_at,
+		       s.comicvine_volume_id, s.metadata_locked, s.one_shot,
+		       s.created_at, s.updated_at,
 		       COUNT(i.id),
 		       COALESCE((
 		           SELECT i2.id FROM issues i2
-		           WHERE i2.series_id = s.id AND i2.cover_cached = 1
+		           WHERE i2.series_id = s.id
 		           ORDER BY CAST(i2.issue_number AS REAL), i2.issue_number
 		           LIMIT 1
 		       ), 0)
@@ -161,8 +198,8 @@ func (s *Store) ListSeries(nameFilter string, sort SeriesSort) ([]Series, error)
 	for rows.Next() {
 		var sr Series
 		err := rows.Scan(&sr.ID, &sr.Name, &sr.FolderPath, &sr.Publisher, &sr.Description,
-			&sr.ComicVineVolumeID, &sr.MetadataLocked, &sr.CreatedAt, &sr.UpdatedAt,
-			&sr.IssueCount, &sr.CoverIssueID)
+			&sr.ComicVineVolumeID, &sr.MetadataLocked, &sr.OneShot,
+			&sr.CreatedAt, &sr.UpdatedAt, &sr.IssueCount, &sr.CoverIssueID)
 		if err != nil {
 			return nil, err
 		}

@@ -147,6 +147,9 @@ func (s *Server) runSeriesScrape(seriesID, volumeID int64) {
 	if err := s.store.EnrichSeriesFromComicVine(seriesID, vol.Name, vol.Publisher, vol.Description); err != nil {
 		log.Printf("comicvine: enrich series %d: %v", seriesID, err)
 	}
+	if err := s.store.SetSeriesOneShot(seriesID, vol.CountOfIssues == 1); err != nil {
+		log.Printf("comicvine: one-shot flag %d: %v", seriesID, err)
+	}
 
 	for _, issue := range todo {
 		if err := s.scrapeOneIssue(&issue, volIssues); err != nil {
@@ -170,6 +173,11 @@ func (s *Server) scrapeOneIssue(issue *store.Issue, volIssues []comicvine.Volume
 			cvID = vi.ID
 			break
 		}
+	}
+	// One-shots have no number in the file name, but the matched volume has
+	// exactly one issue — that has to be the one.
+	if cvID == 0 && want == "" && len(volIssues) == 1 {
+		cvID = volIssues[0].ID
 	}
 	if cvID == 0 {
 		return errNoMatch
@@ -294,8 +302,13 @@ func (s *Server) handleMatchSave(w http.ResponseWriter, r *http.Request) {
 	}
 	if vol, _, err := s.cv.GetVolume(int(volumeID)); err != nil {
 		log.Printf("comicvine: enrich series %d: %v", series.ID, err)
-	} else if err := s.store.EnrichSeriesFromComicVine(series.ID, vol.Name, vol.Publisher, vol.Description); err != nil {
-		log.Printf("comicvine: enrich series %d: %v", series.ID, err)
+	} else {
+		if err := s.store.EnrichSeriesFromComicVine(series.ID, vol.Name, vol.Publisher, vol.Description); err != nil {
+			log.Printf("comicvine: enrich series %d: %v", series.ID, err)
+		}
+		if err := s.store.SetSeriesOneShot(series.ID, vol.CountOfIssues == 1); err != nil {
+			log.Printf("comicvine: one-shot flag %d: %v", series.ID, err)
+		}
 	}
 	http.Redirect(w, r, "/series/"+strconv.FormatInt(series.ID, 10), http.StatusSeeOther)
 }

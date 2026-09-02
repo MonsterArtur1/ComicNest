@@ -48,16 +48,19 @@ func (s *Server) handleSeriesEditSave(w http.ResponseWriter, r *http.Request) {
 	}
 
 	name := strings.TrimSpace(r.FormValue("name"))
+	oneShot := r.FormValue("one_shot") != ""
 	if name == "" {
 		series.Publisher = strings.TrimSpace(r.FormValue("publisher"))
 		series.Description = strings.TrimSpace(r.FormValue("description"))
+		series.OneShot = oneShot
 		s.render(w, "series_edit.html", seriesEditData{Series: series, Error: "Nazwa serii nie może być pusta."})
 		return
 	}
 
 	err := s.store.UpdateSeriesManual(series.ID, name,
 		strings.TrimSpace(r.FormValue("publisher")),
-		strings.TrimSpace(r.FormValue("description")))
+		strings.TrimSpace(r.FormValue("description")),
+		oneShot)
 	if err != nil {
 		s.serverError(w, err)
 		return

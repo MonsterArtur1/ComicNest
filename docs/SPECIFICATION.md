@@ -123,6 +123,14 @@ Skan może nadpisać dane o niższym lub równym priorytecie; `metadata_locked=1
 Okładki nie siedzą w bazie: cache `data/covers/{issue_id}.jpg` (miniatura ~400px szer.)
 + flaga `cover_cached`. Okładka serii = okładka pierwszego zeszytu (najniższy numer).
 
+**Wydania jednorazowe (one-shoty)** — kolumna `series.one_shot` (migracja 2). Sygnały
+(dowolny wystarczy): (1) dopasowany wolumen ComicVine ma `count_of_issues == 1`,
+(2) ComicInfo.xml ma `Format` zawierający "One-Shot" lub `Count=1`, (3) po skanie
+seria ma dokładnie 1 zeszyt bez numeru. Skan zdejmuje flagę, gdy seria zyska drugi
+zeszyt. UI: etykieta „wydanie jednorazowe" zamiast licznika, kafelek na gridzie
+prowadzi wprost do zeszytu. Scrape: zeszyt bez numeru + wolumen z jednym zeszytem
+→ dopasowany zostaje ten jedyny zeszyt.
+
 ## 6. Skanowanie biblioteki
 
 Uruchamiane przyciskiem w UI (`POST /scan`), działa w goroutine; UI odpytuje status

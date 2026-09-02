@@ -153,7 +153,8 @@ func (sc *Scanner) scan() error {
 		return err
 	}
 	sc.setStatus(func(st *Status) { st.Missing = len(missing) })
-	return nil
+
+	return sc.store.ReconcileOneShots()
 }
 
 func isComicFile(path string) bool {
@@ -210,6 +211,13 @@ func (sc *Scanner) addIssue(f foundFile) error {
 
 	if err := sc.store.InsertIssue(&issue); err != nil {
 		return err
+	}
+	// Embedded metadata is the strongest scan-time one-shot signal; the
+	// count-based reconciliation runs once at the end of the scan.
+	if ci != nil && ci.IsOneShot() {
+		if err := sc.store.SetSeriesOneShot(seriesID, true); err != nil {
+			log.Printf("scan: one-shot flag %s: %v", f.path, err)
+		}
 	}
 	sc.cacheCover(&issue)
 	return nil

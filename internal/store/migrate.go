@@ -47,6 +47,12 @@ var migrations = []string{
 
 	CREATE INDEX idx_issues_series ON issues(series_id);
 	`,
+
+	// 2: one-shot flag on series (single publications like tributes or
+	// treasury editions that are not part of any series)
+	`
+	ALTER TABLE series ADD COLUMN one_shot INTEGER NOT NULL DEFAULT 0;
+	`,
 }
 
 func migrate(db *sql.DB) error {

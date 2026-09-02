@@ -367,6 +367,15 @@ details.desc .series-desc { margin: 12px 0 4px; }
 .edit-form input:focus, .edit-form textarea:focus { outline: 1px solid var(--accent); }
 
 .form-row { display: flex; gap: 14px; }
+.check-label {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 8px !important;
+    font-size: 14px !important;
+    color: var(--text) !important;
+    cursor: pointer;
+}
+.check-label input { accent-color: var(--accent); width: 16px; height: 16px; }
 .form-actions { display: flex; gap: 10px; align-items: center; }
 .form-error {
     color: #e06c60;

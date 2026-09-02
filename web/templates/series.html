@@ -7,7 +7,7 @@
     <div>
         <h1>{{.Series.Name}} {{if .Series.MetadataLocked}}<span class="lock" title="metadane zablokowane">🔒</span>{{end}}</h1>
         <p class="series-meta">
-            {{.Series.IssueCount}} {{if eq .Series.IssueCount 1}}zeszyt{{else}}zeszytów{{end}}
+            {{if .Series.OneShot}}wydanie jednorazowe{{else}}{{.Series.IssueCount}} {{if eq .Series.IssueCount 1}}zeszyt{{else}}zeszytów{{end}}{{end}}
             {{if .Series.Publisher}} · {{.Series.Publisher}}{{end}}
             {{if .Series.FolderPath.Valid}} · <code>{{.Series.FolderPath.String}}</code>{{end}}
         </p>

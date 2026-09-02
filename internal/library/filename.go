@@ -67,8 +67,10 @@ func ParseFilename(name string) Parsed {
 		}
 	}
 
-	// Pattern 4: nothing matched — whole cleaned name becomes the title.
-	return Parsed{Title: cleaned}
+	// Pattern 4: nothing matched (a one-shot or unconventional name) — the
+	// name without the trailing "(...)" groups becomes the title, and a year
+	// found in those groups is still kept.
+	return Parsed{Title: base, Year: year}
 }
 
 // stripKnownExt removes a trailing .cbz/.cbr/.pdf extension (case-insensitive)

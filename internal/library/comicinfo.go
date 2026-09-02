@@ -26,6 +26,15 @@ type ComicInfo struct {
 	Inker     string `xml:"Inker"`
 	Publisher string `xml:"Publisher"`
 	PageCount int    `xml:"PageCount"`
+	Format    string `xml:"Format"` // e.g. "One-Shot", "TPB", "Annual"
+	Count     int    `xml:"Count"`  // total issues in the series, when known
+}
+
+// IsOneShot reports whether the embedded metadata marks this comic as a
+// standalone publication rather than part of a series.
+func (c *ComicInfo) IsOneShot() bool {
+	f := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(c.Format, "-", ""), " ", ""))
+	return strings.Contains(f, "oneshot") || c.Count == 1
 }
 
 // ReadComicInfo looks for a ComicInfo.xml entry (any directory level,

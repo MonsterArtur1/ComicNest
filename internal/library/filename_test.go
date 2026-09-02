@@ -34,6 +34,11 @@ func TestParseFilename(t *testing.T) {
 			want: Parsed{Title: "One-Shot Special"},
 		},
 		{
+			name: "one-shot fallback strips paren groups and keeps year",
+			in:   "The Man Who Dreamt the Impossible - A Tribute to Jack Kirby, Treasury Edition (2025) (Digital) (Zone-Empire).cbr",
+			want: Parsed{Title: "The Man Who Dreamt the Impossible - A Tribute to Jack Kirby, Treasury Edition", Year: "2025"},
+		},
+		{
 			name: "plain number with year",
 			in:   "Y The Last Man 60 (2008)",
 			want: Parsed{Series: "Y The Last Man", Number: "60", Year: "2008"},
