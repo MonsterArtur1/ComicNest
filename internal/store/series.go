@@ -66,15 +66,18 @@ func (s *Store) SetSeriesComicVineVolume(id, volumeID int64) error {
 	return err
 }
 
-// EnrichSeriesFromComicVine fills publisher/description with ComicVine data,
-// but only the fields that are still empty and only on unlocked series.
-func (s *Store) EnrichSeriesFromComicVine(id int64, publisher, description string) error {
+// EnrichSeriesFromComicVine applies ComicVine volume data to an unlocked
+// series: the name is taken over outright (the user explicitly picked this
+// volume, and folder-derived names like "WalkingDead" should become the real
+// title), publisher/description only fill fields that are still empty.
+func (s *Store) EnrichSeriesFromComicVine(id int64, name, publisher, description string) error {
 	_, err := s.db.Exec(`
 		UPDATE series SET
+			name        = CASE WHEN ? != '' THEN ? ELSE name END,
 			publisher   = CASE WHEN publisher   = '' THEN ? ELSE publisher   END,
 			description = CASE WHEN description = '' THEN ? ELSE description END,
 			updated_at  = datetime('now')
-		WHERE id = ? AND metadata_locked = 0`, publisher, description, id)
+		WHERE id = ? AND metadata_locked = 0`, name, name, publisher, description, id)
 	return err
 }
 

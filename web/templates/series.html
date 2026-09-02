@@ -11,7 +11,20 @@
             {{if .Series.Publisher}} · {{.Series.Publisher}}{{end}}
             {{if .Series.FolderPath.Valid}} · <code>{{.Series.FolderPath.String}}</code>{{end}}
         </p>
-        {{if .Series.Description}}<p class="series-desc">{{.Series.Description}}</p>{{end}}
+        {{if .Series.Description}}
+            {{if gt (len .Series.Description) 420}}
+            <details class="desc">
+                <summary>
+                    <span class="desc-preview">{{truncate .Series.Description 300}}</span>
+                    <span class="desc-toggle desc-more">Pokaż cały opis ▾</span>
+                    <span class="desc-toggle desc-less">Zwiń opis ▴</span>
+                </summary>
+                <p class="series-desc">{{.Series.Description}}</p>
+            </details>
+            {{else}}
+            <p class="series-desc">{{.Series.Description}}</p>
+            {{end}}
+        {{end}}
     </div>
     <div class="series-actions">
         <a class="btn" href="/series/{{.Series.ID}}/edit">Edytuj</a>

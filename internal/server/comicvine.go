@@ -138,10 +138,14 @@ func (s *Server) runSeriesScrape(seriesID, volumeID int64) {
 		return
 	}
 
-	_, volIssues, err := s.cv.GetVolume(int(volumeID))
+	vol, volIssues, err := s.cv.GetVolume(int(volumeID))
 	if err != nil {
 		finish(err.Error())
 		return
+	}
+	// A series scrape also refreshes the series' own title/metadata.
+	if err := s.store.EnrichSeriesFromComicVine(seriesID, vol.Name, vol.Publisher, vol.Description); err != nil {
+		log.Printf("comicvine: enrich series %d: %v", seriesID, err)
 	}
 
 	for _, issue := range todo {
@@ -290,7 +294,7 @@ func (s *Server) handleMatchSave(w http.ResponseWriter, r *http.Request) {
 	}
 	if vol, _, err := s.cv.GetVolume(int(volumeID)); err != nil {
 		log.Printf("comicvine: enrich series %d: %v", series.ID, err)
-	} else if err := s.store.EnrichSeriesFromComicVine(series.ID, vol.Publisher, vol.Description); err != nil {
+	} else if err := s.store.EnrichSeriesFromComicVine(series.ID, vol.Name, vol.Publisher, vol.Description); err != nil {
 		log.Printf("comicvine: enrich series %d: %v", series.ID, err)
 	}
 	http.Redirect(w, r, "/series/"+strconv.FormatInt(series.ID, 10), http.StatusSeeOther)

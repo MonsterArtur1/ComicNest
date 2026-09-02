@@ -52,6 +52,22 @@ func New(cfg config.Config, st *store.Store, cv *covers.Cache, sc *library.Scann
 var funcMap = template.FuncMap{
 	"prettySize":  prettySize,
 	"sourceLabel": sourceLabel,
+	"truncate":    truncateText,
+}
+
+// truncateText cuts a string to at most n runes, preferring a word boundary,
+// and appends an ellipsis.
+func truncateText(s string, n int) string {
+	s = strings.TrimSpace(s)
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	cut := string(runes[:n])
+	if i := strings.LastIndexAny(cut, " \n\t"); i > n/2 {
+		cut = cut[:i]
+	}
+	return strings.TrimRight(cut, ",.;:") + "…"
 }
 
 // prettySize renders a byte count for humans ("24.3 MB").

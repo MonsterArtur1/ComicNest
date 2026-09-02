@@ -184,6 +184,19 @@ select:hover, button:hover, .btn:hover { background: var(--bg-hover); }
 .series-meta { margin: 0; color: var(--text-dim); font-size: 14px; }
 .series-desc { max-width: 720px; color: var(--text); }
 
+/* collapsible long description (pure HTML <details>, works without JS) */
+details.desc { max-width: 720px; }
+details.desc summary { list-style: none; cursor: pointer; }
+details.desc summary::-webkit-details-marker { display: none; }
+details.desc .desc-preview { display: block; margin: 12px 0 4px; }
+details.desc[open] .desc-preview { display: none; }
+.desc-toggle { color: var(--accent); font-size: 13px; }
+.desc-toggle:hover { text-decoration: underline; }
+details.desc .desc-less { display: none; }
+details.desc[open] .desc-more { display: none; }
+details.desc[open] .desc-less { display: inline; }
+details.desc .series-desc { margin: 12px 0 4px; }
+
 .filter-bar {
     display: flex;
     gap: 8px;
