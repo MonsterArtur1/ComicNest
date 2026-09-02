@@ -294,6 +294,26 @@ func (s *Store) AllIssuePaths() (map[string]int64, error) {
 	return out, rows.Err()
 }
 
+// AllIssueIDs returns the set of existing issue ids (used to garbage-collect
+// orphaned cover thumbnails).
+func (s *Store) AllIssueIDs() (map[int64]bool, error) {
+	rows, err := s.db.Query(`SELECT id FROM issues`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[int64]bool)
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
 // MarkIssuesMissing flags the given issues as missing from disk.
 func (s *Store) MarkIssuesMissing(ids []int64) error {
 	for _, id := range ids {

@@ -29,6 +29,9 @@ func (s *Server) handleIssueCover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Cache-Control", "public, max-age=86400")
+	// Issue ids are reused when the database is recreated and covers change
+	// after a ComicVine scrape, so the browser must revalidate every time.
+	// ServeFile answers those revalidations with cheap 304s (Last-Modified).
+	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeFile(w, r, s.covers.Path(id))
 }

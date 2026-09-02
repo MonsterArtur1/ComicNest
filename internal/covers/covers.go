@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"golang.org/x/image/draw"
 
@@ -51,6 +52,33 @@ func New(dir string) *Cache {
 // Path returns the on-disk path for an issue's thumbnail.
 func (c *Cache) Path(issueID int64) string {
 	return filepath.Join(c.dir, strconv.FormatInt(issueID, 10)+".jpg")
+}
+
+// Cleanup deletes thumbnails whose issue id is not in valid — leftovers from
+// deleted issues or an earlier, recreated database (issue ids get reused, so
+// a stale file would show another comic's cover). Returns how many files
+// were removed.
+func (c *Cache) Cleanup(valid map[int64]bool) (int, error) {
+	entries, err := os.ReadDir(c.dir)
+	if err != nil {
+		return 0, fmt.Errorf("covers: cleanup: %w", err)
+	}
+
+	removed := 0
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".jpg" {
+			continue
+		}
+		id, err := strconv.ParseInt(strings.TrimSuffix(e.Name(), ".jpg"), 10, 64)
+		if err != nil || valid[id] {
+			continue
+		}
+		if err := os.Remove(filepath.Join(c.dir, e.Name())); err != nil {
+			return removed, fmt.Errorf("covers: cleanup %s: %w", e.Name(), err)
+		}
+		removed++
+	}
+	return removed, nil
 }
 
 // Save decodes raw (JPEG/PNG/GIF/WebP/BMP), scales it down to at most 400 px

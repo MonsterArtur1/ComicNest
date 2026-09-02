@@ -126,6 +126,17 @@ func (sc *Scanner) run() {
 }
 
 func (sc *Scanner) scan() error {
+	// Drop thumbnails that don't belong to any known issue. Issue ids restart
+	// from 1 when the database is recreated, so a stale file under a reused
+	// id would show a different comic's cover.
+	if ids, err := sc.store.AllIssueIDs(); err != nil {
+		log.Printf("scan: cover cleanup: %v", err)
+	} else if removed, err := sc.covers.Cleanup(ids); err != nil {
+		log.Printf("scan: cover cleanup: %v", err)
+	} else if removed > 0 {
+		log.Printf("scan: removed %d orphaned cover thumbnails", removed)
+	}
+
 	// Pass 1: collect comic files so the UI can show real progress.
 	var files []foundFile
 	err := filepath.WalkDir(sc.root, func(path string, d os.DirEntry, err error) error {
