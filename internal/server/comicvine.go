@@ -204,6 +204,55 @@ func (s *Server) scrapeOneIssue(issue *store.Issue, volIssues []comicvine.Volume
 	return nil
 }
 
+// autoScrapeCV is the post-scan ComicVine phase (wired into the scanner):
+// it updates every unlocked issue that lacks ComicVine metadata but belongs
+// to a matched series. Cost per scan: one volume fetch per affected series
+// plus one issue fetch per actually matched issue.
+func (s *Server) autoScrapeCV(progress func(done, total, updated, failed int)) {
+	if !s.cv.Enabled() {
+		return
+	}
+	byVolume, err := s.store.IssuesNeedingComicVine()
+	if err != nil {
+		log.Printf("comicvine: post-scan query: %v", err)
+		return
+	}
+
+	total := 0
+	for _, issues := range byVolume {
+		total += len(issues)
+	}
+	if total == 0 {
+		return
+	}
+
+	done, updated, failed := 0, 0, 0
+	progress(done, total, updated, failed)
+
+	for volumeID, issues := range byVolume {
+		_, volIssues, err := s.cv.GetVolume(int(volumeID))
+		if err != nil {
+			log.Printf("comicvine: post-scan volume %d: %v", volumeID, err)
+			done += len(issues)
+			failed += len(issues)
+			progress(done, total, updated, failed)
+			continue
+		}
+		for _, issue := range issues {
+			if err := s.scrapeOneIssue(&issue, volIssues); err != nil {
+				if err != errNoMatch {
+					log.Printf("comicvine: post-scan %s: %v", issue.Path, err)
+				}
+				failed++
+			} else {
+				updated++
+			}
+			done++
+			progress(done, total, updated, failed)
+		}
+	}
+}
+
 // handleIssueScrape updates a single issue from ComicVine, synchronously.
 func (s *Server) handleIssueScrape(w http.ResponseWriter, r *http.Request) {
 	issue := s.getIssueFromPath(w, r)

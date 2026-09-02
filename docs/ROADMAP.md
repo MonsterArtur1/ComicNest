@@ -53,6 +53,7 @@ i coś pokazywała. Szczegóły projektowe: [SPECIFICATION.md](SPECIFICATION.md)
 - [x] Długi opis serii zwijany do ~300 znaków z przełącznikiem (natywny `<details>`, bez JS)
 - [x] Obsługa one-shotów: flaga `one_shot` (sygnały: wolumen CV z 1 zeszytem, ComicInfo `Format`/`Count`, 1 zeszyt bez numeru), etykieta „wydanie jednorazowe", kafelek → zeszyt, scrape dopasowuje jedyny zeszyt wolumenu; fallback parsera nazw obcina grupy `(...)` i łapie rok
 - [x] Checkbox „wydanie jednorazowe" w edycji serii; ręczny wybór (jak każda edycja) blokuje serię — automatyczne sygnały one-shot (skan, ComicVine) szanują blokadę
+- [x] Druga faza skanu: automatyczny scrape ComicVine dla zeszytów z dopasowaną serią, ale bez danych CV (bez blokad i brakujących plików); postęp „Aktualizacja ComicVine… X/Y" i licznik w podsumowaniu skanu („ComicVine: N zaktualizowano")
 
 ## Pomysły na v2 (nie robić teraz)
 - Czytnik stron w przeglądarce (strumieniowanie stron z CBZ/CBR) + zapamiętywanie postępu

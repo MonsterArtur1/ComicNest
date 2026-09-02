@@ -156,6 +156,43 @@ func (s *Store) SearchIssues(q string) ([]IssueWithSeries, error) {
 	return out, rows.Err()
 }
 
+// IssuesNeedingComicVine returns unlocked, present-on-disk issues that lack
+// ComicVine metadata but belong to a series matched to a ComicVine volume,
+// grouped by that volume id.
+func (s *Store) IssuesNeedingComicVine() (map[int64][]Issue, error) {
+	rows, err := s.db.Query(`
+		SELECT i.id, i.series_id, i.path, i.file_size, i.file_missing, i.issue_number,
+			i.title, i.summary, i.release_date, i.writer, i.artist, i.publisher,
+			i.page_count, i.comicvine_issue_id, i.metadata_source, i.metadata_locked,
+			i.has_comicinfo, i.cover_cached, i.created_at, i.updated_at,
+			s.comicvine_volume_id
+		FROM issues i JOIN series s ON s.id = i.series_id
+		WHERE s.comicvine_volume_id IS NOT NULL
+		  AND i.metadata_locked = 0
+		  AND i.metadata_source != 'comicvine'
+		  AND i.file_missing = 0`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[int64][]Issue)
+	for rows.Next() {
+		var i Issue
+		var volumeID int64
+		err := rows.Scan(&i.ID, &i.SeriesID, &i.Path, &i.FileSize, &i.FileMissing,
+			&i.IssueNumber, &i.Title, &i.Summary, &i.ReleaseDate, &i.Writer,
+			&i.Artist, &i.Publisher, &i.PageCount, &i.ComicVineIssueID,
+			&i.MetadataSource, &i.MetadataLocked, &i.HasComicInfo, &i.CoverCached,
+			&i.CreatedAt, &i.UpdatedAt, &volumeID)
+		if err != nil {
+			return nil, err
+		}
+		out[volumeID] = append(out[volumeID], i)
+	}
+	return out, rows.Err()
+}
+
 // GetIssue returns the issue by id, or nil when it does not exist.
 func (s *Store) GetIssue(id int64) (*Issue, error) {
 	i, err := scanIssue(s.db.QueryRow(`SELECT `+issueColumns+` FROM issues WHERE id = ?`, id))

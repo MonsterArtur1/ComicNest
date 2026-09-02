@@ -45,6 +45,9 @@ func New(cfg config.Config, st *store.Store, cv *covers.Cache, sc *library.Scann
 		return nil, err
 	}
 	s.routes()
+	// After every file scan, issues of matched series missing ComicVine data
+	// get scraped automatically.
+	sc.SetCVUpdater(s.autoScrapeCV)
 	return s, nil
 }
 

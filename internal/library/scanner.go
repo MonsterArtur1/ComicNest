@@ -26,17 +26,35 @@ type Status struct {
 	Err        string
 	StartedAt  time.Time
 	FinishedAt time.Time
+
+	// ComicVine follow-up phase (issues of matched series that still lack
+	// ComicVine metadata are scraped right after the file scan).
+	CVPhase   bool // currently in the ComicVine phase
+	CVDone    int
+	CVTotal   int
+	CVUpdated int
+	CVFailed  int
 }
+
+// CVUpdater runs after a successful scan and reports its progress through
+// the callback (done, total, updated, failed).
+type CVUpdater func(progress func(done, total, updated, failed int))
 
 // Scanner walks the library folder and syncs its contents with the store.
 // Only one scan runs at a time; progress is queryable via Status.
 type Scanner struct {
-	store  *store.Store
-	covers *covers.Cache
-	root   string
+	store    *store.Store
+	covers   *covers.Cache
+	root     string
+	cvUpdate CVUpdater // optional, wired by the server
 
 	mu     sync.Mutex
 	status Status
+}
+
+// SetCVUpdater installs the post-scan ComicVine step (nil disables it).
+func (sc *Scanner) SetCVUpdater(fn CVUpdater) {
+	sc.cvUpdate = fn
 }
 
 func NewScanner(st *store.Store, cv *covers.Cache, libraryRoot string) *Scanner {
@@ -86,6 +104,16 @@ type foundFile struct {
 
 func (sc *Scanner) run() {
 	err := sc.scan()
+
+	if err == nil && sc.cvUpdate != nil {
+		sc.setStatus(func(st *Status) { st.CVPhase = true })
+		sc.cvUpdate(func(done, total, updated, failed int) {
+			sc.setStatus(func(st *Status) {
+				st.CVDone, st.CVTotal, st.CVUpdated, st.CVFailed = done, total, updated, failed
+			})
+		})
+		sc.setStatus(func(st *Status) { st.CVPhase = false })
+	}
 
 	sc.setStatus(func(st *Status) {
 		st.Running = false
