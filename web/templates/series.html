@@ -1,0 +1,70 @@
+{{define "title"}}{{.Series.Name}} — ComicNest{{end}}
+
+{{define "content"}}
+<nav class="breadcrumbs"><a href="/">Biblioteka</a> <span>/</span> {{.Series.Name}}</nav>
+
+<div class="series-head">
+    <div>
+        <h1>{{.Series.Name}} {{if .Series.MetadataLocked}}<span class="lock" title="metadane zablokowane">🔒</span>{{end}}</h1>
+        <p class="series-meta">
+            {{.Series.IssueCount}} {{if eq .Series.IssueCount 1}}zeszyt{{else}}zeszytów{{end}}
+            {{if .Series.Publisher}} · {{.Series.Publisher}}{{end}}
+            {{if .Series.FolderPath.Valid}} · <code>{{.Series.FolderPath.String}}</code>{{end}}
+        </p>
+        {{if .Series.Description}}<p class="series-desc">{{.Series.Description}}</p>{{end}}
+    </div>
+    <div class="series-actions">
+        <a class="btn" href="/series/{{.Series.ID}}/edit">Edytuj</a>
+    </div>
+</div>
+
+<div class="scrape-area" id="scrape-area"
+     hx-get="/series/{{.Series.ID}}/scrape/status" hx-trigger="load" hx-swap="innerHTML">
+    <noscript><a class="btn" href="/series/{{.Series.ID}}/match">Dopasuj w ComicVine</a></noscript>
+</div>
+
+<div class="filter-bar">
+    <a class="chip {{if eq .Filter "all"}}active{{end}}" href="/series/{{.Series.ID}}">wszystkie</a>
+    <a class="chip {{if eq .Filter "nometa"}}active{{end}}" href="/series/{{.Series.ID}}?filter=nometa">bez metadanych</a>
+    <a class="chip {{if eq .Filter "comicvine"}}active{{end}}" href="/series/{{.Series.ID}}?filter=comicvine">z ComicVine</a>
+    <a class="chip {{if eq .Filter "missing"}}active{{end}}" href="/series/{{.Series.ID}}?filter=missing">brakujące pliki</a>
+</div>
+
+{{if .Issues}}
+<ul class="issue-list">
+    {{range .Issues}}
+    <li class="issue-row {{if .FileMissing}}missing{{end}}">
+        <a class="issue-thumb" href="/issues/{{.ID}}">
+            <img src="/issues/{{.ID}}/cover" alt="" loading="lazy">
+        </a>
+        <div class="issue-info">
+            <a class="issue-title" href="/issues/{{.ID}}">
+                {{if .IssueNumber}}<span class="issue-num">#{{.IssueNumber}}</span>{{end}}
+                {{if .Title}}{{.Title}}{{else if not .IssueNumber}}{{.Path}}{{end}}
+            </a>
+            <div class="issue-sub">
+                {{if .ReleaseDate}}<span>{{.ReleaseDate}}</span>{{end}}
+                <span>{{prettySize .FileSize}}</span>
+                {{if .PageCount}}<span>{{.PageCount}} stron</span>{{end}}
+            </div>
+        </div>
+        <div class="issue-badges">
+            {{if .FileMissing}}<span class="badge badge-missing">brak pliku</span>{{end}}
+            {{if .MetadataLocked}}<span class="badge badge-lock" title="metadane zablokowane">🔒</span>{{end}}
+            <span class="badge badge-{{.MetadataSource}}">{{sourceLabel .MetadataSource}}</span>
+        </div>
+        {{if .FileMissing}}
+        <form action="/issues/{{.ID}}/delete" method="post"
+              onsubmit="return confirm('Usunąć rekord tego zeszytu z katalogu?');">
+            <button type="submit" class="btn btn-danger" title="Plik zniknął z biblioteki — usuń wpis z katalogu">Usuń</button>
+        </form>
+        {{else}}
+        <a class="btn download" href="/issues/{{.ID}}/download" title="Pobierz plik">Pobierz</a>
+        {{end}}
+    </li>
+    {{end}}
+</ul>
+{{else}}
+<div class="empty-state"><p>Brak zeszytów dla tego filtra.</p></div>
+{{end}}
+{{end}}

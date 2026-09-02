@@ -1,0 +1,63 @@
+{{define "title"}}Szukaj: {{.Query}} — ComicNest{{end}}
+{{define "searchQuery"}}{{.Query}}{{end}}
+
+{{define "content"}}
+<div class="page-head"><h1>Wyniki dla „{{.Query}}"</h1></div>
+
+{{if not .Query}}
+<div class="empty-state"><p>Wpisz zapytanie w polu wyszukiwania.</p></div>
+{{else}}
+
+{{if .Series}}
+<h2 class="section-title">Serie</h2>
+<ul class="series-grid">
+    {{range .Series}}
+    <li class="card">
+        <a href="/series/{{.ID}}">
+            <div class="card-cover">
+                {{if .CoverIssueID}}
+                <img src="/issues/{{.CoverIssueID}}/cover" alt="" loading="lazy">
+                {{else}}
+                <img src="/static/placeholder.svg" alt="">
+                {{end}}
+            </div>
+            <div class="card-body">
+                <span class="card-title">{{.Name}}</span>
+                <span class="card-meta">{{.IssueCount}} {{if eq .IssueCount 1}}zeszyt{{else}}zeszytów{{end}}</span>
+            </div>
+        </a>
+    </li>
+    {{end}}
+</ul>
+{{end}}
+
+{{if .Issues}}
+<h2 class="section-title">Zeszyty</h2>
+<ul class="issue-list">
+    {{range .Issues}}
+    <li class="issue-row {{if .FileMissing}}missing{{end}}">
+        <a class="issue-thumb" href="/issues/{{.ID}}">
+            <img src="/issues/{{.ID}}/cover" alt="" loading="lazy">
+        </a>
+        <div class="issue-info">
+            <a class="issue-title" href="/issues/{{.ID}}">
+                {{.SeriesName}}
+                {{if .IssueNumber}}<span class="issue-num">#{{.IssueNumber}}</span>{{end}}
+                {{if .Title}}— {{.Title}}{{end}}
+            </a>
+            <div class="issue-sub">
+                {{if .ReleaseDate}}<span>{{.ReleaseDate}}</span>{{end}}
+                <span>{{prettySize .FileSize}}</span>
+            </div>
+        </div>
+        <span class="badge badge-{{.MetadataSource}}">{{sourceLabel .MetadataSource}}</span>
+    </li>
+    {{end}}
+</ul>
+{{end}}
+
+{{if and (not .Series) (not .Issues)}}
+<div class="empty-state"><p>Nic nie znaleziono.</p></div>
+{{end}}
+{{end}}
+{{end}}

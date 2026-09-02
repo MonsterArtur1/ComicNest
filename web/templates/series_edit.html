@@ -1,0 +1,36 @@
+{{define "title"}}Edycja: {{.Series.Name}} — ComicNest{{end}}
+
+{{define "content"}}
+<nav class="breadcrumbs">
+    <a href="/">Biblioteka</a> <span>/</span>
+    <a href="/series/{{.Series.ID}}">{{.Series.Name}}</a> <span>/</span> edycja
+</nav>
+
+<div class="page-head"><h1>Edycja serii</h1></div>
+
+{{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
+
+<form class="edit-form" action="/series/{{.Series.ID}}" method="post">
+    <label>Nazwa
+        <input type="text" name="name" value="{{.Series.Name}}" required>
+    </label>
+    <label>Wydawca
+        <input type="text" name="publisher" value="{{.Series.Publisher}}">
+    </label>
+    <label>Opis
+        <textarea name="description" rows="5">{{.Series.Description}}</textarea>
+    </label>
+    <p class="hint">Zapis blokuje metadane serii przed nadpisaniem przez skan i ComicVine.</p>
+    <div class="form-actions">
+        <button type="submit" class="btn-primary">Zapisz</button>
+        <a class="btn" href="/series/{{.Series.ID}}">Anuluj</a>
+    </div>
+</form>
+
+{{if .Series.MetadataLocked}}
+<form class="unlock-form" action="/series/{{.Series.ID}}/unlock" method="post">
+    <p class="hint">Metadane są zablokowane 🔒 — automatyczne aktualizacje ich nie nadpiszą.</p>
+    <button type="submit" class="btn">Zdejmij blokadę</button>
+</form>
+{{end}}
+{{end}}

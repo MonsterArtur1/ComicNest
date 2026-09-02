@@ -1,0 +1,65 @@
+{{define "title"}}{{if .Issue.Title}}{{.Issue.Title}}{{else}}{{.Series.Name}} #{{.Issue.IssueNumber}}{{end}} — ComicNest{{end}}
+
+{{define "content"}}
+{{if .Msg}}<p class="flash {{if .MsgError}}flash-error{{end}}">{{.Msg}}</p>{{end}}
+<nav class="breadcrumbs">
+    <a href="/">Biblioteka</a> <span>/</span>
+    <a href="/series/{{.Series.ID}}">{{.Series.Name}}</a> <span>/</span>
+    {{if .Issue.IssueNumber}}#{{.Issue.IssueNumber}}{{else}}{{.Filename}}{{end}}
+</nav>
+
+<div class="issue-detail">
+    <div class="issue-detail-cover">
+        <img src="/issues/{{.Issue.ID}}/cover" alt="okładka">
+    </div>
+    <div class="issue-detail-body">
+        <h1>
+            {{.Series.Name}}
+            {{if .Issue.IssueNumber}}<span class="issue-num">#{{.Issue.IssueNumber}}</span>{{end}}
+        </h1>
+        {{if .Issue.Title}}<h2 class="issue-detail-title">{{.Issue.Title}}</h2>{{end}}
+
+        <div class="issue-badges detail-badges">
+            {{if .Issue.FileMissing}}<span class="badge badge-missing">brak pliku na dysku</span>{{end}}
+            {{if .Issue.MetadataLocked}}<span class="badge badge-lock">🔒 metadane zablokowane</span>{{end}}
+            <span class="badge badge-{{.Issue.MetadataSource}}">{{sourceLabel .Issue.MetadataSource}}</span>
+        </div>
+
+        {{if .Issue.Summary}}<p class="issue-summary">{{.Issue.Summary}}</p>{{end}}
+
+        <dl class="meta-table">
+            {{if .Issue.ReleaseDate}}<dt>Data wydania</dt><dd>{{.Issue.ReleaseDate}}</dd>{{end}}
+            {{if .Issue.Writer}}<dt>Scenariusz</dt><dd>{{.Issue.Writer}}</dd>{{end}}
+            {{if .Issue.Artist}}<dt>Rysunki</dt><dd>{{.Issue.Artist}}</dd>{{end}}
+            {{if .Issue.Publisher}}<dt>Wydawca</dt><dd>{{.Issue.Publisher}}</dd>{{end}}
+            {{if .Issue.PageCount}}<dt>Strony</dt><dd>{{.Issue.PageCount}}</dd>{{end}}
+            <dt>Plik</dt><dd><code title="{{.Issue.Path}}">{{.Filename}}</code> ({{prettySize .Issue.FileSize}})</dd>
+        </dl>
+
+        <div class="detail-actions">
+            {{if not .Issue.FileMissing}}
+            <a class="btn btn-primary" href="/issues/{{.Issue.ID}}/download">Pobierz plik</a>
+            {{end}}
+            <a class="btn" href="/issues/{{.Issue.ID}}/edit">Edytuj metadane</a>
+            {{if .CVEnabled}}
+            <form action="/issues/{{.Issue.ID}}/scrape" method="post">
+                <button type="submit" class="btn" {{if not .CVMatched}}disabled title="Najpierw dopasuj serię w ComicVine"{{else}}title="Pobierz metadane tego zeszytu z ComicVine"{{end}}>
+                    Pobierz z ComicVine
+                </button>
+            </form>
+            {{end}}
+            {{if .Issue.MetadataLocked}}
+            <form action="/issues/{{.Issue.ID}}/unlock" method="post">
+                <button type="submit" class="btn" title="Pozwól aktualizacjom nadpisać metadane">Zdejmij blokadę 🔒</button>
+            </form>
+            {{end}}
+            {{if .Issue.FileMissing}}
+            <form action="/issues/{{.Issue.ID}}/delete" method="post"
+                  onsubmit="return confirm('Usunąć rekord tego zeszytu z katalogu?');">
+                <button type="submit" class="btn btn-danger" title="Plik zniknął z biblioteki — usuń wpis z katalogu">Usuń rekord</button>
+            </form>
+            {{end}}
+        </div>
+    </div>
+</div>
+{{end}}

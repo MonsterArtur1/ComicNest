@@ -1,0 +1,42 @@
+{{define "title"}}ComicNest — biblioteka{{end}}
+
+{{define "content"}}
+<div class="page-head">
+    <h1>Biblioteka</h1>
+    <div class="page-head-tools">
+        <form action="/" method="get">
+            <select name="sort" onchange="this.form.submit()">
+                <option value="name" {{if eq .Sort "name"}}selected{{end}}>Sortuj: nazwa</option>
+                <option value="recent" {{if eq .Sort "recent"}}selected{{end}}>Sortuj: ostatnio dodane</option>
+            </select>
+        </form>
+    </div>
+</div>
+
+{{if .Series}}
+<ul class="series-grid">
+    {{range .Series}}
+    <li class="card">
+        <a href="/series/{{.ID}}">
+            <div class="card-cover">
+                {{if .CoverIssueID}}
+                <img src="/issues/{{.CoverIssueID}}/cover" alt="" loading="lazy">
+                {{else}}
+                <img src="/static/placeholder.svg" alt="">
+                {{end}}
+            </div>
+            <div class="card-body">
+                <span class="card-title">{{.Name}}</span>
+                <span class="card-meta">{{.IssueCount}} {{if eq .IssueCount 1}}zeszyt{{else}}zeszytów{{end}}</span>
+            </div>
+        </a>
+    </li>
+    {{end}}
+</ul>
+{{else}}
+<div class="empty-state">
+    <p>Biblioteka jest pusta.</p>
+    <p class="hint">Ustaw ścieżkę <code>library</code> w <code>config.yaml</code>, a następnie zeskanuj bibliotekę (Etap&nbsp;2).</p>
+</div>
+{{end}}
+{{end}}

@@ -1,0 +1,26 @@
+{{define "layout"}}<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{block "title" .}}ComicNest{{end}}</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+<header class="topbar">
+    <a class="brand" href="/">Comic<span>Nest</span></a>
+    <form class="search" action="/search" method="get">
+        <input type="search" name="q" placeholder="Szukaj serii lub zeszytu…" value="{{block "searchQuery" .}}{{end}}">
+    </form>
+    <div class="scan-area" id="scan-area" hx-get="/scan/status" hx-trigger="load" hx-swap="innerHTML">
+        <noscript>
+            <form action="/scan" method="post"><button type="submit">Skanuj bibliotekę</button></form>
+        </noscript>
+    </div>
+</header>
+<main class="content">
+{{block "content" .}}{{end}}
+</main>
+</body>
+</html>{{end}}
