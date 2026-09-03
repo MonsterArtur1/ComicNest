@@ -235,8 +235,11 @@ func (sc *Scanner) addIssue(f foundFile) error {
 		} else if found {
 			applyComicInfo(&issue, ci)
 		}
-		if issue.PageCount == 0 {
-			if pages, err := ListPages(f.path); err == nil {
+		// The real page count drives page streaming; it also stands in for
+		// missing metadata.
+		if pages, err := ListPages(f.path); err == nil {
+			issue.FilePages = len(pages)
+			if issue.PageCount == 0 {
 				issue.PageCount = len(pages)
 			}
 		}
@@ -282,6 +285,15 @@ func (sc *Scanner) refreshIssue(id int64, f foundFile) error {
 		} else if found {
 			applyComicInfo(issue, ci)
 			if err := sc.store.UpdateIssueMetadata(issue); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Files catalogued before page streaming existed have no page count yet.
+	if issue.FilePages == 0 && isArchive(f.path) {
+		if pages, err := ListPages(f.path); err == nil && len(pages) > 0 {
+			if err := sc.store.SetIssueFilePages(id, len(pages)); err != nil {
 				return err
 			}
 		}

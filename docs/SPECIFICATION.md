@@ -143,6 +143,13 @@ zeszyt. UI: etykieta „wydanie jednorazowe" zamiast licznika, kafelek na gridzi
 prowadzi wprost do zeszytu. Scrape: zeszyt bez numeru + wolumen z jednym zeszytem
 → dopasowany zostaje ten jedyny zeszyt.
 
+**Strumieniowanie i postęp czytania** (migracja 3): kolumna `issues.file_pages` — rzeczywista
+liczba wpisów graficznych w archiwum (0 = jeszcze nieliczona; `page_count` pozostaje
+metadaną z ComicInfo, edytowalną i potencjalnie błędną) — oraz tabela
+`reading_progress(issue_id PK → issues ON DELETE CASCADE, page, updated_at)`, gdzie `page`
+to ostatnia przeczytana strona 1-based (konwencja OPDS-PSE). Zapis przez `UPSERT` z
+`MAX(page, nowa)`. Skan uzupełnia `file_pages` dla nowych plików i dla starych z wartością 0.
+
 ## 6. Skanowanie biblioteki
 
 Uruchamiane przyciskiem w UI (`POST /scan`), działa w goroutine; UI odpytuje status
@@ -223,11 +230,11 @@ postępu skanu, dialogu dopasowania ComicVine. Każdy widok działa też bez JS
 | Metoda i ścieżka | Widok / akcja |
 |---|---|
 | `GET /` | grid serii (okładka, nazwa, liczba zeszytów); sort: nazwa / ostatnio dodane; filtr tekstowy |
-| `GET /series/{id}` | strona serii: metadane + lista zeszytów (okładka, numer, tytuł, data, rozmiar, badge źródła metadanych) |
+| `GET /series/{id}` | strona serii: metadane + lista zeszytów (okładka, numer, tytuł, data, rozmiar, badge źródła metadanych, pasek postępu czytania pod okładką + „czytane: str. X z N (P%)" / „✓ przeczytane") |
 | `GET /series/{id}/edit` → `POST /series/{id}` | formularz edycji serii (nazwa, wydawca, opis) |
 | `POST /series/{id}/match` / `POST /series/{id}/match/{volumeID}` | wyszukanie kandydatów ComicVine / zapis wyboru |
 | `POST /series/{id}/scrape` | pobranie metadanych ComicVine dla zeszytów serii bez dopasowania |
-| `GET /issues/{id}` | szczegóły zeszytu (pełne metadane, duża okładka) |
+| `GET /issues/{id}` | szczegóły zeszytu (pełne metadane, duża okładka; przy postępie czytania ramka „W trakcie czytania / Przeczytane — przeczytano X z N stron (P%) · ostatnio data" z paskiem, wiersz „Przeczytano" w tabeli; „Strony" pokazuje `file_pages` z fallbackiem na `page_count`) |
 | `GET /issues/{id}/edit` → `POST /issues/{id}` | formularz edycji zeszytu (numer, tytuł, opis, data, twórcy, wydawca); zapis ustawia `manual` + `locked` |
 | `POST /issues/{id}/unlock` | zdjęcie blokady metadanych |
 | `POST /issues/{id}/scrape` | ComicVine dla pojedynczego zeszytu |
@@ -250,14 +257,27 @@ Gdy OPDS jest wyłączony, trasy nie są rejestrowane (404 z catch-alla).
 
 | Ścieżka | Feed |
 |---|---|
-| `GET /opds` | nawigacyjny root: „Wszystkie serie", „Ostatnio dodane" + link `search` |
+| `GET /opds` | nawigacyjny root: „Wszystkie serie", „Aktualnie czytane", „Ostatnio dodane" + link `search` |
 | `GET /opds/series?page=N` | nawigacyjny: serie alfabetycznie (50/stronę, `next`/`previous`, `opensearch:totalResults`); wpis = link `subsection` do feedu serii + okładka pierwszego zeszytu |
 | `GET /opds/series/{id}?page=N` | akwizycyjny: zeszyty serii w kolejności numerów (bez `file_missing`) |
 | `GET /opds/recent?page=N` | akwizycyjny: zeszyty wg `created_at DESC` (rel `sort/new`) |
+| `GET /opds/reading` | akwizycyjny „Aktualnie czytane": zeszyty z `reading_progress`, których ostatnia strona < liczba stron (lub liczba stron nieznana), wg ostatniego czytania (LIMIT 100) |
+| `GET /opds/issues/{id}/pages/{n}?width=W` | strona `n` (0-based) z archiwum CBZ/CBR (OPDS-PSE); bez `width` oryginalny plik z typem po rozszerzeniu, z `width` przeskalowanie do W px (max 4000) i JPEG; pobranie strony zapisuje postęp `n+1` (`MAX` z dotychczasowym); 404 poza zakresem, dla PDF i brakujących plików |
 | `GET /opds/search?q=` | akwizycyjny: jedna płaska lista zeszytów po nazwie serii / tytule / numerze (LIMIT 200) |
 | `GET /opds/opensearch.xml` | OpenSearch description z szablonem `…/opds/search?q={searchTerms}` |
 | `GET /opds/issues/{id}/file` | ten sam handler co `/issues/{id}/download` (Range/HEAD przez `http.ServeFile`) |
 | `GET /opds/issues/{id}/cover` | ten sam handler co `/issues/{id}/cover` |
+
+**Strumieniowanie stron (OPDS-PSE 1.2, `xmlns:pse="http://vaemendis.net/opds-pse/ns"`).** Każdy
+zeszyt CBZ/CBR ze znaną liczbą stron ma link `rel="http://vaemendis.net/opds-pse/stream"
+type="image/jpeg" href="…/opds/issues/{id}/pages/{pageNumber}?width={maxWidth}" pse:count="N"`
+oraz — gdy był czytany — `pse:lastRead` (1-based) i `pse:lastReadDate` (RFC 3339). Czytniki
+(Panels, Chunky, Librera, Moon+…) czytają strony bez pobierania pliku i wznawiają od `lastRead`.
+Postęp powstaje po stronie serwera z żądań stron (czytniki nie raportują go inaczej) — prefetch
+kilku stron do przodu zawyża go nieznacznie; powrót do wcześniejszej strony postępu nie obniża.
+Liczba stron: `issues.file_pages` (rzeczywiste wpisy graficzne w archiwum, liczone przy skanie —
+także dla plików skatalogowanych wcześniej — oraz leniwie przy pierwszym strumieniowaniu),
+z fallbackiem na `page_count` z metadanych. PDF-y nie mają linku PSE (brak renderowania stron).
 
 Wpis zeszytu: tytuł `Seria #numer – tytuł`, `author` z pola `writer` (rozbite po przecinkach),
 `dc:publisher`, `dc:issued` (data wydania), `summary` (opis, a gdy pusty — „Rysunki: …"),

@@ -1,7 +1,13 @@
 package server
 
 import (
+	"archive/zip"
 	"encoding/xml"
+	"fmt"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -33,12 +39,11 @@ func newTestServer(t *testing.T, opdsCfg config.OPDSConfig) (*Server, string) {
 		t.Fatalf("create series: %v", err)
 	}
 	cbz := filepath.Join(dir, "Saga 055.cbz")
-	if err := os.WriteFile(cbz, []byte("PK\x03\x04fake"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeTestCBZ(t, cbz, 3)
 	present := &store.Issue{SeriesID: seriesID, Path: cbz, FileSize: 10, IssueNumber: "55",
 		Title: "Chapter Fifty-Five", Writer: "Brian K. Vaughan, Fiona Staples",
-		Publisher: "Image", ReleaseDate: "2020-09-01", MetadataSource: store.SourceFilename}
+		Publisher: "Image", ReleaseDate: "2020-09-01", MetadataSource: store.SourceFilename,
+		FilePages: 3}
 	if err := st.InsertIssue(present); err != nil {
 		t.Fatalf("insert issue: %v", err)
 	}
@@ -62,6 +67,31 @@ func newTestServer(t *testing.T, opdsCfg config.OPDSConfig) (*Server, string) {
 		t.Fatalf("server.New: %v", err)
 	}
 	return srv, cbz
+}
+
+// writeTestCBZ creates a CBZ holding n tiny PNG pages (4x4, distinct colours).
+func writeTestCBZ(t *testing.T, path string, n int) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	zw := zip.NewWriter(f)
+	for p := range n {
+		img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+		draw.Draw(img, img.Bounds(), &image.Uniform{color.RGBA{uint8(p * 60), 0, 0, 255}}, image.Point{}, draw.Src)
+		w, err := zw.Create(fmt.Sprintf("page%03d.png", p+1))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := png.Encode(w, img); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func get(t *testing.T, h http.Handler, target string, auth func(*http.Request)) *httptest.ResponseRecorder {
@@ -203,11 +233,147 @@ func TestOPDSFileDownload(t *testing.T) {
 	if !strings.Contains(rec.Header().Get("Content-Disposition"), filepath.Base(cbz)) {
 		t.Errorf("Content-Disposition = %q", rec.Header().Get("Content-Disposition"))
 	}
-	if rec.Body.String() != "PK\x03\x04fake" {
-		t.Errorf("unexpected body %q", rec.Body.String())
+	want, err := os.ReadFile(cbz)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec.Body.String() != string(want) {
+		t.Errorf("download body differs from the file on disk")
 	}
 	if rec := get(t, srv.Handler(), "/opds/issues/2/file", nil); rec.Code != http.StatusNotFound {
 		t.Errorf("missing file download: got %d, want 404", rec.Code)
+	}
+}
+
+func TestOPDSPageStreaming(t *testing.T) {
+	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	h := srv.Handler()
+
+	// The series feed advertises page streaming with the real page count and
+	// no progress yet.
+	body := assertXML(t, get(t, h, "/opds/series/1", nil))
+	stream := `rel="http://vaemendis.net/opds-pse/stream" href="http://nas.local:8080/opds/issues/1/pages/{pageNumber}?width={maxWidth}" type="image/jpeg" pse:count="3"`
+	if !strings.Contains(body, stream+">") && !strings.Contains(body, stream+"<") {
+		t.Errorf("series feed lacks the page streaming link:\n%s", body)
+	}
+	if strings.Contains(body, "pse:lastRead") {
+		t.Errorf("unread issue should carry no lastRead:\n%s", body)
+	}
+	if !strings.Contains(body, `xmlns:pse="http://vaemendis.net/opds-pse/ns"`) {
+		t.Errorf("feed lacks the pse namespace declaration:\n%s", body)
+	}
+
+	// Nothing is being read yet.
+	body = assertXML(t, get(t, h, "/opds/reading", nil))
+	if strings.Contains(body, "<entry>") {
+		t.Errorf("reading feed should start empty:\n%s", body)
+	}
+
+	// Page 0 streams as the original PNG.
+	rec := get(t, h, "/opds/issues/1/pages/0", nil)
+	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/png" {
+		t.Fatalf("page 0: %d %q", rec.Code, rec.Header().Get("Content-Type"))
+	}
+	if _, err := png.Decode(rec.Body); err != nil {
+		t.Errorf("page 0 is not a valid PNG: %v", err)
+	}
+
+	// ?width= scales and re-encodes as JPEG.
+	rec = get(t, h, "/opds/issues/1/pages/1?width=2", nil)
+	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/jpeg" {
+		t.Fatalf("page 1 resized: %d %q", rec.Code, rec.Header().Get("Content-Type"))
+	}
+	if cfg, _, err := image.DecodeConfig(rec.Body); err != nil || cfg.Width != 2 {
+		t.Errorf("resized page: width=%d err=%v", cfg.Width, err)
+	}
+
+	// Fetching page index 1 means 2 pages read → progress shows in feeds and
+	// the issue is listed as currently being read.
+	body = assertXML(t, get(t, h, "/opds/series/1", nil))
+	if !strings.Contains(body, `pse:count="3" pse:lastRead="2" pse:lastReadDate="`) {
+		t.Errorf("series feed lacks progress after streaming:\n%s", body)
+	}
+	body = assertXML(t, get(t, h, "/opds/reading", nil))
+	if !strings.Contains(body, "/opds/issues/1/file") || !strings.Contains(body, `pse:lastRead="2"`) {
+		t.Errorf("reading feed should list the started issue:\n%s", body)
+	}
+
+	// Going back to page 0 does not lower the progress.
+	get(t, h, "/opds/issues/1/pages/0", nil)
+	body = assertXML(t, get(t, h, "/opds/series/1", nil))
+	if !strings.Contains(body, `pse:lastRead="2"`) {
+		t.Errorf("re-reading an earlier page must not lower progress:\n%s", body)
+	}
+
+	// Reaching the last page finishes the issue: it leaves "currently reading".
+	if rec := get(t, h, "/opds/issues/1/pages/2", nil); rec.Code != http.StatusOK {
+		t.Fatalf("last page: %d", rec.Code)
+	}
+	body = assertXML(t, get(t, h, "/opds/reading", nil))
+	if strings.Contains(body, "<entry>") {
+		t.Errorf("finished issue must leave the reading feed:\n%s", body)
+	}
+
+	// Out of range and missing files are 404s.
+	if rec := get(t, h, "/opds/issues/1/pages/3", nil); rec.Code != http.StatusNotFound {
+		t.Errorf("page past the end: got %d, want 404", rec.Code)
+	}
+	if rec := get(t, h, "/opds/issues/2/pages/0", nil); rec.Code != http.StatusNotFound {
+		t.Errorf("missing file page: got %d, want 404", rec.Code)
+	}
+}
+
+func TestWebShowsReadingProgress(t *testing.T) {
+	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	h := srv.Handler()
+
+	// Unread: no progress markup anywhere.
+	if body := get(t, h, "/series/1", nil).Body.String(); strings.Contains(body, `class="progress`) {
+		t.Errorf("unread issue should show no progress bar:\n%s", body)
+	}
+	if body := get(t, h, "/issues/1", nil).Body.String(); strings.Contains(body, "Przeczytano") {
+		t.Errorf("unread issue should show no read count:\n%s", body)
+	}
+
+	// Stream page index 1 → 2 of 3 pages read.
+	if rec := get(t, h, "/opds/issues/1/pages/1", nil); rec.Code != http.StatusOK {
+		t.Fatalf("stream page: %d", rec.Code)
+	}
+	body := get(t, h, "/series/1", nil).Body.String()
+	if !strings.Contains(body, `class="progress "`) || !strings.Contains(body, `style="width: 66%"`) ||
+		!strings.Contains(body, "czytane: str. 2 z 3 (66%)") {
+		t.Errorf("series list lacks the progress bar:\n%s", body)
+	}
+	body = get(t, h, "/issues/1", nil).Body.String()
+	if !strings.Contains(body, "<dt>Przeczytano</dt><dd>2 z 3 stron (66%)</dd>") ||
+		!strings.Contains(body, "W trakcie czytania") {
+		t.Errorf("issue page lacks the read count:\n%s", body)
+	}
+
+	// Last page → finished.
+	get(t, h, "/opds/issues/1/pages/2", nil)
+	body = get(t, h, "/issues/1", nil).Body.String()
+	if !strings.Contains(body, "<strong>Przeczytane</strong>") || !strings.Contains(body, `class="progress progress-lg done"`) {
+		t.Errorf("finished issue should be marked as read:\n%s", body)
+	}
+}
+
+func TestOPDSNoStreamingForPDF(t *testing.T) {
+	e := opdsIssueEntry("http://h", store.Issue{ID: 9, Path: "x/Comic.pdf", PageCount: 40}, "Comic", nil)
+	for _, l := range e.Links {
+		if l.Rel == "http://vaemendis.net/opds-pse/stream" {
+			t.Errorf("PDF issues must not advertise page streaming: %+v", l)
+		}
+	}
+	e = opdsIssueEntry("http://h", store.Issue{ID: 9, Path: "x/Comic.cbr", PageCount: 40}, "Comic", nil)
+	found := false
+	for _, l := range e.Links {
+		if l.Rel == "http://vaemendis.net/opds-pse/stream" && l.PageCount == 40 {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("CBR with metadata page count should advertise streaming: %+v", e.Links)
 	}
 }
 

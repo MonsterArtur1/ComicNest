@@ -60,8 +60,15 @@ katalog OPDS o adresie `http://<adres-komputera>:8080/opds` (adres IP komputera
 z biblioteką w sieci domowej). Katalog oferuje:
 
 - **Wszystkie serie** (alfabetycznie, z okładkami) → zeszyty serii do pobrania,
+- **Aktualnie czytane** — zeszyty zaczęte w czytniku, ale nieprzeczytane do końca,
 - **Ostatnio dodane** — zeszyty w kolejności trafienia do biblioteki,
-- **wyszukiwanie** po nazwie serii, tytule i numerze zeszytu (OpenSearch).
+- **wyszukiwanie** po nazwie serii, tytule i numerze zeszytu (OpenSearch),
+- **czytanie bez pobierania** (OPDS-PSE): czytniki takie jak Panels, Chunky, Librera czy
+  Moon+ Reader strumieniują strony CBZ/CBR bezpośrednio z serwera i wznawiają od ostatniej
+  strony. Postęp zapisuje się na serwerze podczas czytania; PDF-y są tylko do pobrania.
+
+Postęp czytania widać też w interfejsie WWW: pasek pod okładką na liście zeszytów serii
+oraz liczba przeczytanych stron i data ostatniego czytania na stronie zeszytu.
 
 Na tym samym komputerze (np. Thorium Reader na PC) użyj `http://127.0.0.1:8080/opds` —
 Thorium odrzuca adresy bez domeny, więc `http://localhost:8080/opds` kończy się błędem

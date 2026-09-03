@@ -138,6 +138,31 @@ func (c *Cache) Save(issueID int64, raw []byte) error {
 	return nil
 }
 
+// Resize decodes raw (any supported format), scales it down so its width is
+// at most maxWidth (never upscaling) and returns it JPEG-encoded. Used to
+// stream comic pages to readers that ask for a smaller size.
+func Resize(raw []byte, maxWidth int) ([]byte, error) {
+	if len(raw) > maxRawBytes {
+		return nil, fmt.Errorf("covers: raw input too large (%d bytes, max %d)", len(raw), maxRawBytes)
+	}
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(raw))
+	if err != nil {
+		return nil, fmt.Errorf("covers: decoding image config: %w", err)
+	}
+	if cfg.Width > maxDimension || cfg.Height > maxDimension {
+		return nil, fmt.Errorf("covers: image dimensions too large (%dx%d, max %dx%d)", cfg.Width, cfg.Height, maxDimension, maxDimension)
+	}
+	src, _, err := image.Decode(bytes.NewReader(raw))
+	if err != nil {
+		return nil, fmt.Errorf("covers: decoding image: %w", err)
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, scale(src, maxWidth), &jpeg.Options{Quality: jpegQuality}); err != nil {
+		return nil, fmt.Errorf("covers: encoding jpeg: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
 // scale returns src resized so its width is at most maxWidth, preserving
 // aspect ratio. Images already narrower than maxWidth are returned as an
 // RGBA copy without upscaling.

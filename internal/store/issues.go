@@ -44,7 +44,8 @@ type Issue struct {
 	Writer           string
 	Artist           string
 	Publisher        string
-	PageCount        int
+	PageCount        int // from metadata (ComicInfo), may be 0 or wrong
+	FilePages        int // image entries actually inside the archive (0 = not counted yet)
 	ComicVineIssueID sql.NullInt64
 	MetadataSource   string
 	MetadataLocked   bool
@@ -55,21 +56,34 @@ type Issue struct {
 }
 
 const issueColumns = `id, series_id, path, file_size, file_missing, issue_number,
-	title, summary, release_date, writer, artist, publisher, page_count,
+	title, summary, release_date, writer, artist, publisher, page_count, file_pages,
 	comicvine_issue_id, metadata_source, metadata_locked, has_comicinfo,
 	cover_cached, created_at, updated_at`
 
+// fields returns scan targets for issueColumns, in order.
+func (i *Issue) fields() []any {
+	return []any{&i.ID, &i.SeriesID, &i.Path, &i.FileSize, &i.FileMissing,
+		&i.IssueNumber, &i.Title, &i.Summary, &i.ReleaseDate, &i.Writer,
+		&i.Artist, &i.Publisher, &i.PageCount, &i.FilePages, &i.ComicVineIssueID,
+		&i.MetadataSource, &i.MetadataLocked, &i.HasComicInfo, &i.CoverCached,
+		&i.CreatedAt, &i.UpdatedAt}
+}
+
 func scanIssue(row interface{ Scan(...any) error }) (*Issue, error) {
 	var i Issue
-	err := row.Scan(&i.ID, &i.SeriesID, &i.Path, &i.FileSize, &i.FileMissing,
-		&i.IssueNumber, &i.Title, &i.Summary, &i.ReleaseDate, &i.Writer,
-		&i.Artist, &i.Publisher, &i.PageCount, &i.ComicVineIssueID,
-		&i.MetadataSource, &i.MetadataLocked, &i.HasComicInfo, &i.CoverCached,
-		&i.CreatedAt, &i.UpdatedAt)
-	if err != nil {
+	if err := row.Scan(i.fields()...); err != nil {
 		return nil, err
 	}
 	return &i, nil
+}
+
+// TotalPages is the page count to trust for reading: the archive's actual
+// image count when known, otherwise the metadata figure.
+func (i *Issue) TotalPages() int {
+	if i.FilePages > 0 {
+		return i.FilePages
+	}
+	return i.PageCount
 }
 
 // IssueFilter narrows issue lists in the UI.
@@ -128,19 +142,14 @@ type IssueWithSeries struct {
 // `issues i JOIN series s`.
 const issueWithSeriesColumns = `i.id, i.series_id, i.path, i.file_size, i.file_missing,
 	i.issue_number, i.title, i.summary, i.release_date, i.writer, i.artist, i.publisher,
-	i.page_count, i.comicvine_issue_id, i.metadata_source, i.metadata_locked,
+	i.page_count, i.file_pages, i.comicvine_issue_id, i.metadata_source, i.metadata_locked,
 	i.has_comicinfo, i.cover_cached, i.created_at, i.updated_at, s.name`
 
 func scanIssuesWithSeries(rows *sql.Rows) ([]IssueWithSeries, error) {
 	var out []IssueWithSeries
 	for rows.Next() {
 		var i IssueWithSeries
-		err := rows.Scan(&i.ID, &i.SeriesID, &i.Path, &i.FileSize, &i.FileMissing,
-			&i.IssueNumber, &i.Title, &i.Summary, &i.ReleaseDate, &i.Writer,
-			&i.Artist, &i.Publisher, &i.PageCount, &i.ComicVineIssueID,
-			&i.MetadataSource, &i.MetadataLocked, &i.HasComicInfo, &i.CoverCached,
-			&i.CreatedAt, &i.UpdatedAt, &i.SeriesName)
-		if err != nil {
+		if err := rows.Scan(append(i.fields(), &i.SeriesName)...); err != nil {
 			return nil, err
 		}
 		out = append(out, i)
@@ -214,8 +223,8 @@ func (s *Store) IssuesNeedingComicVine() (map[int64][]Issue, error) {
 	rows, err := s.db.Query(`
 		SELECT i.id, i.series_id, i.path, i.file_size, i.file_missing, i.issue_number,
 			i.title, i.summary, i.release_date, i.writer, i.artist, i.publisher,
-			i.page_count, i.comicvine_issue_id, i.metadata_source, i.metadata_locked,
-			i.has_comicinfo, i.cover_cached, i.created_at, i.updated_at,
+			i.page_count, i.file_pages, i.comicvine_issue_id, i.metadata_source,
+			i.metadata_locked, i.has_comicinfo, i.cover_cached, i.created_at, i.updated_at,
 			s.comicvine_volume_id
 		FROM issues i JOIN series s ON s.id = i.series_id
 		WHERE s.comicvine_volume_id IS NOT NULL
@@ -231,12 +240,7 @@ func (s *Store) IssuesNeedingComicVine() (map[int64][]Issue, error) {
 	for rows.Next() {
 		var i Issue
 		var volumeID int64
-		err := rows.Scan(&i.ID, &i.SeriesID, &i.Path, &i.FileSize, &i.FileMissing,
-			&i.IssueNumber, &i.Title, &i.Summary, &i.ReleaseDate, &i.Writer,
-			&i.Artist, &i.Publisher, &i.PageCount, &i.ComicVineIssueID,
-			&i.MetadataSource, &i.MetadataLocked, &i.HasComicInfo, &i.CoverCached,
-			&i.CreatedAt, &i.UpdatedAt, &volumeID)
-		if err != nil {
+		if err := rows.Scan(append(i.fields(), &volumeID)...); err != nil {
 			return nil, err
 		}
 		out[volumeID] = append(out[volumeID], i)
@@ -266,11 +270,11 @@ func (s *Store) GetIssueByPath(path string) (*Issue, error) {
 func (s *Store) InsertIssue(i *Issue) error {
 	res, err := s.db.Exec(`
 		INSERT INTO issues (series_id, path, file_size, issue_number, title,
-			summary, release_date, writer, artist, publisher, page_count,
+			summary, release_date, writer, artist, publisher, page_count, file_pages,
 			metadata_source, has_comicinfo)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		i.SeriesID, i.Path, i.FileSize, i.IssueNumber, i.Title,
-		i.Summary, i.ReleaseDate, i.Writer, i.Artist, i.Publisher, i.PageCount,
+		i.Summary, i.ReleaseDate, i.Writer, i.Artist, i.Publisher, i.PageCount, i.FilePages,
 		i.MetadataSource, i.HasComicInfo)
 	if err != nil {
 		return err
@@ -307,6 +311,12 @@ func (s *Store) TouchIssueFile(id int64, size int64) error {
 	_, err := s.db.Exec(`
 		UPDATE issues SET file_size = ?, file_missing = 0, updated_at = datetime('now')
 		WHERE id = ?`, size, id)
+	return err
+}
+
+// SetIssueFilePages records the number of image pages found in the archive.
+func (s *Store) SetIssueFilePages(id int64, pages int) error {
+	_, err := s.db.Exec(`UPDATE issues SET file_pages = ? WHERE id = ?`, pages, id)
 	return err
 }
 

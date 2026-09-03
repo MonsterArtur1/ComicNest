@@ -36,6 +36,18 @@ const (
 	RelAcquisition = "http://opds-spec.org/acquisition"
 	RelImage       = "http://opds-spec.org/image"
 	RelThumbnail   = "http://opds-spec.org/image/thumbnail"
+
+	// RelPageStream is the OPDS-PSE (Page Streaming Extension) link: readers
+	// fetch pages one by one instead of downloading the whole archive. The
+	// href holds the literal placeholders {pageNumber} (0-based) and
+	// optionally {maxWidth}.
+	RelPageStream = "http://vaemendis.net/opds-pse/stream"
+)
+
+// PlaceholderPage and PlaceholderWidth are the OPDS-PSE href template tokens.
+const (
+	PlaceholderPage  = "{pageNumber}"
+	PlaceholderWidth = "{maxWidth}"
 )
 
 // Feed is an OPDS catalog feed (navigation or acquisition — the difference is
@@ -46,6 +58,7 @@ type Feed struct {
 	XmlnsDC       string   `xml:"xmlns:dc,attr"`
 	XmlnsOPDS     string   `xml:"xmlns:opds,attr"`
 	XmlnsOpensrch string   `xml:"xmlns:opensearch,attr"`
+	XmlnsPSE      string   `xml:"xmlns:pse,attr"`
 	ID            string   `xml:"id"`
 	Title         string   `xml:"title"`
 	Updated       string   `xml:"updated"`
@@ -63,12 +76,17 @@ type Author struct {
 	URI  string `xml:"uri,omitempty"`
 }
 
-// Link is an Atom link with the attributes OPDS cares about.
+// Link is an Atom link with the attributes OPDS cares about, plus the
+// OPDS-PSE page-streaming attributes (only set on RelPageStream links).
 type Link struct {
 	Rel   string `xml:"rel,attr,omitempty"`
 	Href  string `xml:"href,attr"`
 	Type  string `xml:"type,attr,omitempty"`
 	Title string `xml:"title,attr,omitempty"`
+
+	PageCount    int    `xml:"pse:count,attr,omitempty"`        // total pages
+	LastRead     int    `xml:"pse:lastRead,attr,omitempty"`     // last page read, 1-based
+	LastReadDate string `xml:"pse:lastReadDate,attr,omitempty"` // RFC 3339
 }
 
 // Text is an Atom text construct; Type is "text" or "html".
@@ -100,6 +118,7 @@ func NewFeed(id, title string, updated time.Time) *Feed {
 		XmlnsDC:       "http://purl.org/dc/terms/",
 		XmlnsOPDS:     "http://opds-spec.org/2010/catalog",
 		XmlnsOpensrch: "http://a9.com/-/spec/opensearch/1.1/",
+		XmlnsPSE:      "http://vaemendis.net/opds-pse/ns",
 		ID:            id,
 		Title:         title,
 		Updated:       FormatTime(updated),

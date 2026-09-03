@@ -53,6 +53,19 @@ var migrations = []string{
 	`
 	ALTER TABLE series ADD COLUMN one_shot INTEGER NOT NULL DEFAULT 0;
 	`,
+
+	// 3: page streaming (OPDS-PSE) — the real number of image pages inside
+	// the archive (page_count is metadata and may be missing or wrong) and
+	// per-issue reading progress reported by streaming readers.
+	`
+	ALTER TABLE issues ADD COLUMN file_pages INTEGER NOT NULL DEFAULT 0;
+
+	CREATE TABLE reading_progress (
+		issue_id   INTEGER PRIMARY KEY REFERENCES issues(id) ON DELETE CASCADE,
+		page       INTEGER NOT NULL,
+		updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+	);
+	`,
 }
 
 func migrate(db *sql.DB) error {

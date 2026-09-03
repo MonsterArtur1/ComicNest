@@ -240,7 +240,33 @@ details.desc .series-desc { margin: 12px 0 4px; }
 }
 .issue-row.missing { opacity: 0.6; }
 
-.issue-thumb { flex: none; }
+.issue-thumb { flex: none; display: flex; flex-direction: column; gap: 4px; }
+
+/* --- reading progress --- */
+.progress {
+    display: block;
+    height: 4px;
+    width: 100%;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.progress > span { display: block; height: 100%; background: var(--accent); }
+.progress.done > span { background: #5cb85c; }
+.progress-lg { height: 8px; border-radius: 4px; }
+.reading-note { color: var(--accent); }
+.reading-box {
+    margin: 12px 0 16px;
+    padding: 12px 14px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.reading-text { font-size: 14px; }
+.reading-date, .dim { color: var(--text-dim); font-size: 13px; }
 .issue-thumb img {
     width: 44px;
     height: 66px;

@@ -2,13 +2,19 @@ package server
 
 import (
 	"crypto/subtle"
+	"errors"
 	"fmt"
+	"log"
+	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"comicnest/internal/covers"
+	"comicnest/internal/library"
 	"comicnest/internal/opds"
 	"comicnest/internal/store"
 )
@@ -28,10 +34,12 @@ func (s *Server) opdsRoutes() {
 	handle("GET /opds/series", s.handleOPDSSeriesList)
 	handle("GET /opds/series/{id}", s.handleOPDSSeries)
 	handle("GET /opds/recent", s.handleOPDSRecent)
+	handle("GET /opds/reading", s.handleOPDSReading)
 	handle("GET /opds/search", s.handleOPDSSearch)
 	handle("GET /opds/opensearch.xml", s.handleOPDSOpenSearch)
 	handle("GET /opds/issues/{id}/file", s.handleIssueDownload)
 	handle("GET /opds/issues/{id}/cover", s.handleIssueCover)
+	handle("GET /opds/issues/{id}/pages/{page}", s.handleOPDSPage)
 }
 
 // opdsAuth enforces HTTP Basic auth when credentials are configured.
@@ -118,6 +126,13 @@ func (s *Server) handleOPDSRoot(w http.ResponseWriter, r *http.Request) {
 			Links:   []opds.Link{{Rel: opds.RelSubsection, Href: base + "/opds/series", Type: opds.TypeNavigation}},
 		},
 		{
+			ID:      "urn:comicnest:reading",
+			Title:   "Aktualnie czytane",
+			Updated: opds.FormatTime(now),
+			Content: &opds.Text{Type: "text", Value: "Zeszyty rozpoczęte w czytniku, ale nieprzeczytane do końca"},
+			Links:   []opds.Link{{Rel: opds.RelSubsection, Href: base + "/opds/reading", Type: opds.TypeAcquisition}},
+		},
+		{
 			ID:      "urn:comicnest:recent",
 			Title:   "Ostatnio dodane",
 			Updated: opds.FormatTime(now),
@@ -126,6 +141,122 @@ func (s *Server) handleOPDSRoot(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	s.writeFeed(w, f, opds.TypeNavigation)
+}
+
+// progressFor fetches reading progress for the given issues in one query.
+func (s *Server) progressFor(issues []store.Issue) (map[int64]store.ReadingProgress, error) {
+	ids := make([]int64, len(issues))
+	for i, is := range issues {
+		ids[i] = is.ID
+	}
+	return s.store.ReadingProgressFor(ids)
+}
+
+// progressPtr returns the issue's progress from a batch map, or nil.
+func progressPtr(m map[int64]store.ReadingProgress, id int64) *store.ReadingProgress {
+	if p, ok := m[id]; ok {
+		return &p
+	}
+	return nil
+}
+
+// handleOPDSReading serves issues started in a reader but not finished,
+// most recently read first.
+func (s *Server) handleOPDSReading(w http.ResponseWriter, r *http.Request) {
+	items, err := s.store.ListIssuesInProgress(100)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	base := opdsBaseURL(r)
+	f := s.newOPDSFeed(r, "reading", "Aktualnie czytane", time.Now())
+	f.Links[0].Type = opds.TypeAcquisition
+	f.AddLink(opds.RelUp, base+"/opds", opds.TypeNavigation)
+	f.TotalResults, f.ItemsPerPage, f.StartIndex = len(items), len(items), 1
+	for _, it := range items {
+		f.Entries = append(f.Entries, opdsIssueEntry(base, it.Issue, it.SeriesName, &it.Progress))
+	}
+	s.writeFeed(w, f, opds.TypeAcquisition)
+}
+
+// maxStreamWidth caps the width a reader may request for a streamed page.
+const maxStreamWidth = 4000
+
+// handleOPDSPage streams one page of an archive (OPDS-PSE): {page} is
+// 0-based; ?width=N scales the image down to N pixels wide (JPEG). Fetching a
+// page records reading progress, which is how streaming readers report it.
+func (s *Server) handleOPDSPage(w http.ResponseWriter, r *http.Request) {
+	issue := s.getIssueFromPath(w, r)
+	if issue == nil {
+		return
+	}
+	page, err := strconv.Atoi(r.PathValue("page"))
+	if err != nil || page < 0 {
+		http.NotFound(w, r)
+		return
+	}
+	if !canStreamPages(issue.Path) {
+		http.Error(w, "Strumieniowanie stron działa tylko dla archiwów CBZ/CBR.", http.StatusNotFound)
+		return
+	}
+	if _, err := os.Stat(issue.Path); err != nil {
+		http.Error(w, "Plik nie istnieje na dysku (oznaczony jako brakujący?).", http.StatusNotFound)
+		return
+	}
+
+	data, name, err := library.ExtractPage(issue.Path, page)
+	if errors.Is(err, library.ErrPageOutOfRange) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+
+	// First streamed page of a file catalogued before page counting existed:
+	// store the real count so feeds can advertise it.
+	if issue.FilePages == 0 {
+		if pages, err := library.ListPages(issue.Path); err == nil {
+			if err := s.store.SetIssueFilePages(issue.ID, len(pages)); err != nil {
+				log.Printf("opds: page count for issue %d: %v", issue.ID, err)
+			}
+		}
+	}
+
+	contentType := mime.TypeByExtension(strings.ToLower(filepath.Ext(name)))
+	if width, _ := strconv.Atoi(r.FormValue("width")); width > 0 {
+		if width > maxStreamWidth {
+			width = maxStreamWidth
+		}
+		if resized, err := covers.Resize(data, width); err == nil {
+			data, contentType = resized, "image/jpeg"
+		} else {
+			log.Printf("opds: resize page %d of issue %d: %v (serving original)", page, issue.ID, err)
+		}
+	}
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	if err := s.store.SetReadingProgress(issue.ID, page+1); err != nil {
+		log.Printf("opds: progress for issue %d: %v", issue.ID, err)
+	}
+
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.Header().Set("Cache-Control", "private, max-age=86400")
+	w.Write(data)
+}
+
+// canStreamPages reports whether pages can be extracted from the file
+// (image archives only — PDF pages are not rendered).
+func canStreamPages(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".cbz", ".cbr":
+		return true
+	}
+	return false
 }
 
 // handleOPDSSeriesList serves the paged navigation feed of all series.
@@ -242,8 +373,13 @@ func (s *Server) handleOPDSSeries(w http.ResponseWriter, r *http.Request) {
 	}
 	f.TotalResults, f.ItemsPerPage, f.StartIndex = len(issues), opdsPageSize, from+1
 
+	progress, err := s.progressFor(issues[from:to])
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
 	for _, i := range issues[from:to] {
-		f.Entries = append(f.Entries, opdsIssueEntry(base, i, series.Name))
+		f.Entries = append(f.Entries, opdsIssueEntry(base, i, series.Name, progressPtr(progress, i.ID)))
 	}
 	s.writeFeed(w, f, opds.TypeAcquisition)
 }
@@ -275,10 +411,28 @@ func (s *Server) handleOPDSRecent(w http.ResponseWriter, r *http.Request) {
 	}
 	f.TotalResults, f.ItemsPerPage, f.StartIndex = total, opdsPageSize, from+1
 
-	for _, i := range issues {
-		f.Entries = append(f.Entries, opdsIssueEntry(base, i.Issue, i.SeriesName))
+	if err := s.appendIssueEntries(f, base, issues); err != nil {
+		s.serverError(w, err)
+		return
 	}
 	s.writeFeed(w, f, opds.TypeAcquisition)
+}
+
+// appendIssueEntries adds publication entries (with reading progress) for
+// issues joined with their series name.
+func (s *Server) appendIssueEntries(f *opds.Feed, base string, issues []store.IssueWithSeries) error {
+	ids := make([]int64, len(issues))
+	for i, is := range issues {
+		ids[i] = is.ID
+	}
+	progress, err := s.store.ReadingProgressFor(ids)
+	if err != nil {
+		return err
+	}
+	for _, i := range issues {
+		f.Entries = append(f.Entries, opdsIssueEntry(base, i.Issue, i.SeriesName, progressPtr(progress, i.ID)))
+	}
+	return nil
 }
 
 // handleOPDSSearch serves search results as one flat acquisition feed.
@@ -297,8 +451,9 @@ func (s *Server) handleOPDSSearch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		f.TotalResults, f.ItemsPerPage, f.StartIndex = len(issues), len(issues), 1
-		for _, i := range issues {
-			f.Entries = append(f.Entries, opdsIssueEntry(base, i.Issue, i.SeriesName))
+		if err := s.appendIssueEntries(f, base, issues); err != nil {
+			s.serverError(w, err)
+			return
 		}
 	}
 	s.writeFeed(w, f, opds.TypeAcquisition)
@@ -312,8 +467,9 @@ func (s *Server) handleOPDSOpenSearch(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// opdsIssueEntry builds a publication entry with acquisition and cover links.
-func opdsIssueEntry(base string, i store.Issue, seriesName string) opds.Entry {
+// opdsIssueEntry builds a publication entry with acquisition, cover and
+// (for archives) page-streaming links; progress may be nil.
+func opdsIssueEntry(base string, i store.Issue, seriesName string, progress *store.ReadingProgress) opds.Entry {
 	id := strconv.FormatInt(i.ID, 10)
 
 	title := seriesName
@@ -351,6 +507,19 @@ func opdsIssueEntry(base string, i store.Issue, seriesName string) opds.Entry {
 		e.Links = append(e.Links,
 			opds.Link{Rel: opds.RelImage, Href: cover, Type: "image/jpeg"},
 			opds.Link{Rel: opds.RelThumbnail, Href: cover, Type: "image/jpeg"})
+	}
+	if pages := i.TotalPages(); pages > 0 && canStreamPages(i.Path) {
+		stream := opds.Link{
+			Rel:       opds.RelPageStream,
+			Href:      base + "/opds/issues/" + id + "/pages/" + opds.PlaceholderPage + "?width=" + opds.PlaceholderWidth,
+			Type:      "image/jpeg",
+			PageCount: pages,
+		}
+		if progress != nil {
+			stream.LastRead = progress.Page
+			stream.LastReadDate = opds.FormatTime(opds.ParseDBTime(progress.UpdatedAt, time.Now()))
+		}
+		e.Links = append(e.Links, stream)
 	}
 	return e
 }
