@@ -19,7 +19,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 
 	if q != "" {
 		var err error
-		data.Series, err = s.store.ListSeries(q, store.SeriesSortName)
+		data.Series, err = s.store.ListSeries(q, store.SeriesSortName, store.SeriesFilterAll)
 		if err != nil {
 			s.serverError(w, err)
 			return

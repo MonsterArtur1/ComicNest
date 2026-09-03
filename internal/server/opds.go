@@ -261,7 +261,7 @@ func canStreamPages(path string) bool {
 
 // handleOPDSSeriesList serves the paged navigation feed of all series.
 func (s *Server) handleOPDSSeriesList(w http.ResponseWriter, r *http.Request) {
-	series, err := s.store.ListSeries("", store.SeriesSortName)
+	series, err := s.store.ListSeries("", store.SeriesSortName, store.SeriesFilterAll)
 	if err != nil {
 		s.serverError(w, err)
 		return

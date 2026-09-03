@@ -17,6 +17,21 @@ type Series struct {
 
 	IssueCount   int   // number of issues in the series
 	CoverIssueID int64 // first issue of the series (used for cover + one-shot links)
+
+	// Reading aggregates over issues present on disk (list views only).
+	IssuesPresent int // issues whose file exists
+	IssuesStarted int // present issues with any reading progress
+	IssuesRead    int // present issues read to the last page
+}
+
+// AllRead reports whether every downloadable issue has been read to the end.
+func (sr *Series) AllRead() bool {
+	return sr.IssuesPresent > 0 && sr.IssuesRead == sr.IssuesPresent
+}
+
+// InProgress reports whether reading has started but not finished.
+func (sr *Series) InProgress() bool {
+	return sr.IssuesStarted > 0 && !sr.AllRead()
 }
 
 // GetSeries returns the series by id (with its issue count), or nil.
@@ -161,13 +176,57 @@ const (
 	SeriesSortRecent SeriesSort = "recent"
 )
 
+// SeriesFilter narrows the series grid.
+type SeriesFilter string
+
+const (
+	SeriesFilterAll     SeriesFilter = "all"
+	SeriesFilterUnread  SeriesFilter = "unread"  // no reading progress at all
+	SeriesFilterRead    SeriesFilter = "read"    // every present issue read to the end
+	SeriesFilterReading SeriesFilter = "reading" // started, not all finished
+	SeriesFilterNoCV    SeriesFilter = "nocv"    // some issue without ComicVine (or manual) metadata
+	SeriesFilterMissing SeriesFilter = "missing" // some issue's file is gone
+)
+
+// ParseSeriesFilter maps a query value to a filter (unknown → all).
+func ParseSeriesFilter(v string) SeriesFilter {
+	switch f := SeriesFilter(v); f {
+	case SeriesFilterUnread, SeriesFilterRead, SeriesFilterReading, SeriesFilterNoCV, SeriesFilterMissing:
+		return f
+	}
+	return SeriesFilterAll
+}
+
+// having returns the HAVING clause for the filter, in terms of the aggregate
+// aliases computed by ListSeries.
+func (f SeriesFilter) having() string {
+	switch f {
+	case SeriesFilterUnread:
+		return "HAVING started_cnt = 0"
+	case SeriesFilterRead:
+		return "HAVING present_cnt > 0 AND read_cnt = present_cnt"
+	case SeriesFilterReading:
+		return "HAVING started_cnt > 0 AND read_cnt < present_cnt"
+	case SeriesFilterNoCV:
+		return "HAVING SUM(i.metadata_source IN ('filename', 'comicinfo')) > 0"
+	case SeriesFilterMissing:
+		return "HAVING SUM(i.file_missing) > 0"
+	}
+	return ""
+}
+
 // ListSeries returns series that have at least one issue, optionally filtered
-// by a case-insensitive name substring.
-func (s *Store) ListSeries(nameFilter string, sort SeriesSort) ([]Series, error) {
+// by a case-insensitive name substring and a SeriesFilter, with reading
+// aggregates filled in.
+func (s *Store) ListSeries(nameFilter string, sort SeriesSort, filter SeriesFilter) ([]Series, error) {
 	order := "s.name COLLATE NOCASE ASC"
 	if sort == SeriesSortRecent {
 		order = "MAX(i.created_at) DESC"
 	}
+
+	// An issue counts as read when its progress reached the page total
+	// (archive count, else metadata count); unknown totals never count.
+	const total = `CASE WHEN i.file_pages > 0 THEN i.file_pages ELSE i.page_count END`
 
 	// The cover endpoint falls back to a placeholder on its own, so the
 	// representative issue is simply the series' first one.
@@ -181,11 +240,17 @@ func (s *Store) ListSeries(nameFilter string, sort SeriesSort) ([]Series, error)
 		           WHERE i2.series_id = s.id
 		           ORDER BY CAST(i2.issue_number AS REAL), i2.issue_number
 		           LIMIT 1
-		       ), 0)
+		       ), 0),
+		       COALESCE(SUM(i.file_missing = 0), 0) AS present_cnt,
+		       COALESCE(SUM(i.file_missing = 0 AND rp.page IS NOT NULL), 0) AS started_cnt,
+		       COALESCE(SUM(i.file_missing = 0 AND rp.page IS NOT NULL
+		                    AND ` + total + ` > 0 AND rp.page >= ` + total + `), 0) AS read_cnt
 		FROM series s
 		JOIN issues i ON i.series_id = s.id
+		LEFT JOIN reading_progress rp ON rp.issue_id = i.id
 		WHERE (? = '' OR s.name LIKE '%' || ? || '%')
 		GROUP BY s.id
+		` + filter.having() + `
 		ORDER BY ` + order
 
 	rows, err := s.db.Query(query, nameFilter, nameFilter)
@@ -199,7 +264,8 @@ func (s *Store) ListSeries(nameFilter string, sort SeriesSort) ([]Series, error)
 		var sr Series
 		err := rows.Scan(&sr.ID, &sr.Name, &sr.FolderPath, &sr.Publisher, &sr.Description,
 			&sr.ComicVineVolumeID, &sr.MetadataLocked, &sr.OneShot,
-			&sr.CreatedAt, &sr.UpdatedAt, &sr.IssueCount, &sr.CoverIssueID)
+			&sr.CreatedAt, &sr.UpdatedAt, &sr.IssueCount, &sr.CoverIssueID,
+			&sr.IssuesPresent, &sr.IssuesStarted, &sr.IssuesRead)
 		if err != nil {
 			return nil, err
 		}

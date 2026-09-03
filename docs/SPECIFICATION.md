@@ -229,7 +229,7 @@ postępu skanu, dialogu dopasowania ComicVine. Każdy widok działa też bez JS
 
 | Metoda i ścieżka | Widok / akcja |
 |---|---|
-| `GET /` | grid serii (okładka, nazwa, liczba zeszytów); sort: nazwa / ostatnio dodane; filtr tekstowy |
+| `GET /?sort=&filter=` | grid serii (okładka, nazwa, liczba zeszytów, zielony znaczek ✓ gdy wszystkie dostępne zeszyty przeczytane); sort: nazwa / ostatnio dodane; filtry: wszystkie / nieczytane (żaden zeszyt nie ma postępu) / w trakcie czytania (jest postęp, nie wszystko skończone) / przeczytane (każdy dostępny zeszyt doczytany, ≥1 zeszyt) / bez metadanych z ComicVine (jakiś zeszyt ze źródłem `filename` lub `comicinfo`) / brakujące pliki (jakiś zeszyt `file_missing`). Agregaty liczone w `ListSeries` (`LEFT JOIN reading_progress`, HAVING) |
 | `GET /series/{id}` | strona serii: metadane + lista zeszytów (okładka, numer, tytuł, data, rozmiar, badge źródła metadanych, pasek postępu czytania pod okładką + „czytane: str. X z N (P%)" / „✓ przeczytane") |
 | `GET /series/{id}/edit` → `POST /series/{id}` | formularz edycji serii (nazwa, wydawca, opis) |
 | `POST /series/{id}/match` / `POST /series/{id}/match/{volumeID}` | wyszukanie kandydatów ComicVine / zapis wyboru |

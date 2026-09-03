@@ -59,6 +59,7 @@ i coś pokazywała. Szczegóły projektowe: [SPECIFICATION.md](SPECIFICATION.md)
 - [x] OPDS pod Thorium Reader: komunikat startowy z adresami IP (Thorium odrzuca `localhost`). Widok „półki" serii (grupy `rel="collection"`, pojedyncze wydania jako zeszyt) był wdrożony i wycofany — w Thorium robił większy bałagan niż lista
 - [x] Strumieniowanie stron OPDS-PSE 1.2 (`/opds/issues/{id}/pages/{n}?width=`), postęp czytania zapisywany z żądań stron (`reading_progress`, migracja 3 z `issues.file_pages`), `pse:lastRead` w feedach, sekcja „Aktualnie czytane" (`/opds/reading`); `library.ExtractPage`, `covers.Resize`
 - [x] Postęp czytania w UI WWW: pasek pod okładką i „czytane: str. X z N" na liście zeszytów serii, ramka z postępem i wiersz „Przeczytano" na stronie zeszytu (`readingView`, `issueRow`)
+- [x] Grid biblioteki: zielony znaczek ✓ na przeczytanych seriach i filtry (nieczytane / w trakcie / przeczytane / bez ComicVine / brakujące pliki) obok sortowania; agregaty czytania w `ListSeries` (`SeriesFilter`)
 
 ## Pomysły na v2 (nie robić teraz)
 - Czytnik stron w przeglądarce (endpoint stron i postęp już istnieją po stronie OPDS — do reużycia)

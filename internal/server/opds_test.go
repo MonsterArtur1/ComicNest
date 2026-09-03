@@ -358,6 +358,72 @@ func TestWebShowsReadingProgress(t *testing.T) {
 	}
 }
 
+func TestHomeFiltersAndReadMark(t *testing.T) {
+	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	h := srv.Handler()
+	lists := func(filter string) bool {
+		body := get(t, h, "/?filter="+filter, nil).Body.String()
+		return strings.Contains(body, `<span class="card-title">Saga</span>`)
+	}
+	hasMark := func() bool {
+		return strings.Contains(get(t, h, "/", nil).Body.String(), `class="read-mark"`)
+	}
+
+	// A second series whose issues are all present and untouched: every
+	// aggregate over it is computed from NULL progress rows only.
+	batmanID, err := srv.store.FindOrCreateSeriesByFolder("Batman", "Batman")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.store.InsertIssue(&store.Issue{SeriesID: batmanID, Path: filepath.Join(t.TempDir(), "Batman 1.cbz"),
+		IssueNumber: "1", FilePages: 20, MetadataSource: store.SourceComicVine}); err != nil {
+		t.Fatal(err)
+	}
+	batmanListed := func(filter string) bool {
+		return strings.Contains(get(t, h, "/?filter="+filter, nil).Body.String(), `<span class="card-title">Batman</span>`)
+	}
+	if rec := get(t, h, "/", nil); rec.Code != http.StatusOK {
+		t.Fatalf("home page: %d", rec.Code)
+	}
+	if !batmanListed("all") || !batmanListed("unread") || batmanListed("nocv") || batmanListed("missing") {
+		t.Error("untouched ComicVine-sourced series should be listed under 'all' and 'unread' only")
+	}
+
+	// Nothing read yet.
+	if hasMark() {
+		t.Error("unread series must not carry the read mark")
+	}
+	if !lists("unread") || lists("reading") || lists("read") {
+		t.Error("unread series should be listed only under 'unread'")
+	}
+	// Independent of reading: Saga has a filename-sourced issue and a missing file.
+	if !lists("nocv") || !lists("missing") {
+		t.Error("series should match the 'nocv' and 'missing' filters")
+	}
+	if !lists("all") || !lists("bogus") {
+		t.Error("'all' and unknown filters should list everything")
+	}
+
+	// Start reading → in progress.
+	get(t, h, "/opds/issues/1/pages/0", nil)
+	if lists("unread") || !lists("reading") || lists("read") || hasMark() {
+		t.Error("started series should be listed only under 'reading', without the read mark")
+	}
+
+	// Finish the only present issue (the missing one does not count) → read.
+	get(t, h, "/opds/issues/1/pages/2", nil)
+	if lists("unread") || lists("reading") || !lists("read") || !hasMark() {
+		t.Error("finished series should be listed under 'read' with the read mark")
+	}
+
+	// The sort selector keeps the active filter.
+	body := get(t, h, "/?filter=read&sort=recent", nil).Body.String()
+	if !strings.Contains(body, `<input type="hidden" name="filter" value="read">`) ||
+		!strings.Contains(body, `class="chip active" href="/?sort=recent&amp;filter=read"`) {
+		t.Errorf("filter/sort state not preserved in the page head:\n%s", body)
+	}
+}
+
 func TestOPDSNoStreamingForPDF(t *testing.T) {
 	e := opdsIssueEntry("http://h", store.Issue{ID: 9, Path: "x/Comic.pdf", PageCount: 40}, "Comic", nil)
 	for _, l := range e.Links {
