@@ -51,8 +51,13 @@
         </dl>
 
         <div class="detail-actions">
+            {{if and (not .Issue.FileMissing) (canRead .Issue.Path)}}
+            <a class="btn btn-primary" href="/issues/{{.Issue.ID}}/read">
+                {{if and .Reading (not .Reading.Finished)}}Czytaj dalej (str. {{.Reading.Page}}){{else if .Reading}}Czytaj od nowa{{else}}Czytaj{{end}}
+            </a>
+            {{end}}
             {{if not .Issue.FileMissing}}
-            <a class="btn btn-primary" href="/issues/{{.Issue.ID}}/download">Pobierz plik</a>
+            <a class="btn {{if not (canRead .Issue.Path)}}btn-primary{{end}}" href="/issues/{{.Issue.ID}}/download">Pobierz plik</a>
             {{end}}
             <a class="btn" href="/issues/{{.Issue.ID}}/edit">Edytuj metadane</a>
             {{if and .Reading .Reading.Finished}}

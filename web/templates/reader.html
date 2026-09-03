@@ -1,0 +1,51 @@
+{{define "reader"}}<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <title>{{.Title}} — ComicNest</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/reader.js" defer></script>
+</head>
+<body class="reader-body">
+<main id="reader" class="reader"
+      data-issue="{{.Issue.ID}}"
+      data-total="{{.Total}}"
+      data-start="{{.StartPage}}"
+      data-prev="{{.PrevIssueID}}"
+      data-next="{{.NextIssueID}}"
+      data-back="/issues/{{.Issue.ID}}"
+      data-series="/series/{{.Series.ID}}">
+
+    <header class="reader-bar reader-top">
+        <a class="reader-back" href="/issues/{{.Issue.ID}}" title="Wróć do zeszytu (Esc)">◂</a>
+        <span class="reader-title" title="{{.Title}}">{{.Title}}</span>
+        <span class="reader-counter"><span id="page-num">{{.StartPage}}</span> / {{.Total}}</span>
+        <div class="reader-tools">
+            <button type="button" data-zoom="fit-h" title="Dopasuj do wysokości (0)">↕</button>
+            <button type="button" data-zoom="fit-w" title="Dopasuj do szerokości (w)">↔</button>
+            <button type="button" data-zoom="out" title="Pomniejsz (−)">−</button>
+            <span id="zoom-label" class="reader-zoom-label">auto</span>
+            <button type="button" data-zoom="in" title="Powiększ (+)">+</button>
+            <button type="button" id="fullscreen" title="Pełny ekran (f)">⛶</button>
+        </div>
+    </header>
+
+    <div id="stage" class="reader-stage">
+        <img id="page" class="reader-page" alt="strona" draggable="false">
+        <div class="reader-zone reader-zone-prev" data-nav="prev" title="Poprzednia strona"></div>
+        <div class="reader-zone reader-zone-menu" data-nav="menu"></div>
+        <div class="reader-zone reader-zone-next" data-nav="next" title="Następna strona"></div>
+        <div id="loading" class="reader-loading" hidden>Ładowanie…</div>
+    </div>
+
+    <footer class="reader-bar reader-bottom">
+        {{if .PrevIssueID}}<a class="reader-issue-link" href="/issues/{{.PrevIssueID}}/read" title="Poprzedni zeszyt">◂◂</a>{{end}}
+        <button type="button" data-nav="prev" title="Poprzednia (←)">◂</button>
+        <input id="slider" type="range" min="1" max="{{.Total}}" value="{{.StartPage}}" step="1" aria-label="Strona">
+        <button type="button" data-nav="next" title="Następna (→)">▸</button>
+        {{if .NextIssueID}}<a class="reader-issue-link" href="/issues/{{.NextIssueID}}/read" title="Następny zeszyt">▸▸</a>{{end}}
+    </footer>
+</main>
+</body>
+</html>{{end}}

@@ -39,7 +39,7 @@ func (s *Server) opdsRoutes() {
 	handle("GET /opds/opensearch.xml", s.handleOPDSOpenSearch)
 	handle("GET /opds/issues/{id}/file", s.handleIssueDownload)
 	handle("GET /opds/issues/{id}/cover", s.handleIssueCover)
-	handle("GET /opds/issues/{id}/pages/{page}", s.handleOPDSPage)
+	handle("GET /opds/issues/{id}/pages/{page}", s.handleIssuePage)
 }
 
 // opdsAuth enforces HTTP Basic auth when credentials are configured.
@@ -182,10 +182,12 @@ func (s *Server) handleOPDSReading(w http.ResponseWriter, r *http.Request) {
 // maxStreamWidth caps the width a reader may request for a streamed page.
 const maxStreamWidth = 4000
 
-// handleOPDSPage streams one page of an archive (OPDS-PSE): {page} is
-// 0-based; ?width=N scales the image down to N pixels wide (JPEG). Fetching a
-// page records reading progress, which is how streaming readers report it.
-func (s *Server) handleOPDSPage(w http.ResponseWriter, r *http.Request) {
+// handleIssuePage streams one page of an archive (OPDS-PSE and the web
+// reader): {page} is 0-based; ?width=N scales the image down to N pixels wide
+// (JPEG). Fetching a page records reading progress — that is how streaming
+// readers report it — unless ?track=0, which the web reader uses because it
+// preloads pages and reports progress explicitly instead.
+func (s *Server) handleIssuePage(w http.ResponseWriter, r *http.Request) {
 	issue := s.getIssueFromPath(w, r)
 	if issue == nil {
 		return
@@ -239,8 +241,10 @@ func (s *Server) handleOPDSPage(w http.ResponseWriter, r *http.Request) {
 		contentType = "application/octet-stream"
 	}
 
-	if err := s.store.SetReadingProgress(issue.ID, page+1); err != nil {
-		log.Printf("opds: progress for issue %d: %v", issue.ID, err)
+	if r.FormValue("track") != "0" {
+		if err := s.store.SetReadingProgress(issue.ID, page+1); err != nil {
+			log.Printf("opds: progress for issue %d: %v", issue.ID, err)
+		}
 	}
 
 	w.Header().Set("Content-Type", contentType)

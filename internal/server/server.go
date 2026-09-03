@@ -29,6 +29,7 @@ type Server struct {
 	scrape    *scrapeJob
 	templates map[string]*template.Template
 	partials  *template.Template
+	reader    *template.Template // standalone full-screen reader page
 	mux       *http.ServeMux
 }
 
@@ -59,6 +60,7 @@ func (s *Server) funcMap() template.FuncMap {
 		"sourceLabel": sourceLabel,
 		"truncate":    truncateText,
 		"opdsEnabled": func() bool { return s.cfg.OPDS.Enabled },
+		"canRead":     canStreamPages, // in-browser reader works for CBZ/CBR only
 	}
 }
 
@@ -129,6 +131,13 @@ func (s *Server) parseTemplates() error {
 		return fmt.Errorf("parsing partials: %w", err)
 	}
 	s.partials = partials
+
+	// The reader has its own chrome-less document instead of the layout.
+	reader, err := template.New("reader.html").Funcs(s.funcMap()).ParseFS(web.FS, "templates/reader.html")
+	if err != nil {
+		return fmt.Errorf("parsing reader template: %w", err)
+	}
+	s.reader = reader
 	return nil
 }
 
@@ -155,6 +164,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /issues/{id}/delete", s.handleIssueDelete)
 	s.mux.HandleFunc("POST /issues/{id}/read", s.handleIssueMarkRead)
 	s.mux.HandleFunc("POST /issues/{id}/unread", s.handleIssueMarkUnread)
+	s.mux.HandleFunc("GET /issues/{id}/read", s.handleReader)
+	s.mux.HandleFunc("GET /issues/{id}/pages/{page}", s.handleIssuePage)
+	s.mux.HandleFunc("POST /issues/{id}/progress", s.handleIssueProgress)
 	s.mux.HandleFunc("GET /issues/{id}/cover", s.handleIssueCover)
 	s.mux.HandleFunc("GET /issues/{id}/download", s.handleIssueDownload)
 	s.mux.HandleFunc("GET /search", s.handleSearch)

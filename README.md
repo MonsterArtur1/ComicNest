@@ -17,6 +17,9 @@ biblioteka na Twoim dysku. Inspirowany [Komgą](https://komga.org/), ale prostsz
 - **Okładki** wyciągane z pierwszej strony archiwum (cache miniatur na dysku).
 - **Przeglądanie i wyszukiwanie**: grid serii, strona serii z filtrami
   (bez metadanych / z ComicVine / brakujące pliki), szczegóły zeszytu, pobieranie pliku.
+- **Czytnik w przeglądarce** dla CBZ/CBR: strona po stronie, zoom (dopasowanie do
+  wysokości lub szerokości, skala), klawiatura, kliknięcia, gesty, pełny ekran; wznawia od
+  ostatniej strony i dzieli postęp z czytnikami OPDS.
 - **Serwer OPDS** (opcjonalny) — biblioteka dostępna w czytnikach komiksów na telefonie
   i tablecie (Panels, Chunky, Moon+ Reader, Librera, KOReader…), z okładkami,
   wyszukiwaniem i opcjonalnym hasłem.
