@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -195,11 +196,59 @@ func (s *Server) withLogging(next http.Handler) http.Handler {
 // (localhost by default — the web UI has no auth).
 func (s *Server) ListenAndServe() error {
 	addr := fmt.Sprintf("%s:%d", s.cfg.Listen, s.cfg.Port)
-	fmt.Printf("ComicNest running at http://%s/\n", addr)
+	hosts := s.reachableHosts()
+	for i, h := range hosts {
+		label := "ComicNest running at"
+		if i > 0 {
+			label = "             also at"
+		}
+		fmt.Printf("%s http://%s:%d/\n", label, h, s.cfg.Port)
+	}
 	if s.cfg.OPDS.Enabled {
-		fmt.Printf("OPDS catalog at http://%s/opds\n", addr)
+		for _, h := range hosts {
+			fmt.Printf("OPDS catalog: http://%s:%d/opds\n", h, s.cfg.Port)
+		}
+		// Thorium Reader validates catalog URLs with a "must have a TLD" rule
+		// (validator.js isURL, THORIUM_ISURL_REQUIRE_TLD_FALSE unset in
+		// official builds), so "localhost" is rejected while IPs pass.
+		fmt.Println("OPDS note: Thorium Reader rejects \"localhost\" — use an IP address (127.0.0.1 or the LAN address above)")
 	}
 	return http.ListenAndServe(addr, s.withLogging(s.mux))
+}
+
+// reachableHosts lists hosts a client can use to reach the server: just the
+// configured one, or — when bound to all interfaces — localhost plus every
+// non-loopback IPv4 address, so the user can copy a LAN URL into a reader.
+func (s *Server) reachableHosts() []string {
+	if s.cfg.Listen != "0.0.0.0" && s.cfg.Listen != "" && s.cfg.Listen != "::" {
+		return []string{s.cfg.Listen}
+	}
+	hosts := []string{"localhost"}
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return hosts
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, a := range addrs {
+			ipNet, ok := a.(*net.IPNet)
+			if !ok {
+				continue
+			}
+			ip := ipNet.IP.To4()
+			if ip == nil || ip.IsLinkLocalUnicast() {
+				continue
+			}
+			hosts = append(hosts, ip.String())
+		}
+	}
+	return hosts
 }
 
 // Handler exposes the routed handler (without request logging) for tests.

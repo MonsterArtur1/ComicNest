@@ -63,6 +63,10 @@ z biblioteką w sieci domowej). Katalog oferuje:
 - **Ostatnio dodane** — zeszyty w kolejności trafienia do biblioteki,
 - **wyszukiwanie** po nazwie serii, tytule i numerze zeszytu (OpenSearch).
 
+Na tym samym komputerze (np. Thorium Reader na PC) użyj `http://127.0.0.1:8080/opds` —
+Thorium odrzuca adresy bez domeny, więc `http://localhost:8080/opds` kończy się błędem
+„Błąd dostępu do kanału". Serwer wypisuje przy starcie wszystkie działające adresy.
+
 Jeśli ustawisz `opds.username` i `opds.password`, czytnik zapyta o login (HTTP Basic).
 Pamiętaj, że przy `listen: 0.0.0.0` interfejs WWW (bez logowania) także jest widoczny
 w sieci lokalnej — hasło OPDS chroni tylko katalog dla czytników. Zeszyty oznaczone

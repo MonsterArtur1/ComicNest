@@ -268,6 +268,19 @@ z żądania, z uwzględnieniem `X-Forwarded-Proto/Host`), bo część czytników
 względne `href`. Layout HTML dodaje `<link rel="alternate" type="…opds-catalog…">` (autodetekcja)
 i plakietkę „OPDS" w nagłówku.
 
+Zgodność klientów: Thorium Reader (3.5.x) waliduje adres katalogu przez `validator.isURL` z
+`require_tld` (flaga budowania `THORIUM_ISURL_REQUIRE_TLD_FALSE` nie jest ustawiona w oficjalnych
+wydaniach), więc `http://localhost:…` odrzuca **przed** wysłaniem żądania („Błąd dostępu do
+kanału"), a adresy IP (`127.0.0.1`, IP w LAN) akceptuje. Basic auth Thorium obsługuje z nagłówka
+`WWW-Authenticate: Basic` (okno logowania, `Authorization: Basic` w kolejnych żądaniach). Dlatego
+komunikat startowy wypisuje wszystkie osiągalne adresy (localhost + IPv4 interfejsów przy `0.0.0.0`).
+
+Ograniczenie Thorium (do wiadomości, nie obchodzone): wpisy nawigacyjne renderuje jako czysty
+tekst bez miniatur, okładki pokazuje tylko dla publikacji, a kliknięcie publikacji otwiera dialog
+informacji bez nawigacji do katalogu. Próba widoku „półki" (serie jako grupy `rel="collection"`
+z zeszytami, pojedyncze wydania jako publikacje) została wycofana na życzenie użytkownika —
+dawała większy bałagan niż zwykła lista.
+
 ## 10. Uwagi bezpieczeństwa i jakości
 
 - **Stary projekt ma zahardkodowany klucz ComicVine w `Old/ComicsNest/apiProcessor.go`

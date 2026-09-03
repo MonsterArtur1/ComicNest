@@ -56,6 +56,7 @@ i coś pokazywała. Szczegóły projektowe: [SPECIFICATION.md](SPECIFICATION.md)
 - [x] Druga faza skanu: automatyczny scrape ComicVine dla zeszytów z dopasowaną serią, ale bez danych CV (bez blokad i brakujących plików); postęp „Aktualizacja ComicVine… X/Y" i licznik w podsumowaniu skanu („ComicVine: N zaktualizowano")
 - [x] Fix pomieszanych okładek po rekreacji bazy: okładki serwowane z `Cache-Control: no-cache` (rewalidacja przez Last-Modified/304 zamiast max-age 24h — ID zeszytów są reużywane), a skan na starcie usuwa osierocone miniatury z `data/covers/`
 - [x] Serwer OPDS 1.2 (`opds.enabled` w configu, opcjonalne Basic auth, `listen` do wystawienia w LAN): root → serie (nawigacja, paginacja) → zeszyty serii (akwizycja), „Ostatnio dodane", wyszukiwanie + OpenSearch, pliki i okładki pod `/opds/…`; pakiet `internal/opds` + testy httptest (SPECIFICATION §9a)
+- [x] OPDS pod Thorium Reader: komunikat startowy z adresami IP (Thorium odrzuca `localhost`). Widok „półki" serii (grupy `rel="collection"`, pojedyncze wydania jako zeszyt) był wdrożony i wycofany — w Thorium robił większy bałagan niż lista
 
 ## Pomysły na v2 (nie robić teraz)
 - Czytnik stron w przeglądarce (strumieniowanie stron z CBZ/CBR) + zapamiętywanie postępu
