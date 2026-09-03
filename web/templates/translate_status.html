@@ -1,0 +1,30 @@
+{{define "translate-status"}}
+{{if .Enabled}}
+{{if and .Running .Mine}}
+<div class="scan-status running"
+     hx-get="/issues/{{.ThisIssueID}}/translate/status" hx-trigger="every 3s"
+     hx-target="#translate-area" hx-swap="innerHTML">
+    <span class="spinner"></span>
+    <span>Tłumaczenie stron… {{.Done}}/{{.Total}}</span>
+</div>
+{{else}}
+<div class="scan-status">
+    {{if .CanTranslate}}
+    <form hx-post="/issues/{{.ThisIssueID}}/translate" hx-target="#translate-area" hx-swap="innerHTML"
+          action="/issues/{{.ThisIssueID}}/translate" method="post">
+        <button type="submit" class="btn" {{if .Running}}disabled title="Inne tłumaczenie jest w toku"{{else}}title="Przetłumacz strony komiksu ({{.Lang}}) przez AI"{{end}}>
+            Przetłumacz na polski (AI)
+        </button>
+    </form>
+    {{end}}
+    {{if and .Finished .Mine}}
+        {{if .Err}}
+        <span class="scan-note scan-error" title="{{.Err}}">błąd tłumaczenia: {{.Err}}</span>
+        {{else if .NewIssueID}}
+        <span class="scan-note">gotowe — <a class="flash-link" href="/issues/{{.NewIssueID}}">otwórz przetłumaczony zeszyt</a></span>
+        {{end}}
+    {{end}}
+</div>
+{{end}}
+{{end}}
+{{end}}

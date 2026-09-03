@@ -45,6 +45,49 @@ Bez klucza ComicVine aplikacja działa normalnie — funkcje dopasowania/scrape'
 wyłączone z podpowiedzią w UI. Klucz trzymaj wyłącznie w `config.yaml` (plik jest
 w `.gitignore`).
 
+## Tłumaczenie komiksów na polski (AI)
+
+ComicNest potrafi przetłumaczyć strony zeszytu (dymki) i zapisać wynik jako
+`<nazwa> [PL].cbz` obok oryginału — nowy plik od razu trafia do katalogu jako
+zablokowany wpis w tej samej serii. Ciężką robotę (detekcja dymków, OCR,
+inpainting) wykonuje lokalnie działający
+[manga-image-translator](https://github.com/zyddnys/manga-image-translator),
+a samo tłumaczenie tekstu zleca skonfigurowanemu LLM.
+
+Instalacja serwisu (raz, wymaga Pythona; GPU NVIDII mocno zalecane):
+
+```
+git clone https://github.com/zyddnys/manga-image-translator
+cd manga-image-translator
+pip install -r requirements.txt   # najlepiej w venv/conda
+```
+
+W katalogu projektu utwórz `.env` z kluczem LLM używanym do tłumaczenia:
+
+```
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
+```
+
+Uruchom serwer (modele pobiorą się przy pierwszym użyciu):
+
+```
+cd server
+python main.py --use-gpu
+```
+
+Na koniec wskaż serwis w `config.yaml` ComicNest:
+
+```yaml
+translator_url: "http://127.0.0.1:8001"
+translator_engine: "chatgpt"   # też: gemini, deepseek, deepl, groq…
+translator_lang: "POL"
+```
+
+Po restarcie na stronie zeszytu (CBZ/CBR) pojawi się przycisk
+**„Przetłumacz na polski (AI)"** z postępem strona po stronie. Jedno
+tłumaczenie naraz; z GPU strona zajmuje sekundy, na CPU — minuty.
+
 ## Organizacja biblioteki
 
 Preferowana struktura — **folder = seria**:

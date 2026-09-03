@@ -2,3 +2,4 @@ port: 8080
 library: "D:/Library"
 data_dir: ./data
 comicvine_api_key: "38f4732067d47702b21621d27a828a5b7a51dde1"
+translator_url: "http://127.0.0.1:8001"

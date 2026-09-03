@@ -13,14 +13,24 @@ type Config struct {
 	Library         string `yaml:"library"`
 	DataDir         string `yaml:"data_dir"`
 	ComicVineAPIKey string `yaml:"comicvine_api_key"`
+
+	// Page translation via a locally running manga-image-translator server
+	// (https://github.com/zyddnys/manga-image-translator). Empty URL disables
+	// the feature.
+	TranslatorURL    string `yaml:"translator_url"`
+	TranslatorEngine string `yaml:"translator_engine"` // e.g. chatgpt, gemini, deepl
+	TranslatorLang   string `yaml:"translator_lang"`   // target language code, e.g. POL
 }
 
 func defaults() Config {
 	return Config{
-		Port:            8080,
-		Library:         "",
-		DataDir:         "./data",
-		ComicVineAPIKey: "",
+		Port:             8080,
+		Library:          "",
+		DataDir:          "./data",
+		ComicVineAPIKey:  "",
+		TranslatorURL:    "",
+		TranslatorEngine: "chatgpt",
+		TranslatorLang:   "POL",
 	}
 }
 

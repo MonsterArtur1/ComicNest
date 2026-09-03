@@ -11,6 +11,7 @@ import (
 	"comicnest/internal/library"
 	"comicnest/internal/server"
 	"comicnest/internal/store"
+	"comicnest/internal/translator"
 )
 
 func main() {
@@ -38,11 +39,17 @@ func main() {
 	} else {
 		log.Printf("comicvine: enabled")
 	}
+	if cfg.TranslatorURL == "" {
+		log.Printf("translator: disabled (no translator_url in config.yaml)")
+	} else {
+		log.Printf("translator: %s (engine %s, lang %s)", cfg.TranslatorURL, cfg.TranslatorEngine, cfg.TranslatorLang)
+	}
 
 	coverCache := covers.New(coversDir)
 	scanner := library.NewScanner(st, coverCache, cfg.Library)
 
-	srv, err := server.New(cfg, st, coverCache, scanner, comicvine.New(cfg.ComicVineAPIKey))
+	srv, err := server.New(cfg, st, coverCache, scanner, comicvine.New(cfg.ComicVineAPIKey),
+		translator.New(cfg.TranslatorURL, cfg.TranslatorEngine, cfg.TranslatorLang))
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}

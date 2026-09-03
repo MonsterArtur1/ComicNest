@@ -192,11 +192,17 @@ func ExtractCover(archivePath string) ([]byte, error) {
 	if len(pages) == 0 {
 		return nil, fmt.Errorf("archive %s has no image pages", archivePath)
 	}
-	target := pages[0]
+	return ExtractPage(archivePath, pages[0])
+}
 
+// ExtractPage returns the raw bytes of the named page entry (a name from
+// ListPages). Each call reopens the archive, which for RAR means a sequential
+// walk to the entry — fine for occasional reads, and page extraction time is
+// dwarfed by whatever the caller does with the page anyway.
+func ExtractPage(archivePath, pageName string) ([]byte, error) {
 	entries, err := openArchive(archivePath)
 	if err != nil {
-		return nil, fmt.Errorf("extract cover from %s: %w", archivePath, err)
+		return nil, fmt.Errorf("extract page from %s: %w", archivePath, err)
 	}
 	defer entries.Close()
 
@@ -206,29 +212,29 @@ func ExtractCover(archivePath string) ([]byte, error) {
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("extract cover from %s: %w", archivePath, err)
+			return nil, fmt.Errorf("extract page from %s: %w", archivePath, err)
 		}
-		if e.Name != target {
+		if e.Name != pageName {
 			continue
 		}
 		if e.Size >= 0 && e.Size > maxCoverSize {
-			return nil, fmt.Errorf("cover page %s in %s exceeds %d byte limit", target, archivePath, maxCoverSize)
+			return nil, fmt.Errorf("page %s in %s exceeds %d byte limit", pageName, archivePath, maxCoverSize)
 		}
 		rc, err := e.open()
 		if err != nil {
-			return nil, fmt.Errorf("open cover page %s in %s: %w", target, archivePath, err)
+			return nil, fmt.Errorf("open page %s in %s: %w", pageName, archivePath, err)
 		}
 		data, err := io.ReadAll(io.LimitReader(rc, maxCoverSize+1))
 		rc.Close()
 		if err != nil {
-			return nil, fmt.Errorf("read cover page %s in %s: %w", target, archivePath, err)
+			return nil, fmt.Errorf("read page %s in %s: %w", pageName, archivePath, err)
 		}
 		if int64(len(data)) > maxCoverSize {
-			return nil, fmt.Errorf("cover page %s in %s exceeds %d byte limit", target, archivePath, maxCoverSize)
+			return nil, fmt.Errorf("page %s in %s exceeds %d byte limit", pageName, archivePath, maxCoverSize)
 		}
 		return data, nil
 	}
-	return nil, fmt.Errorf("cover page %s not found in %s", target, archivePath)
+	return nil, fmt.Errorf("page %s not found in %s", pageName, archivePath)
 }
 
 // isDigit reports whether r is an ASCII digit.

@@ -60,6 +60,9 @@
             </form>
             {{end}}
         </div>
+
+        <div class="scrape-area" id="translate-area"
+             hx-get="/issues/{{.Issue.ID}}/translate/status" hx-trigger="load" hx-swap="innerHTML"></div>
     </div>
 </div>
 {{end}}

@@ -15,6 +15,7 @@ import (
 	"comicnest/internal/covers"
 	"comicnest/internal/library"
 	"comicnest/internal/store"
+	"comicnest/internal/translator"
 	"comicnest/web"
 )
 
@@ -24,22 +25,26 @@ type Server struct {
 	store     *store.Store
 	covers    *covers.Cache
 	scanner   *library.Scanner
-	cv        *comicvine.Client
-	scrape    *scrapeJob
-	templates map[string]*template.Template
-	partials  *template.Template
-	mux       *http.ServeMux
+	cv         *comicvine.Client
+	scrape     *scrapeJob
+	translator *translator.Client
+	translate  *translateJob
+	templates  map[string]*template.Template
+	partials   *template.Template
+	mux        *http.ServeMux
 }
 
-func New(cfg config.Config, st *store.Store, cv *covers.Cache, sc *library.Scanner, cvc *comicvine.Client) (*Server, error) {
+func New(cfg config.Config, st *store.Store, cv *covers.Cache, sc *library.Scanner, cvc *comicvine.Client, tr *translator.Client) (*Server, error) {
 	s := &Server{
-		cfg:     cfg,
-		store:   st,
-		covers:  cv,
-		scanner: sc,
-		cv:      cvc,
-		scrape:  &scrapeJob{},
-		mux:     http.NewServeMux(),
+		cfg:        cfg,
+		store:      st,
+		covers:     cv,
+		scanner:    sc,
+		cv:         cvc,
+		scrape:     &scrapeJob{},
+		translator: tr,
+		translate:  &translateJob{},
+		mux:        http.NewServeMux(),
 	}
 	if err := s.parseTemplates(); err != nil {
 		return nil, err
@@ -120,7 +125,7 @@ func (s *Server) parseTemplates() error {
 	}
 
 	// Partials are rendered standalone (no layout), mostly for HTMX swaps.
-	partials, err := template.ParseFS(web.FS, "templates/scan_status.html", "templates/scrape_status.html")
+	partials, err := template.ParseFS(web.FS, "templates/scan_status.html", "templates/scrape_status.html", "templates/translate_status.html")
 	if err != nil {
 		return fmt.Errorf("parsing partials: %w", err)
 	}
@@ -149,6 +154,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /issues/{id}/unlock", s.handleIssueUnlock)
 	s.mux.HandleFunc("POST /issues/{id}/scrape", s.handleIssueScrape)
 	s.mux.HandleFunc("POST /issues/{id}/delete", s.handleIssueDelete)
+	s.mux.HandleFunc("POST /issues/{id}/translate", s.handleIssueTranslate)
+	s.mux.HandleFunc("GET /issues/{id}/translate/status", s.handleTranslateStatus)
 	s.mux.HandleFunc("GET /issues/{id}/cover", s.handleIssueCover)
 	s.mux.HandleFunc("GET /issues/{id}/download", s.handleIssueDownload)
 	s.mux.HandleFunc("GET /search", s.handleSearch)
