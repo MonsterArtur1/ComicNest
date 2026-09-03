@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{block "title" .}}ComicNest{{end}}</title>
     <link rel="stylesheet" href="/static/styles.css">
+    {{if opdsEnabled}}<link rel="alternate" type="application/atom+xml;profile=opds-catalog;kind=navigation" title="ComicNest OPDS" href="/opds">{{end}}
     <script src="/static/htmx.min.js" defer></script>
 </head>
 <body>
@@ -13,6 +14,7 @@
     <form class="search" action="/search" method="get">
         <input type="search" name="q" placeholder="Szukaj serii lub zeszytu…" value="{{block "searchQuery" .}}{{end}}">
     </form>
+    {{if opdsEnabled}}<a class="opds-badge" href="/opds" title="Adres katalogu OPDS — wklej go w czytniku komiksów (Panels, Chunky, Moon+ Reader, Librera…)">OPDS</a>{{end}}
     <div class="scan-area" id="scan-area" hx-get="/scan/status" hx-trigger="load" hx-swap="innerHTML">
         <noscript>
             <form action="/scan" method="post"><button type="submit">Skanuj bibliotekę</button></form>

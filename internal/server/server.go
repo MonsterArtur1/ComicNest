@@ -52,10 +52,13 @@ func New(cfg config.Config, st *store.Store, cv *covers.Cache, sc *library.Scann
 }
 
 // funcMap holds helpers available in every template.
-var funcMap = template.FuncMap{
-	"prettySize":  prettySize,
-	"sourceLabel": sourceLabel,
-	"truncate":    truncateText,
+func (s *Server) funcMap() template.FuncMap {
+	return template.FuncMap{
+		"prettySize":  prettySize,
+		"sourceLabel": sourceLabel,
+		"truncate":    truncateText,
+		"opdsEnabled": func() bool { return s.cfg.OPDS.Enabled },
+	}
 }
 
 // truncateText cuts a string to at most n runes, preferring a word boundary,
@@ -111,7 +114,7 @@ func (s *Server) parseTemplates() error {
 
 	s.templates = make(map[string]*template.Template)
 	for _, page := range pages {
-		t, err := template.New(page).Funcs(funcMap).
+		t, err := template.New(page).Funcs(s.funcMap()).
 			ParseFS(web.FS, "templates/layout.html", "templates/"+page)
 		if err != nil {
 			return fmt.Errorf("parsing template %s: %w", page, err)
@@ -154,6 +157,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /search", s.handleSearch)
 	s.mux.HandleFunc("POST /scan", s.handleScanStart)
 	s.mux.HandleFunc("GET /scan/status", s.handleScanStatus)
+	if s.cfg.OPDS.Enabled {
+		s.opdsRoutes()
+	}
 	s.mux.HandleFunc("/", s.handleNotFound) // catch-all: styled 404
 }
 
@@ -185,11 +191,20 @@ func (s *Server) withLogging(next http.Handler) http.Handler {
 	})
 }
 
-// ListenAndServe blocks, serving the app on localhost (personal app, no auth).
+// ListenAndServe blocks, serving the app on the configured interface
+// (localhost by default — the web UI has no auth).
 func (s *Server) ListenAndServe() error {
-	addr := fmt.Sprintf("localhost:%d", s.cfg.Port)
+	addr := fmt.Sprintf("%s:%d", s.cfg.Listen, s.cfg.Port)
 	fmt.Printf("ComicNest running at http://%s/\n", addr)
+	if s.cfg.OPDS.Enabled {
+		fmt.Printf("OPDS catalog at http://%s/opds\n", addr)
+	}
 	return http.ListenAndServe(addr, s.withLogging(s.mux))
+}
+
+// Handler exposes the routed handler (without request logging) for tests.
+func (s *Server) Handler() http.Handler {
+	return s.mux
 }
 
 // render writes a full page with status 200.

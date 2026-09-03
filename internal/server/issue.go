@@ -120,6 +120,6 @@ func (s *Server) handleIssueDownload(w http.ResponseWriter, r *http.Request) {
 		"filename": filepath.Base(issue.Path),
 	})
 	w.Header().Set("Content-Disposition", disposition)
-	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Type", comicMediaType(issue.Path))
 	http.ServeFile(w, r, issue.Path)
 }

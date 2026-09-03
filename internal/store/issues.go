@@ -124,22 +124,14 @@ type IssueWithSeries struct {
 	SeriesName string
 }
 
-// SearchIssues finds issues whose title or number matches the query.
-func (s *Store) SearchIssues(q string) ([]IssueWithSeries, error) {
-	rows, err := s.db.Query(`
-		SELECT i.id, i.series_id, i.path, i.file_size, i.file_missing, i.issue_number,
-			i.title, i.summary, i.release_date, i.writer, i.artist, i.publisher,
-			i.page_count, i.comicvine_issue_id, i.metadata_source, i.metadata_locked,
-			i.has_comicinfo, i.cover_cached, i.created_at, i.updated_at, s.name
-		FROM issues i JOIN series s ON s.id = i.series_id
-		WHERE i.title LIKE '%' || ? || '%' OR i.issue_number LIKE '%' || ? || '%'
-		ORDER BY s.name COLLATE NOCASE, CAST(i.issue_number AS REAL)
-		LIMIT 100`, q, q)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+// issueWithSeriesColumns is the select list for IssueWithSeries queries over
+// `issues i JOIN series s`.
+const issueWithSeriesColumns = `i.id, i.series_id, i.path, i.file_size, i.file_missing,
+	i.issue_number, i.title, i.summary, i.release_date, i.writer, i.artist, i.publisher,
+	i.page_count, i.comicvine_issue_id, i.metadata_source, i.metadata_locked,
+	i.has_comicinfo, i.cover_cached, i.created_at, i.updated_at, s.name`
 
+func scanIssuesWithSeries(rows *sql.Rows) ([]IssueWithSeries, error) {
 	var out []IssueWithSeries
 	for rows.Next() {
 		var i IssueWithSeries
@@ -154,6 +146,65 @@ func (s *Store) SearchIssues(q string) ([]IssueWithSeries, error) {
 		out = append(out, i)
 	}
 	return out, rows.Err()
+}
+
+// SearchIssues finds issues whose title or number matches the query.
+func (s *Store) SearchIssues(q string) ([]IssueWithSeries, error) {
+	rows, err := s.db.Query(`
+		SELECT `+issueWithSeriesColumns+`
+		FROM issues i JOIN series s ON s.id = i.series_id
+		WHERE i.title LIKE '%' || ? || '%' OR i.issue_number LIKE '%' || ? || '%'
+		ORDER BY s.name COLLATE NOCASE, CAST(i.issue_number AS REAL)
+		LIMIT 100`, q, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanIssuesWithSeries(rows)
+}
+
+// SearchIssuesBroad finds present-on-disk issues whose series name, title or
+// number matches the query — one flat result list for clients (OPDS readers)
+// that cannot show series and issues separately.
+func (s *Store) SearchIssuesBroad(q string, limit int) ([]IssueWithSeries, error) {
+	rows, err := s.db.Query(`
+		SELECT `+issueWithSeriesColumns+`
+		FROM issues i JOIN series s ON s.id = i.series_id
+		WHERE i.file_missing = 0
+		  AND (s.name LIKE '%' || ? || '%'
+		       OR i.title LIKE '%' || ? || '%'
+		       OR i.issue_number LIKE '%' || ? || '%')
+		ORDER BY s.name COLLATE NOCASE, i.issue_number = '',
+			CAST(i.issue_number AS REAL), i.issue_number, i.title
+		LIMIT ?`, q, q, q, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanIssuesWithSeries(rows)
+}
+
+// ListRecentIssues returns present-on-disk issues, newest first (by the time
+// the scanner added them), for "recently added" views.
+func (s *Store) ListRecentIssues(limit, offset int) ([]IssueWithSeries, error) {
+	rows, err := s.db.Query(`
+		SELECT `+issueWithSeriesColumns+`
+		FROM issues i JOIN series s ON s.id = i.series_id
+		WHERE i.file_missing = 0
+		ORDER BY i.created_at DESC, i.id DESC
+		LIMIT ? OFFSET ?`, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanIssuesWithSeries(rows)
+}
+
+// CountIssues returns the number of issues present on disk.
+func (s *Store) CountIssues() (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM issues WHERE file_missing = 0`).Scan(&n)
+	return n, err
 }
 
 // IssuesNeedingComicVine returns unlocked, present-on-disk issues that lack

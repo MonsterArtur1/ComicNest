@@ -59,6 +59,18 @@ code {
 }
 .search input:focus { outline: 1px solid var(--accent); }
 
+.opds-badge {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    text-decoration: none;
+}
+.opds-badge:hover { color: var(--accent); border-color: var(--accent); }
+
 /* --- scan widget --- */
 .scan-area { margin-left: auto; }
 

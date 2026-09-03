@@ -17,6 +17,9 @@ biblioteka na Twoim dysku. Inspirowany [Komgą](https://komga.org/), ale prostsz
 - **Okładki** wyciągane z pierwszej strony archiwum (cache miniatur na dysku).
 - **Przeglądanie i wyszukiwanie**: grid serii, strona serii z filtrami
   (bez metadanych / z ComicVine / brakujące pliki), szczegóły zeszytu, pobieranie pliku.
+- **Serwer OPDS** (opcjonalny) — biblioteka dostępna w czytnikach komiksów na telefonie
+  i tablecie (Panels, Chunky, Moon+ Reader, Librera, KOReader…), z okładkami,
+  wyszukiwaniem i opcjonalnym hasłem.
 - Frontend: Go templates + HTMX, dark theme, działa też bez JavaScriptu.
 
 ## Uruchomienie
@@ -36,14 +39,34 @@ localhost; brak logowania — to aplikacja osobista). Kliknij **Skanuj bibliotek
 
 ```yaml
 port: 8080
+listen: localhost            # "0.0.0.0", żeby inne urządzenia w sieci widziały serwer
 library: "D:/Komiksy"        # korzeń biblioteki komiksów
 data_dir: "./data"           # baza SQLite + cache okładek
 comicvine_api_key: ""        # klucz z https://comicvine.gamespot.com/api/
+opds:
+  enabled: false             # katalog OPDS pod http://…/opds
+  username: ""               # opcjonalne logowanie do katalogu (oba pola razem)
+  password: ""
 ```
 
 Bez klucza ComicVine aplikacja działa normalnie — funkcje dopasowania/scrape'u są
 wyłączone z podpowiedzią w UI. Klucz trzymaj wyłącznie w `config.yaml` (plik jest
 w `.gitignore`).
+
+## Czytniki komiksów (OPDS)
+
+Ustaw `opds.enabled: true` i `listen: 0.0.0.0`, uruchom ponownie, a w czytniku dodaj
+katalog OPDS o adresie `http://<adres-komputera>:8080/opds` (adres IP komputera
+z biblioteką w sieci domowej). Katalog oferuje:
+
+- **Wszystkie serie** (alfabetycznie, z okładkami) → zeszyty serii do pobrania,
+- **Ostatnio dodane** — zeszyty w kolejności trafienia do biblioteki,
+- **wyszukiwanie** po nazwie serii, tytule i numerze zeszytu (OpenSearch).
+
+Jeśli ustawisz `opds.username` i `opds.password`, czytnik zapyta o login (HTTP Basic).
+Pamiętaj, że przy `listen: 0.0.0.0` interfejs WWW (bez logowania) także jest widoczny
+w sieci lokalnej — hasło OPDS chroni tylko katalog dla czytników. Zeszyty oznaczone
+jako brakujące na dysku nie pojawiają się w katalogu.
 
 ## Organizacja biblioteki
 

@@ -53,7 +53,8 @@ ComicNextClaude/
 │   │   └── comicinfo.go         # parser ComicInfo.xml
 │   ├── covers/                  # ekstrakcja pierwszej strony → miniatura JPEG → cache
 │   ├── comicvine/               # klient API: search volume, get volume, get issue; rate limiter
-│   └── server/                  # handlery HTTP, routing, renderowanie szablonów
+│   ├── opds/                    # typy Atom/OPDS 1.2 + serializacja feedów i OpenSearch (bez HTTP/DB)
+│   └── server/                  # handlery HTTP, routing, renderowanie szablonów (+ opds.go: katalog OPDS)
 ├── web/
 │   ├── templates/               # layout.html + widoki + partiale HTMX
 │   └── static/                  # htmx.min.js, styles.css, placeholder.jpg
@@ -66,13 +67,24 @@ ComicNextClaude/
 
 ```yaml
 port: 8080
+listen: localhost              # "0.0.0.0" = dostęp z sieci lokalnej (potrzebne czytnikom OPDS)
 library: "D:/Library"          # korzeń biblioteki komiksów
 data_dir: "./data"             # baza sqlite + cache okładek
 comicvine_api_key: ""          # puste = funkcje ComicVine wyłączone (UI to komunikuje)
+opds:
+  enabled: false               # katalog OPDS pod /opds (patrz §9a)
+  username: ""                 # oba puste = katalog bez logowania;
+  password: ""                 # oba ustawione = HTTP Basic auth na /opds/*
 ```
 
 Przy braku pliku aplikacja zapisuje domyślny config i loguje instrukcję uzupełnienia.
 Klucz API **nigdy nie trafia do kodu** (w starym projekcie był zahardkodowany — patrz §10).
+Walidacja: `username`/`password` muszą być ustawione razem (jedno bez drugiego = błąd startu).
+
+Interfejs WWW nie ma logowania, dlatego domyślnie nasłuch jest tylko na `localhost`.
+Ustawienie `listen: 0.0.0.0` wystawia **całą aplikację** (także edycję metadanych) w sieci
+lokalnej — świadoma decyzja użytkownika na zaufanej sieci domowej; opcjonalne hasło OPDS
+chroni wyłącznie katalog dla czytników, nie UI.
 
 ## 5. Model danych (SQLite)
 
@@ -220,13 +232,41 @@ postępu skanu, dialogu dopasowania ComicVine. Każdy widok działa też bez JS
 | `POST /issues/{id}/unlock` | zdjęcie blokady metadanych |
 | `POST /issues/{id}/scrape` | ComicVine dla pojedynczego zeszytu |
 | `GET /issues/{id}/cover` | miniatura z cache (Cache-Control; placeholder gdy brak) |
-| `GET /issues/{id}/download` | plik komiksu (`Content-Disposition: attachment`, oryginalna nazwa) |
+| `GET /issues/{id}/download` | plik komiksu (`Content-Disposition: attachment`, oryginalna nazwa, `Content-Type` wg rozszerzenia: `application/vnd.comicbook+zip` / `-rar` / `application/pdf`) |
 | `POST /scan` / `GET /scan/status` | start skanu / partial HTMX z postępem |
 | `GET /search?q=` | wyniki po nazwach serii, tytułach i numerach zeszytów (LIKE) |
 | `GET /static/...` | statyki z `embed.FS` |
 
 Filtry na stronie serii i w gridzie: wszystkie / bez metadanych (`metadata_source='filename'`)
 / z ComicVine / brakujące pliki — odpowiednik all/scraped/unscraped ze starego projektu.
+
+## 9a. Katalog OPDS (`opds.enabled: true`)
+
+OPDS 1.2 (Atom) — format obsługiwany przez czytniki komiksów (Panels, Chunky, Moon+ Reader,
+Librera, KOReader, Mihon przez rozszerzenie). Cały katalog — feedy, okładki i pliki — żyje pod
+prefiksem `/opds`, żeby opcjonalne Basic auth (`opds.username`/`password`) obejmowało wszystko,
+czego dotyka czytnik; endpointy UI (`/issues/{id}/download`, `/cover`) pozostają bez zmian.
+Gdy OPDS jest wyłączony, trasy nie są rejestrowane (404 z catch-alla).
+
+| Ścieżka | Feed |
+|---|---|
+| `GET /opds` | nawigacyjny root: „Wszystkie serie", „Ostatnio dodane" + link `search` |
+| `GET /opds/series?page=N` | nawigacyjny: serie alfabetycznie (50/stronę, `next`/`previous`, `opensearch:totalResults`); wpis = link `subsection` do feedu serii + okładka pierwszego zeszytu |
+| `GET /opds/series/{id}?page=N` | akwizycyjny: zeszyty serii w kolejności numerów (bez `file_missing`) |
+| `GET /opds/recent?page=N` | akwizycyjny: zeszyty wg `created_at DESC` (rel `sort/new`) |
+| `GET /opds/search?q=` | akwizycyjny: jedna płaska lista zeszytów po nazwie serii / tytule / numerze (LIMIT 200) |
+| `GET /opds/opensearch.xml` | OpenSearch description z szablonem `…/opds/search?q={searchTerms}` |
+| `GET /opds/issues/{id}/file` | ten sam handler co `/issues/{id}/download` (Range/HEAD przez `http.ServeFile`) |
+| `GET /opds/issues/{id}/cover` | ten sam handler co `/issues/{id}/cover` |
+
+Wpis zeszytu: tytuł `Seria #numer – tytuł`, `author` z pola `writer` (rozbite po przecinkach),
+`dc:publisher`, `dc:issued` (data wydania), `summary` (opis, a gdy pusty — „Rysunki: …"),
+link `http://opds-spec.org/acquisition` z `type` wg rozszerzenia (`application/vnd.comicbook+zip`,
+`application/vnd.comicbook-rar`, `application/pdf`) i linki `image`/`image/thumbnail` tylko gdy
+`cover_cached=1` (zamiast linku do placeholdera SVG). Linki są **absolutne** (schemat + `Host`
+z żądania, z uwzględnieniem `X-Forwarded-Proto/Host`), bo część czytników źle rozwiązuje
+względne `href`. Layout HTML dodaje `<link rel="alternate" type="…opds-catalog…">` (autodetekcja)
+i plakietkę „OPDS" w nagłówku.
 
 ## 10. Uwagi bezpieczeństwa i jakości
 

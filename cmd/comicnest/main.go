@@ -38,6 +38,17 @@ func main() {
 	} else {
 		log.Printf("comicvine: enabled")
 	}
+	switch {
+	case !cfg.OPDS.Enabled:
+		log.Printf("opds: disabled (set opds.enabled: true in config.yaml)")
+	case cfg.OPDS.Username != "":
+		log.Printf("opds: enabled (basic auth)")
+	default:
+		log.Printf("opds: enabled (no auth)")
+	}
+	if cfg.OPDS.Enabled && cfg.Listen == "localhost" {
+		log.Printf("opds: listening on localhost only — set listen: 0.0.0.0 to reach the catalog from other devices")
+	}
 
 	coverCache := covers.New(coversDir)
 	scanner := library.NewScanner(st, coverCache, cfg.Library)
