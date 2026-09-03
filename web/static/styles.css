@@ -59,6 +59,18 @@ code {
 }
 .search input:focus { outline: 1px solid var(--accent); }
 
+.opds-badge {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    text-decoration: none;
+}
+.opds-badge:hover { color: var(--accent); border-color: var(--accent); }
+
 /* --- scan widget --- */
 .scan-area { margin-left: auto; }
 
@@ -136,6 +148,22 @@ select:hover, button:hover, .btn:hover { background: var(--bg-hover); }
 .card-cover {
     aspect-ratio: 2 / 3;
     background: var(--bg);
+    position: relative;
+}
+.read-mark {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #3fa34d;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 22px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 .card-cover img {
     width: 100%;
@@ -228,7 +256,33 @@ details.desc .series-desc { margin: 12px 0 4px; }
 }
 .issue-row.missing { opacity: 0.6; }
 
-.issue-thumb { flex: none; }
+.issue-thumb { flex: none; display: flex; flex-direction: column; gap: 4px; }
+
+/* --- reading progress --- */
+.progress {
+    display: block;
+    height: 4px;
+    width: 100%;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.progress > span { display: block; height: 100%; background: var(--accent); }
+.progress.done > span { background: #5cb85c; }
+.progress-lg { height: 8px; border-radius: 4px; }
+.reading-note { color: var(--accent); }
+.reading-box {
+    margin: 12px 0 16px;
+    padding: 12px 14px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.reading-text { font-size: 14px; }
+.reading-date, .dim { color: var(--text-dim); font-size: 13px; }
 .issue-thumb img {
     width: 44px;
     height: 66px;

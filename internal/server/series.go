@@ -9,7 +9,7 @@ import (
 
 type seriesData struct {
 	Series *store.Series
-	Issues []store.Issue
+	Issues []issueRow
 	Filter string
 }
 
@@ -42,6 +42,11 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
+	rows, err := s.issueRows(issues)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
 
-	s.render(w, "series.html", seriesData{Series: series, Issues: issues, Filter: string(filter)})
+	s.render(w, "series.html", seriesData{Series: series, Issues: rows, Filter: string(filter)})
 }

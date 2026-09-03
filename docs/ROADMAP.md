@@ -55,9 +55,14 @@ i coś pokazywała. Szczegóły projektowe: [SPECIFICATION.md](SPECIFICATION.md)
 - [x] Checkbox „wydanie jednorazowe" w edycji serii; ręczny wybór (jak każda edycja) blokuje serię — automatyczne sygnały one-shot (skan, ComicVine) szanują blokadę
 - [x] Druga faza skanu: automatyczny scrape ComicVine dla zeszytów z dopasowaną serią, ale bez danych CV (bez blokad i brakujących plików); postęp „Aktualizacja ComicVine… X/Y" i licznik w podsumowaniu skanu („ComicVine: N zaktualizowano")
 - [x] Fix pomieszanych okładek po rekreacji bazy: okładki serwowane z `Cache-Control: no-cache` (rewalidacja przez Last-Modified/304 zamiast max-age 24h — ID zeszytów są reużywane), a skan na starcie usuwa osierocone miniatury z `data/covers/`
+- [x] Serwer OPDS 1.2 (`opds.enabled` w configu, opcjonalne Basic auth, `listen` do wystawienia w LAN): root → serie (nawigacja, paginacja) → zeszyty serii (akwizycja), „Ostatnio dodane", wyszukiwanie + OpenSearch, pliki i okładki pod `/opds/…`; pakiet `internal/opds` + testy httptest (SPECIFICATION §9a)
+- [x] OPDS pod Thorium Reader: komunikat startowy z adresami IP (Thorium odrzuca `localhost`). Widok „półki" serii (grupy `rel="collection"`, pojedyncze wydania jako zeszyt) był wdrożony i wycofany — w Thorium robił większy bałagan niż lista
+- [x] Strumieniowanie stron OPDS-PSE 1.2 (`/opds/issues/{id}/pages/{n}?width=`), postęp czytania zapisywany z żądań stron (`reading_progress`, migracja 3 z `issues.file_pages`), `pse:lastRead` w feedach, sekcja „Aktualnie czytane" (`/opds/reading`); `library.ExtractPage`, `covers.Resize`
+- [x] Postęp czytania w UI WWW: pasek pod okładką i „czytane: str. X z N" na liście zeszytów serii, ramka z postępem i wiersz „Przeczytano" na stronie zeszytu (`readingView`, `issueRow`)
+- [x] Grid biblioteki: zielony znaczek ✓ na przeczytanych seriach i filtry (nieczytane / w trakcie / przeczytane / bez ComicVine / brakujące pliki) obok sortowania; agregaty czytania w `ListSeries` (`SeriesFilter`)
 
 ## Pomysły na v2 (nie robić teraz)
-- Czytnik stron w przeglądarce (strumieniowanie stron z CBZ/CBR) + zapamiętywanie postępu
+- Czytnik stron w przeglądarce (endpoint stron i postęp już istnieją po stronie OPDS — do reużycia)
 - Zapis metadanych do ComicInfo.xml w archiwum
 - Okładki z PDF
 - Obserwowanie zmian w bibliotece (fsnotify)

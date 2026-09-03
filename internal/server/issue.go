@@ -14,6 +14,7 @@ import (
 type issueData struct {
 	Issue     *store.Issue
 	Series    *store.Series
+	Reading   *readingView // nil when never read
 	Filename  string
 	CVEnabled bool
 	CVMatched bool
@@ -65,9 +66,16 @@ func (s *Server) handleIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	progress, err := s.store.GetReadingProgress(issue.ID)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+
 	data := issueData{
 		Issue:     issue,
 		Series:    series,
+		Reading:   newReadingView(issue, progress),
 		Filename:  filepath.Base(issue.Path),
 		CVEnabled: s.cv.Enabled(),
 		CVMatched: series.ComicVineVolumeID.Valid,
@@ -120,6 +128,6 @@ func (s *Server) handleIssueDownload(w http.ResponseWriter, r *http.Request) {
 		"filename": filepath.Base(issue.Path),
 	})
 	w.Header().Set("Content-Disposition", disposition)
-	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Type", comicMediaType(issue.Path))
 	http.ServeFile(w, r, issue.Path)
 }

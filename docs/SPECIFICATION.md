@@ -53,7 +53,8 @@ ComicNextClaude/
 │   │   └── comicinfo.go         # parser ComicInfo.xml
 │   ├── covers/                  # ekstrakcja pierwszej strony → miniatura JPEG → cache
 │   ├── comicvine/               # klient API: search volume, get volume, get issue; rate limiter
-│   └── server/                  # handlery HTTP, routing, renderowanie szablonów
+│   ├── opds/                    # typy Atom/OPDS 1.2 + serializacja feedów i OpenSearch (bez HTTP/DB)
+│   └── server/                  # handlery HTTP, routing, renderowanie szablonów (+ opds.go: katalog OPDS)
 ├── web/
 │   ├── templates/               # layout.html + widoki + partiale HTMX
 │   └── static/                  # htmx.min.js, styles.css, placeholder.jpg
@@ -66,13 +67,24 @@ ComicNextClaude/
 
 ```yaml
 port: 8080
+listen: localhost              # "0.0.0.0" = dostęp z sieci lokalnej (potrzebne czytnikom OPDS)
 library: "D:/Library"          # korzeń biblioteki komiksów
 data_dir: "./data"             # baza sqlite + cache okładek
 comicvine_api_key: ""          # puste = funkcje ComicVine wyłączone (UI to komunikuje)
+opds:
+  enabled: false               # katalog OPDS pod /opds (patrz §9a)
+  username: ""                 # oba puste = katalog bez logowania;
+  password: ""                 # oba ustawione = HTTP Basic auth na /opds/*
 ```
 
 Przy braku pliku aplikacja zapisuje domyślny config i loguje instrukcję uzupełnienia.
 Klucz API **nigdy nie trafia do kodu** (w starym projekcie był zahardkodowany — patrz §10).
+Walidacja: `username`/`password` muszą być ustawione razem (jedno bez drugiego = błąd startu).
+
+Interfejs WWW nie ma logowania, dlatego domyślnie nasłuch jest tylko na `localhost`.
+Ustawienie `listen: 0.0.0.0` wystawia **całą aplikację** (także edycję metadanych) w sieci
+lokalnej — świadoma decyzja użytkownika na zaufanej sieci domowej; opcjonalne hasło OPDS
+chroni wyłącznie katalog dla czytników, nie UI.
 
 ## 5. Model danych (SQLite)
 
@@ -130,6 +142,13 @@ seria ma dokładnie 1 zeszyt bez numeru. Skan zdejmuje flagę, gdy seria zyska d
 zeszyt. UI: etykieta „wydanie jednorazowe" zamiast licznika, kafelek na gridzie
 prowadzi wprost do zeszytu. Scrape: zeszyt bez numeru + wolumen z jednym zeszytem
 → dopasowany zostaje ten jedyny zeszyt.
+
+**Strumieniowanie i postęp czytania** (migracja 3): kolumna `issues.file_pages` — rzeczywista
+liczba wpisów graficznych w archiwum (0 = jeszcze nieliczona; `page_count` pozostaje
+metadaną z ComicInfo, edytowalną i potencjalnie błędną) — oraz tabela
+`reading_progress(issue_id PK → issues ON DELETE CASCADE, page, updated_at)`, gdzie `page`
+to ostatnia przeczytana strona 1-based (konwencja OPDS-PSE). Zapis przez `UPSERT` z
+`MAX(page, nowa)`. Skan uzupełnia `file_pages` dla nowych plików i dla starych z wartością 0.
 
 ## 6. Skanowanie biblioteki
 
@@ -210,23 +229,77 @@ postępu skanu, dialogu dopasowania ComicVine. Każdy widok działa też bez JS
 
 | Metoda i ścieżka | Widok / akcja |
 |---|---|
-| `GET /` | grid serii (okładka, nazwa, liczba zeszytów); sort: nazwa / ostatnio dodane; filtr tekstowy |
-| `GET /series/{id}` | strona serii: metadane + lista zeszytów (okładka, numer, tytuł, data, rozmiar, badge źródła metadanych) |
+| `GET /?sort=&filter=` | grid serii (okładka, nazwa, liczba zeszytów, zielony znaczek ✓ gdy wszystkie dostępne zeszyty przeczytane); sort: nazwa / ostatnio dodane; filtry: wszystkie / nieczytane (żaden zeszyt nie ma postępu) / w trakcie czytania (jest postęp, nie wszystko skończone) / przeczytane (każdy dostępny zeszyt doczytany, ≥1 zeszyt) / bez metadanych z ComicVine (jakiś zeszyt ze źródłem `filename` lub `comicinfo`) / brakujące pliki (jakiś zeszyt `file_missing`). Agregaty liczone w `ListSeries` (`LEFT JOIN reading_progress`, HAVING) |
+| `GET /series/{id}` | strona serii: metadane + lista zeszytów (okładka, numer, tytuł, data, rozmiar, badge źródła metadanych, pasek postępu czytania pod okładką + „czytane: str. X z N (P%)" / „✓ przeczytane") |
 | `GET /series/{id}/edit` → `POST /series/{id}` | formularz edycji serii (nazwa, wydawca, opis) |
 | `POST /series/{id}/match` / `POST /series/{id}/match/{volumeID}` | wyszukanie kandydatów ComicVine / zapis wyboru |
 | `POST /series/{id}/scrape` | pobranie metadanych ComicVine dla zeszytów serii bez dopasowania |
-| `GET /issues/{id}` | szczegóły zeszytu (pełne metadane, duża okładka) |
+| `GET /issues/{id}` | szczegóły zeszytu (pełne metadane, duża okładka; przy postępie czytania ramka „W trakcie czytania / Przeczytane — przeczytano X z N stron (P%) · ostatnio data" z paskiem, wiersz „Przeczytano" w tabeli; „Strony" pokazuje `file_pages` z fallbackiem na `page_count`) |
 | `GET /issues/{id}/edit` → `POST /issues/{id}` | formularz edycji zeszytu (numer, tytuł, opis, data, twórcy, wydawca); zapis ustawia `manual` + `locked` |
 | `POST /issues/{id}/unlock` | zdjęcie blokady metadanych |
 | `POST /issues/{id}/scrape` | ComicVine dla pojedynczego zeszytu |
 | `GET /issues/{id}/cover` | miniatura z cache (Cache-Control; placeholder gdy brak) |
-| `GET /issues/{id}/download` | plik komiksu (`Content-Disposition: attachment`, oryginalna nazwa) |
+| `GET /issues/{id}/download` | plik komiksu (`Content-Disposition: attachment`, oryginalna nazwa, `Content-Type` wg rozszerzenia: `application/vnd.comicbook+zip` / `-rar` / `application/pdf`) |
 | `POST /scan` / `GET /scan/status` | start skanu / partial HTMX z postępem |
 | `GET /search?q=` | wyniki po nazwach serii, tytułach i numerach zeszytów (LIKE) |
 | `GET /static/...` | statyki z `embed.FS` |
 
 Filtry na stronie serii i w gridzie: wszystkie / bez metadanych (`metadata_source='filename'`)
 / z ComicVine / brakujące pliki — odpowiednik all/scraped/unscraped ze starego projektu.
+
+## 9a. Katalog OPDS (`opds.enabled: true`)
+
+OPDS 1.2 (Atom) — format obsługiwany przez czytniki komiksów (Panels, Chunky, Moon+ Reader,
+Librera, KOReader, Mihon przez rozszerzenie). Cały katalog — feedy, okładki i pliki — żyje pod
+prefiksem `/opds`, żeby opcjonalne Basic auth (`opds.username`/`password`) obejmowało wszystko,
+czego dotyka czytnik; endpointy UI (`/issues/{id}/download`, `/cover`) pozostają bez zmian.
+Gdy OPDS jest wyłączony, trasy nie są rejestrowane (404 z catch-alla).
+
+| Ścieżka | Feed |
+|---|---|
+| `GET /opds` | nawigacyjny root: „Wszystkie serie", „Aktualnie czytane", „Ostatnio dodane" + link `search` |
+| `GET /opds/series?page=N` | nawigacyjny: serie alfabetycznie (50/stronę, `next`/`previous`, `opensearch:totalResults`); wpis = link `subsection` do feedu serii + okładka pierwszego zeszytu |
+| `GET /opds/series/{id}?page=N` | akwizycyjny: zeszyty serii w kolejności numerów (bez `file_missing`) |
+| `GET /opds/recent?page=N` | akwizycyjny: zeszyty wg `created_at DESC` (rel `sort/new`) |
+| `GET /opds/reading` | akwizycyjny „Aktualnie czytane": zeszyty z `reading_progress`, których ostatnia strona < liczba stron (lub liczba stron nieznana), wg ostatniego czytania (LIMIT 100) |
+| `GET /opds/issues/{id}/pages/{n}?width=W` | strona `n` (0-based) z archiwum CBZ/CBR (OPDS-PSE); bez `width` oryginalny plik z typem po rozszerzeniu, z `width` przeskalowanie do W px (max 4000) i JPEG; pobranie strony zapisuje postęp `n+1` (`MAX` z dotychczasowym); 404 poza zakresem, dla PDF i brakujących plików |
+| `GET /opds/search?q=` | akwizycyjny: jedna płaska lista zeszytów po nazwie serii / tytule / numerze (LIMIT 200) |
+| `GET /opds/opensearch.xml` | OpenSearch description z szablonem `…/opds/search?q={searchTerms}` |
+| `GET /opds/issues/{id}/file` | ten sam handler co `/issues/{id}/download` (Range/HEAD przez `http.ServeFile`) |
+| `GET /opds/issues/{id}/cover` | ten sam handler co `/issues/{id}/cover` |
+
+**Strumieniowanie stron (OPDS-PSE 1.2, `xmlns:pse="http://vaemendis.net/opds-pse/ns"`).** Każdy
+zeszyt CBZ/CBR ze znaną liczbą stron ma link `rel="http://vaemendis.net/opds-pse/stream"
+type="image/jpeg" href="…/opds/issues/{id}/pages/{pageNumber}?width={maxWidth}" pse:count="N"`
+oraz — gdy był czytany — `pse:lastRead` (1-based) i `pse:lastReadDate` (RFC 3339). Czytniki
+(Panels, Chunky, Librera, Moon+…) czytają strony bez pobierania pliku i wznawiają od `lastRead`.
+Postęp powstaje po stronie serwera z żądań stron (czytniki nie raportują go inaczej) — prefetch
+kilku stron do przodu zawyża go nieznacznie; powrót do wcześniejszej strony postępu nie obniża.
+Liczba stron: `issues.file_pages` (rzeczywiste wpisy graficzne w archiwum, liczone przy skanie —
+także dla plików skatalogowanych wcześniej — oraz leniwie przy pierwszym strumieniowaniu),
+z fallbackiem na `page_count` z metadanych. PDF-y nie mają linku PSE (brak renderowania stron).
+
+Wpis zeszytu: tytuł `Seria #numer – tytuł`, `author` z pola `writer` (rozbite po przecinkach),
+`dc:publisher`, `dc:issued` (data wydania), `summary` (opis, a gdy pusty — „Rysunki: …"),
+link `http://opds-spec.org/acquisition` z `type` wg rozszerzenia (`application/vnd.comicbook+zip`,
+`application/vnd.comicbook-rar`, `application/pdf`) i linki `image`/`image/thumbnail` tylko gdy
+`cover_cached=1` (zamiast linku do placeholdera SVG). Linki są **absolutne** (schemat + `Host`
+z żądania, z uwzględnieniem `X-Forwarded-Proto/Host`), bo część czytników źle rozwiązuje
+względne `href`. Layout HTML dodaje `<link rel="alternate" type="…opds-catalog…">` (autodetekcja)
+i plakietkę „OPDS" w nagłówku.
+
+Zgodność klientów: Thorium Reader (3.5.x) waliduje adres katalogu przez `validator.isURL` z
+`require_tld` (flaga budowania `THORIUM_ISURL_REQUIRE_TLD_FALSE` nie jest ustawiona w oficjalnych
+wydaniach), więc `http://localhost:…` odrzuca **przed** wysłaniem żądania („Błąd dostępu do
+kanału"), a adresy IP (`127.0.0.1`, IP w LAN) akceptuje. Basic auth Thorium obsługuje z nagłówka
+`WWW-Authenticate: Basic` (okno logowania, `Authorization: Basic` w kolejnych żądaniach). Dlatego
+komunikat startowy wypisuje wszystkie osiągalne adresy (localhost + IPv4 interfejsów przy `0.0.0.0`).
+
+Ograniczenie Thorium (do wiadomości, nie obchodzone): wpisy nawigacyjne renderuje jako czysty
+tekst bez miniatur, okładki pokazuje tylko dla publikacji, a kliknięcie publikacji otwiera dialog
+informacji bez nawigacji do katalogu. Próba widoku „półki" (serie jako grupy `rel="collection"`
+z zeszytami, pojedyncze wydania jako publikacje) została wycofana na życzenie użytkownika —
+dawała większy bałagan niż zwykła lista.
 
 ## 10. Uwagi bezpieczeństwa i jakości
 

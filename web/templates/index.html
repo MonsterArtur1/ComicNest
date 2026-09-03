@@ -5,12 +5,23 @@
     <h1>Biblioteka</h1>
     <div class="page-head-tools">
         <form action="/" method="get">
+            {{if ne .Filter "all"}}<input type="hidden" name="filter" value="{{.Filter}}">{{end}}
             <select name="sort" onchange="this.form.submit()">
                 <option value="name" {{if eq .Sort "name"}}selected{{end}}>Sortuj: nazwa</option>
                 <option value="recent" {{if eq .Sort "recent"}}selected{{end}}>Sortuj: ostatnio dodane</option>
             </select>
         </form>
     </div>
+</div>
+
+{{$sort := .Sort}}{{$filter := .Filter}}
+<div class="filter-bar">
+    <a class="chip {{if eq $filter "all"}}active{{end}}" href="/?sort={{$sort}}">wszystkie</a>
+    <a class="chip {{if eq $filter "unread"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=unread">nieczytane</a>
+    <a class="chip {{if eq $filter "reading"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=reading">w trakcie czytania</a>
+    <a class="chip {{if eq $filter "read"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=read">przeczytane</a>
+    <a class="chip {{if eq $filter "nocv"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=nocv">bez metadanych z ComicVine</a>
+    <a class="chip {{if eq $filter "missing"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=missing">brakujące pliki</a>
 </div>
 
 {{if .Series}}
@@ -24,6 +35,7 @@
                 {{else}}
                 <img src="/static/placeholder.svg" alt="">
                 {{end}}
+                {{if .AllRead}}<span class="read-mark" title="przeczytane">✓</span>{{end}}
             </div>
             <div class="card-body">
                 <span class="card-title">{{.Name}}</span>
@@ -35,8 +47,12 @@
 </ul>
 {{else}}
 <div class="empty-state">
+    {{if eq .Filter "all"}}
     <p>Biblioteka jest pusta.</p>
     <p class="hint">Ustaw ścieżkę <code>library</code> w <code>config.yaml</code>, a następnie zeskanuj bibliotekę (Etap&nbsp;2).</p>
+    {{else}}
+    <p>Brak serii dla tego filtra.</p>
+    {{end}}
 </div>
 {{end}}
 {{end}}

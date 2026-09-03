@@ -27,12 +27,26 @@
 
         {{if .Issue.Summary}}<p class="issue-summary">{{.Issue.Summary}}</p>{{end}}
 
+        {{with .Reading}}
+        <div class="reading-box">
+            <div class="reading-text">
+                {{if .Finished}}<strong>Przeczytane</strong>{{else}}<strong>W trakcie czytania</strong>{{end}}
+                — przeczytano {{.Page}}{{if .Total}} z {{.Total}}{{end}} stron{{if .Total}} ({{.Percent}}%){{end}}
+                {{if .ReadAt}}<span class="reading-date">· ostatnio {{.ReadAt}}</span>{{end}}
+            </div>
+            <span class="progress progress-lg {{if .Finished}}done{{end}}">
+                <span style="width: {{if .Total}}{{.Percent}}{{else}}100{{end}}%"></span>
+            </span>
+        </div>
+        {{end}}
+
         <dl class="meta-table">
             {{if .Issue.ReleaseDate}}<dt>Data wydania</dt><dd>{{.Issue.ReleaseDate}}</dd>{{end}}
             {{if .Issue.Writer}}<dt>Scenariusz</dt><dd>{{.Issue.Writer}}</dd>{{end}}
             {{if .Issue.Artist}}<dt>Rysunki</dt><dd>{{.Issue.Artist}}</dd>{{end}}
             {{if .Issue.Publisher}}<dt>Wydawca</dt><dd>{{.Issue.Publisher}}</dd>{{end}}
-            {{if .Issue.PageCount}}<dt>Strony</dt><dd>{{.Issue.PageCount}}</dd>{{end}}
+            {{if .Issue.TotalPages}}<dt>Strony</dt><dd>{{.Issue.TotalPages}}{{if and .Issue.FilePages .Issue.PageCount (ne .Issue.FilePages .Issue.PageCount)}} <span class="dim">(metadane: {{.Issue.PageCount}})</span>{{end}}</dd>{{end}}
+            {{with .Reading}}<dt>Przeczytano</dt><dd>{{.Page}}{{if .Total}} z {{.Total}} stron ({{.Percent}}%){{else}} stron{{end}}</dd>{{end}}
             <dt>Plik</dt><dd><code title="{{.Issue.Path}}">{{.Filename}}</code> ({{prettySize .Issue.FileSize}})</dd>
         </dl>
 

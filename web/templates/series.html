@@ -49,6 +49,11 @@
     <li class="issue-row {{if .FileMissing}}missing{{end}}">
         <a class="issue-thumb" href="/issues/{{.ID}}">
             <img src="/issues/{{.ID}}/cover" alt="" loading="lazy">
+            {{with .Reading}}
+            <span class="progress {{if .Finished}}done{{end}}" title="{{if .Finished}}przeczytane{{else}}przeczytano {{.Page}}{{if .Total}} z {{.Total}}{{end}} stron{{end}}">
+                <span style="width: {{if .Total}}{{.Percent}}{{else}}100{{end}}%"></span>
+            </span>
+            {{end}}
         </a>
         <div class="issue-info">
             <a class="issue-title" href="/issues/{{.ID}}">
@@ -59,6 +64,7 @@
                 {{if .ReleaseDate}}<span>{{.ReleaseDate}}</span>{{end}}
                 <span>{{prettySize .FileSize}}</span>
                 {{if .PageCount}}<span>{{.PageCount}} stron</span>{{end}}
+                {{with .Reading}}<span class="reading-note">{{if .Finished}}✓ przeczytane{{else}}czytane: str. {{.Page}}{{if .Total}} z {{.Total}} ({{.Percent}}%){{end}}{{end}}</span>{{end}}
             </div>
         </div>
         <div class="issue-badges">
