@@ -153,6 +153,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /issues/{id}/unlock", s.handleIssueUnlock)
 	s.mux.HandleFunc("POST /issues/{id}/scrape", s.handleIssueScrape)
 	s.mux.HandleFunc("POST /issues/{id}/delete", s.handleIssueDelete)
+	s.mux.HandleFunc("POST /issues/{id}/read", s.handleIssueMarkRead)
+	s.mux.HandleFunc("POST /issues/{id}/unread", s.handleIssueMarkUnread)
 	s.mux.HandleFunc("GET /issues/{id}/cover", s.handleIssueCover)
 	s.mux.HandleFunc("GET /issues/{id}/download", s.handleIssueDownload)
 	s.mux.HandleFunc("GET /search", s.handleSearch)

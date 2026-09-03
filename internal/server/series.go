@@ -11,6 +11,7 @@ type seriesData struct {
 	Series *store.Series
 	Issues []issueRow
 	Filter string
+	Next   string // this page's URL, for forms that should return here
 }
 
 func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
@@ -48,5 +49,9 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, "series.html", seriesData{Series: series, Issues: rows, Filter: string(filter)})
+	next := "/series/" + strconv.FormatInt(id, 10)
+	if filter != store.IssueFilterAll {
+		next += "?filter=" + string(filter)
+	}
+	s.render(w, "series.html", seriesData{Series: series, Issues: rows, Filter: string(filter), Next: next})
 }

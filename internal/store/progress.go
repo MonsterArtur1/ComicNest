@@ -25,6 +25,12 @@ func (s *Store) SetReadingProgress(issueID int64, page int) error {
 	return err
 }
 
+// ClearReadingProgress forgets the issue's progress (marks it unread).
+func (s *Store) ClearReadingProgress(issueID int64) error {
+	_, err := s.db.Exec(`DELETE FROM reading_progress WHERE issue_id = ?`, issueID)
+	return err
+}
+
 // GetReadingProgress returns the issue's progress, or nil when never read.
 func (s *Store) GetReadingProgress(issueID int64) (*ReadingProgress, error) {
 	var p ReadingProgress

@@ -1,11 +1,67 @@
 package server
 
 import (
+	"log"
+	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
+	"comicnest/internal/library"
 	"comicnest/internal/opds"
 	"comicnest/internal/store"
 )
+
+// handleIssueMarkRead sets the issue's progress to its last page. Archives
+// whose pages were never counted get counted now; an issue with an unknown
+// page total cannot be marked (there is no "finished" without a last page).
+func (s *Server) handleIssueMarkRead(w http.ResponseWriter, r *http.Request) {
+	issue := s.getIssueFromPath(w, r)
+	if issue == nil {
+		return
+	}
+	total := issue.TotalPages()
+	if total == 0 && canStreamPages(issue.Path) && !issue.FileMissing {
+		if pages, err := library.ListPages(issue.Path); err == nil && len(pages) > 0 {
+			total = len(pages)
+			if err := s.store.SetIssueFilePages(issue.ID, total); err != nil {
+				log.Printf("mark read: page count for issue %d: %v", issue.ID, err)
+			}
+		}
+	}
+	if total == 0 {
+		s.redirectBack(w, r, issue.ID, "read_nopages")
+		return
+	}
+	if err := s.store.SetReadingProgress(issue.ID, total); err != nil {
+		s.serverError(w, err)
+		return
+	}
+	s.redirectBack(w, r, issue.ID, "read_ok")
+}
+
+// handleIssueMarkUnread forgets the issue's reading progress.
+func (s *Server) handleIssueMarkUnread(w http.ResponseWriter, r *http.Request) {
+	issue := s.getIssueFromPath(w, r)
+	if issue == nil {
+		return
+	}
+	if err := s.store.ClearReadingProgress(issue.ID); err != nil {
+		s.serverError(w, err)
+		return
+	}
+	s.redirectBack(w, r, issue.ID, "unread_ok")
+}
+
+// redirectBack returns to the page the form was submitted from (the "next"
+// field, restricted to local paths) or to the issue page with a flash code.
+func (s *Server) redirectBack(w http.ResponseWriter, r *http.Request, issueID int64, msg string) {
+	next := r.FormValue("next")
+	if next == "" || !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") {
+		next = "/issues/" + strconv.FormatInt(issueID, 10) + "?msg=" + msg
+	}
+	http.Redirect(w, r, next, http.StatusSeeOther)
+}
 
 // readingView is reading progress shaped for templates.
 type readingView struct {

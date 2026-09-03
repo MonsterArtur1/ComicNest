@@ -327,6 +327,8 @@ details.desc .series-desc { margin: 12px 0 4px; }
 .badge-lock      { border: none; }
 
 .btn.download { flex: none; font-size: 13px; }
+.btn-mini { flex: none; font-size: 12px; padding: 4px 8px; color: var(--text-dim); white-space: nowrap; }
+.btn-mini:hover { color: var(--text); }
 .btn-primary {
     display: inline-block;
     background: var(--accent);

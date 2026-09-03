@@ -237,6 +237,7 @@ postępu skanu, dialogu dopasowania ComicVine. Każdy widok działa też bez JS
 | `GET /issues/{id}` | szczegóły zeszytu (pełne metadane, duża okładka; przy postępie czytania ramka „W trakcie czytania / Przeczytane — przeczytano X z N stron (P%) · ostatnio data" z paskiem, wiersz „Przeczytano" w tabeli; „Strony" pokazuje `file_pages` z fallbackiem na `page_count`) |
 | `GET /issues/{id}/edit` → `POST /issues/{id}` | formularz edycji zeszytu (numer, tytuł, opis, data, twórcy, wydawca); zapis ustawia `manual` + `locked` |
 | `POST /issues/{id}/unlock` | zdjęcie blokady metadanych |
+| `POST /issues/{id}/read` / `POST /issues/{id}/unread` | oznaczenie zeszytu jako przeczytany (postęp = liczba stron; dla archiwum bez policzonych stron liczy je teraz; przy nieznanej liczbie stron błąd flash) / nieprzeczytany (usunięcie postępu). Pole `next` (tylko ścieżki lokalne) wraca na stronę listy; bez niego redirect na stronę zeszytu z `?msg=` |
 | `POST /issues/{id}/scrape` | ComicVine dla pojedynczego zeszytu |
 | `GET /issues/{id}/cover` | miniatura z cache (Cache-Control; placeholder gdy brak) |
 | `GET /issues/{id}/download` | plik komiksu (`Content-Disposition: attachment`, oryginalna nazwa, `Content-Type` wg rozszerzenia: `application/vnd.comicbook+zip` / `-rar` / `application/pdf`) |

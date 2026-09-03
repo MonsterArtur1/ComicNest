@@ -71,6 +71,8 @@ Postęp czytania widać też w interfejsie WWW: pasek pod okładką na liście z
 liczba przeczytanych stron i data ostatniego czytania na stronie zeszytu, a na gridzie
 biblioteki zielony znaczek ✓ przy seriach przeczytanych do końca. Grid ma filtry:
 nieczytane, w trakcie czytania, przeczytane, bez metadanych z ComicVine, brakujące pliki.
+Zeszyt można też ręcznie oznaczyć jako przeczytany lub nieprzeczytany (przyciski na
+stronie zeszytu i na liście zeszytów serii).
 
 Na tym samym komputerze (np. Thorium Reader na PC) użyj `http://127.0.0.1:8080/opds` —
 Thorium odrzuca adresy bez domeny, więc `http://localhost:8080/opds` kończy się błędem

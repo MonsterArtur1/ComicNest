@@ -44,6 +44,7 @@
 </div>
 
 {{if .Issues}}
+{{$next := .Next}}
 <ul class="issue-list">
     {{range .Issues}}
     <li class="issue-row {{if .FileMissing}}missing{{end}}">
@@ -78,6 +79,17 @@
             <button type="submit" class="btn btn-danger" title="Plik zniknął z biblioteki — usuń wpis z katalogu">Usuń</button>
         </form>
         {{else}}
+        {{if and .Reading .Reading.Finished}}
+        <form action="/issues/{{.ID}}/unread" method="post">
+            <input type="hidden" name="next" value="{{$next}}">
+            <button type="submit" class="btn btn-mini" title="Oznacz jako nieprzeczytany">↺ nieprzeczytany</button>
+        </form>
+        {{else}}
+        <form action="/issues/{{.ID}}/read" method="post">
+            <input type="hidden" name="next" value="{{$next}}">
+            <button type="submit" class="btn btn-mini" title="Oznacz jako przeczytany">✓ przeczytany</button>
+        </form>
+        {{end}}
         <a class="btn download" href="/issues/{{.ID}}/download" title="Pobierz plik">Pobierz</a>
         {{end}}
     </li>

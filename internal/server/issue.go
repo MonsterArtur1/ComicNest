@@ -27,12 +27,15 @@ var flashMessages = map[string]struct {
 	text  string
 	isErr bool
 }{
-	"cv_ok":       {"Metadane zaktualizowane z ComicVine.", false},
-	"cv_nomatch":  {"Nie znaleziono zeszytu o tym numerze w dopasowanym wolumenie ComicVine.", true},
-	"cv_locked":   {"Metadane są zablokowane — najpierw zdejmij blokadę.", true},
-	"cv_novolume": {"Seria nie jest dopasowana do wolumenu ComicVine.", true},
-	"cv_nokey":    {"Brak klucza API ComicVine w config.yaml.", true},
-	"cv_error":    {"Aktualizacja z ComicVine nie powiodła się — szczegóły w logu serwera.", true},
+	"cv_ok":        {"Metadane zaktualizowane z ComicVine.", false},
+	"cv_nomatch":   {"Nie znaleziono zeszytu o tym numerze w dopasowanym wolumenie ComicVine.", true},
+	"cv_locked":    {"Metadane są zablokowane — najpierw zdejmij blokadę.", true},
+	"cv_novolume":  {"Seria nie jest dopasowana do wolumenu ComicVine.", true},
+	"cv_nokey":     {"Brak klucza API ComicVine w config.yaml.", true},
+	"cv_error":     {"Aktualizacja z ComicVine nie powiodła się — szczegóły w logu serwera.", true},
+	"read_ok":      {"Zeszyt oznaczony jako przeczytany.", false},
+	"unread_ok":    {"Zeszyt oznaczony jako nieprzeczytany.", false},
+	"read_nopages": {"Nie można oznaczyć jako przeczytany — nieznana liczba stron (brak pliku lub format bez stron).", true},
 }
 
 // getIssueFromPath resolves the {id} path value to an issue, writing the

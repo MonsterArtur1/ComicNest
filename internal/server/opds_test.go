@@ -424,6 +424,61 @@ func TestHomeFiltersAndReadMark(t *testing.T) {
 	}
 }
 
+func TestMarkReadUnread(t *testing.T) {
+	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	h := srv.Handler()
+	post := func(target, form string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, target, strings.NewReader(form))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+
+	// Mark read from the series list → progress = page total, back to the list.
+	rec := post("/issues/1/read", "next=/series/1?filter=all")
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/series/1?filter=all" {
+		t.Fatalf("mark read: %d -> %q", rec.Code, rec.Header().Get("Location"))
+	}
+	body := get(t, h, "/issues/1", nil).Body.String()
+	if !strings.Contains(body, "<dt>Przeczytano</dt><dd>3 z 3 stron (100%)</dd>") ||
+		!strings.Contains(body, "Oznacz jako nieprzeczytany") || strings.Contains(body, "Oznacz jako przeczytany") {
+		t.Errorf("issue page after mark read:\n%s", body)
+	}
+	if !strings.Contains(get(t, h, "/", nil).Body.String(), `class="read-mark"`) {
+		t.Error("home grid should show the read mark after marking read")
+	}
+	body = get(t, h, "/series/1", nil).Body.String()
+	if !strings.Contains(body, "↺ nieprzeczytany") || strings.Contains(body, "✓ przeczytany") {
+		t.Errorf("series list should offer 'unread' for a finished issue:\n%s", body)
+	}
+
+	// Mark unread without "next" → issue page with a flash.
+	rec = post("/issues/1/unread", "")
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/issues/1?msg=unread_ok" {
+		t.Fatalf("mark unread: %d -> %q", rec.Code, rec.Header().Get("Location"))
+	}
+	body = get(t, h, "/issues/1?msg=unread_ok", nil).Body.String()
+	if strings.Contains(body, "Przeczytano") || !strings.Contains(body, "Zeszyt oznaczony jako nieprzeczytany.") {
+		t.Errorf("issue page after mark unread:\n%s", body)
+	}
+	if p, _ := srv.store.GetReadingProgress(1); p != nil {
+		t.Errorf("progress should be gone, got %+v", p)
+	}
+
+	// Off-site "next" values are ignored.
+	rec = post("/issues/1/read", "next=//evil.example/x")
+	if loc := rec.Header().Get("Location"); loc != "/issues/1?msg=read_ok" {
+		t.Errorf("open redirect not blocked: %q", loc)
+	}
+
+	// Missing file with no known page count cannot be marked read.
+	rec = post("/issues/2/read", "")
+	if loc := rec.Header().Get("Location"); loc != "/issues/2?msg=read_nopages" {
+		t.Errorf("issue without pages: %q", loc)
+	}
+}
+
 func TestOPDSNoStreamingForPDF(t *testing.T) {
 	e := opdsIssueEntry("http://h", store.Issue{ID: 9, Path: "x/Comic.pdf", PageCount: 40}, "Comic", nil)
 	for _, l := range e.Links {
