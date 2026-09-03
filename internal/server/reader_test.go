@@ -51,14 +51,14 @@ func TestReaderPageAndProgress(t *testing.T) {
 	if rec := get(t, h, "/issues/1/pages/1?track=0", nil); rec.Code != http.StatusOK {
 		t.Fatalf("page via web route: %d", rec.Code)
 	}
-	if p, _ := srv.store.GetReadingProgress(1); p != nil {
+	if p, _ := srv.store.GetReadingProgress("", 1); p != nil {
 		t.Errorf("track=0 must not record progress, got %+v", p)
 	}
 	// … and reports it explicitly.
 	if rec := postForm(t, h, "/issues/1/progress", "page=2"); rec.Code != http.StatusNoContent {
 		t.Fatalf("progress: %d %s", rec.Code, rec.Body)
 	}
-	if p, _ := srv.store.GetReadingProgress(1); p == nil || p.Page != 2 {
+	if p, _ := srv.store.GetReadingProgress("", 1); p == nil || p.Page != 2 {
 		t.Fatalf("progress not stored: %+v", p)
 	}
 	// Resume from the recorded page; ?page= overrides.
@@ -86,7 +86,7 @@ func TestReaderPageAndProgress(t *testing.T) {
 		t.Errorf("finished issue should restart at page 1:\n%s", body)
 	}
 	postForm(t, h, "/issues/1/progress", "page=1")
-	if p, _ := srv.store.GetReadingProgress(1); p == nil || p.Page != 3 {
+	if p, _ := srv.store.GetReadingProgress("", 1); p == nil || p.Page != 3 {
 		t.Errorf("progress must keep the furthest page, got %+v", p)
 	}
 	if body := get(t, h, "/issues/1", nil).Body.String(); !strings.Contains(body, "Czytaj od nowa") {

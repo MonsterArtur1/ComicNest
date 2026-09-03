@@ -33,7 +33,7 @@ func (s *Server) handleIssueMarkRead(w http.ResponseWriter, r *http.Request) {
 		s.redirectBack(w, r, issue.ID, "read_nopages")
 		return
 	}
-	if err := s.store.SetReadingProgress(issue.ID, total); err != nil {
+	if err := s.store.SetReadingProgress(userFrom(r), issue.ID, total); err != nil {
 		s.serverError(w, err)
 		return
 	}
@@ -46,7 +46,7 @@ func (s *Server) handleIssueMarkUnread(w http.ResponseWriter, r *http.Request) {
 	if issue == nil {
 		return
 	}
-	if err := s.store.ClearReadingProgress(issue.ID); err != nil {
+	if err := s.store.ClearReadingProgress(userFrom(r), issue.ID); err != nil {
 		s.serverError(w, err)
 		return
 	}
@@ -96,8 +96,8 @@ type issueRow struct {
 }
 
 // issueRows attaches reading progress to issues in one query.
-func (s *Server) issueRows(issues []store.Issue) ([]issueRow, error) {
-	progress, err := s.progressFor(issues)
+func (s *Server) issueRows(user string, issues []store.Issue) ([]issueRow, error) {
+	progress, err := s.progressFor(user, issues)
 	if err != nil {
 		return nil, err
 	}

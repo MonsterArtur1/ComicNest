@@ -7,3 +7,8 @@ opds:
   enabled: true               # katalog OPDS pod /opds (patrz §9a)
   username: "artur"                 # oba puste = katalog bez logowania;
   password: "artur"
+users:
+  - name: artur
+    password: sekret
+  - name: kasia
+    password: inne

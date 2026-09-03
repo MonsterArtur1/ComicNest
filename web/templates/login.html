@@ -1,0 +1,26 @@
+{{define "login"}}<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Logowanie — ComicNest</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="login-body">
+<main class="login-box">
+    <h1 class="brand">Comic<span>Nest</span></h1>
+    <p class="login-hint">Zaloguj się kontem z <code>config.yaml</code>. To samo hasło działa w czytniku OPDS.</p>
+    {{if .Error}}<p class="flash flash-error">{{.Error}}</p>{{end}}
+    <form method="post" action="/login" class="login-form">
+        <input type="hidden" name="next" value="{{.Next}}">
+        <label>Użytkownik
+            <input type="text" name="name" value="{{.Name}}" autocomplete="username" autofocus required>
+        </label>
+        <label>Hasło
+            <input type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <button type="submit" class="btn btn-primary">Zaloguj</button>
+    </form>
+</main>
+</body>
+</html>{{end}}

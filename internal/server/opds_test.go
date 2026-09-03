@@ -462,7 +462,7 @@ func TestMarkReadUnread(t *testing.T) {
 	if strings.Contains(body, "Przeczytano") || !strings.Contains(body, "Zeszyt oznaczony jako nieprzeczytany.") {
 		t.Errorf("issue page after mark unread:\n%s", body)
 	}
-	if p, _ := srv.store.GetReadingProgress(1); p != nil {
+	if p, _ := srv.store.GetReadingProgress("", 1); p != nil {
 		t.Errorf("progress should be gone, got %+v", p)
 	}
 
@@ -499,7 +499,8 @@ func TestOPDSNoStreamingForPDF(t *testing.T) {
 }
 
 func TestOPDSBasicAuth(t *testing.T) {
-	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true, Username: "artur", Password: "sekret"})
+	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	srv.cfg.Users = []config.User{{Name: "artur", Password: "sekret"}}
 	h := srv.Handler()
 
 	for _, path := range []string{"/opds", "/opds/series/1", "/opds/issues/1/file", "/opds/issues/1/cover"} {
@@ -519,9 +520,11 @@ func TestOPDSBasicAuth(t *testing.T) {
 	if rec := get(t, h, "/opds", right); rec.Code != http.StatusOK {
 		t.Errorf("correct credentials: got %d, want 200", rec.Code)
 	}
-	// The web UI stays open regardless of OPDS credentials.
-	if rec := get(t, h, "/issues/1/download", nil); rec.Code != http.StatusOK {
-		t.Errorf("web download should not require OPDS auth: got %d", rec.Code)
+	// The web UI uses the same accounts, via the login form: without a session
+	// it redirects to /login instead of answering a Basic challenge.
+	rec := get(t, h, "/issues/1/download", nil)
+	if rec.Code != http.StatusSeeOther || !strings.HasPrefix(rec.Header().Get("Location"), "/login?next=") {
+		t.Errorf("web download without a session: %d -> %q", rec.Code, rec.Header().Get("Location"))
 	}
 }
 

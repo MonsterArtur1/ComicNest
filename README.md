@@ -48,9 +48,19 @@ data_dir: "./data"           # baza SQLite + cache okładek
 comicvine_api_key: ""        # klucz z https://comicvine.gamespot.com/api/
 opds:
   enabled: false             # katalog OPDS pod http://…/opds
-  username: ""               # opcjonalne logowanie do katalogu (oba pola razem)
-  password: ""
+users:                       # konta (opcjonalne); puste = brak logowania
+  - name: artur
+    password: sekret         # hasło zapisane jawnie
 ```
+
+## Konta użytkowników
+
+Wpisz konta w sekcji `users`. Od tej chwili interfejs WWW wymaga zalogowania (formularz na
+`/login`, „Wyloguj" w nagłówku), a czytniki OPDS pytają o tę samą nazwę i hasło. Każdy
+użytkownik ma własny postęp czytania: pasek postępu, znaczki „przeczytane", filtry i sekcja
+„Aktualnie czytane" pokazują tylko jego dane. Postęp sprzed wprowadzenia kont trafia na
+pierwsze konto z listy. Bez sekcji `users` wszystko działa jak dotąd, bez logowania.
+Hasła są w pliku jawnym tekstem, więc trzymaj `config.yaml` poza repozytorium.
 
 Bez klucza ComicVine aplikacja działa normalnie — funkcje dopasowania/scrape'u są
 wyłączone z podpowiedzią w UI. Klucz trzymaj wyłącznie w `config.yaml` (plik jest
@@ -81,10 +91,10 @@ Na tym samym komputerze (np. Thorium Reader na PC) użyj `http://127.0.0.1:8080/
 Thorium odrzuca adresy bez domeny, więc `http://localhost:8080/opds` kończy się błędem
 „Błąd dostępu do kanału". Serwer wypisuje przy starcie wszystkie działające adresy.
 
-Jeśli ustawisz `opds.username` i `opds.password`, czytnik zapyta o login (HTTP Basic).
-Pamiętaj, że przy `listen: 0.0.0.0` interfejs WWW (bez logowania) także jest widoczny
-w sieci lokalnej — hasło OPDS chroni tylko katalog dla czytników. Zeszyty oznaczone
-jako brakujące na dysku nie pojawiają się w katalogu.
+Jeśli zdefiniujesz konta w `users`, czytnik zapyta o login (HTTP Basic) i będzie widział
+postęp tego użytkownika. Przy `listen: 0.0.0.0` bez kont interfejs WWW jest otwarty
+w sieci lokalnej, dlatego w takim układzie warto konta dodać. Zeszyty oznaczone jako
+brakujące na dysku nie pojawiają się w katalogu.
 
 ## Organizacja biblioteki
 

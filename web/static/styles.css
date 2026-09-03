@@ -160,6 +160,33 @@ code {
 }
 .opds-badge:hover { color: var(--accent); border-color: var(--accent); }
 
+.user-box { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); }
+.user-name { white-space: nowrap; }
+
+/* --- login page --- */
+.login-body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.login-box {
+    width: min(360px, 92vw);
+    padding: 28px 28px 24px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.login-box .brand { margin: 0 0 6px; font-size: 26px; }
+.login-hint { color: var(--text-dim); font-size: 13px; margin: 0 0 16px; }
+.login-form { display: flex; flex-direction: column; gap: 12px; }
+.login-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-dim); }
+.login-form input {
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+}
+.login-form input:focus { outline: 1px solid var(--accent); }
+.login-form .btn { margin-top: 6px; justify-content: center; text-align: center; }
+
 /* --- scan widget --- */
 .scan-area { margin-left: auto; }
 

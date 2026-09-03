@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"comicnest/internal/comicvine"
 	"comicnest/internal/config"
@@ -38,11 +39,26 @@ func main() {
 	} else {
 		log.Printf("comicvine: enabled")
 	}
+	if cfg.AuthEnabled() {
+		names := make([]string, len(cfg.Users))
+		for i, u := range cfg.Users {
+			names[i] = u.Name
+		}
+		log.Printf("users: %s (web login + OPDS basic auth)", strings.Join(names, ", "))
+		// Progress recorded before accounts existed belongs to the first user.
+		if moved, err := st.AdoptAnonymousProgress(cfg.Users[0].Name); err != nil {
+			log.Printf("users: adopting anonymous progress: %v", err)
+		} else if moved > 0 {
+			log.Printf("users: %d reading-progress record(s) assigned to %s", moved, cfg.Users[0].Name)
+		}
+	} else {
+		log.Printf("users: none configured — no login, single anonymous reader")
+	}
 	switch {
 	case !cfg.OPDS.Enabled:
 		log.Printf("opds: disabled (set opds.enabled: true in config.yaml)")
-	case cfg.OPDS.Username != "":
-		log.Printf("opds: enabled (basic auth)")
+	case cfg.AuthEnabled():
+		log.Printf("opds: enabled (basic auth with user accounts)")
 	default:
 		log.Printf("opds: enabled (no auth)")
 	}

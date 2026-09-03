@@ -31,7 +31,7 @@ func (s *Server) handleReader(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if issue.FileMissing || !canStreamPages(issue.Path) {
-		s.errorPage(w, http.StatusNotFound,
+		s.errorPage(w, r, http.StatusNotFound,
 			"Czytnik obsługuje tylko archiwa CBZ/CBR obecne na dysku — ten zeszyt można jedynie pobrać.")
 		return
 	}
@@ -54,12 +54,12 @@ func (s *Server) handleReader(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if total == 0 {
-		s.errorPage(w, http.StatusNotFound, "To archiwum nie zawiera stron z obrazami.")
+		s.errorPage(w, r, http.StatusNotFound, "To archiwum nie zawiera stron z obrazami.")
 		return
 	}
 
 	start := 1
-	if p, err := s.store.GetReadingProgress(issue.ID); err != nil {
+	if p, err := s.store.GetReadingProgress(userFrom(r), issue.ID); err != nil {
 		s.serverError(w, err)
 		return
 	} else if p != nil && p.Page > 0 && p.Page < total {
@@ -136,7 +136,7 @@ func (s *Server) handleIssueProgress(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "nieprawidłowy numer strony", http.StatusBadRequest)
 		return
 	}
-	if err := s.store.SetReadingProgress(issue.ID, page); err != nil {
+	if err := s.store.SetReadingProgress(userFrom(r), issue.ID, page); err != nil {
 		s.serverError(w, err)
 		return
 	}

@@ -69,7 +69,7 @@ func (s *Server) handleIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	progress, err := s.store.GetReadingProgress(issue.ID)
+	progress, err := s.store.GetReadingProgress(userFrom(r), issue.ID)
 	if err != nil {
 		s.serverError(w, err)
 		return
@@ -87,7 +87,7 @@ func (s *Server) handleIssue(w http.ResponseWriter, r *http.Request) {
 		data.Msg = flash.text
 		data.MsgError = flash.isErr
 	}
-	s.render(w, "issue.html", data)
+	s.render(w, r, "issue.html", data)
 }
 
 // handleIssueDelete removes the record of an issue whose file disappeared
@@ -99,7 +99,7 @@ func (s *Server) handleIssueDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !issue.FileMissing {
-		s.errorPage(w, http.StatusConflict,
+		s.errorPage(w, r, http.StatusConflict,
 			"Ten zeszyt ma plik na dysku — rekordów istniejących plików nie można usuwać.")
 		return
 	}

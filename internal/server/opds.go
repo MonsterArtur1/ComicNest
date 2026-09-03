@@ -1,7 +1,6 @@
 package server
 
 import (
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"log"
@@ -42,22 +41,22 @@ func (s *Server) opdsRoutes() {
 	handle("GET /opds/issues/{id}/pages/{page}", s.handleIssuePage)
 }
 
-// opdsAuth enforces HTTP Basic auth when credentials are configured.
+// opdsAuth enforces HTTP Basic auth against the configured user accounts and
+// binds the authenticated user to the request, so progress recorded through
+// the catalog lands on that user's record.
 func (s *Server) opdsAuth(next http.Handler) http.Handler {
-	user, pass := s.cfg.OPDS.Username, s.cfg.OPDS.Password
-	if user == "" {
-		return next
-	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.cfg.AuthEnabled() {
+			next.ServeHTTP(w, r)
+			return
+		}
 		u, p, ok := r.BasicAuth()
-		if !ok ||
-			subtle.ConstantTimeCompare([]byte(u), []byte(user)) != 1 ||
-			subtle.ConstantTimeCompare([]byte(p), []byte(pass)) != 1 {
+		if !ok || !s.checkPassword(u, p) {
 			w.Header().Set("WWW-Authenticate", `Basic realm="ComicNest OPDS", charset="UTF-8"`)
 			http.Error(w, "Wymagane logowanie do katalogu OPDS.", http.StatusUnauthorized)
 			return
 		}
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, withUser(r, u))
 	})
 }
 
@@ -144,12 +143,12 @@ func (s *Server) handleOPDSRoot(w http.ResponseWriter, r *http.Request) {
 }
 
 // progressFor fetches reading progress for the given issues in one query.
-func (s *Server) progressFor(issues []store.Issue) (map[int64]store.ReadingProgress, error) {
+func (s *Server) progressFor(user string, issues []store.Issue) (map[int64]store.ReadingProgress, error) {
 	ids := make([]int64, len(issues))
 	for i, is := range issues {
 		ids[i] = is.ID
 	}
-	return s.store.ReadingProgressFor(ids)
+	return s.store.ReadingProgressFor(user, ids)
 }
 
 // progressPtr returns the issue's progress from a batch map, or nil.
@@ -163,7 +162,7 @@ func progressPtr(m map[int64]store.ReadingProgress, id int64) *store.ReadingProg
 // handleOPDSReading serves issues started in a reader but not finished,
 // most recently read first.
 func (s *Server) handleOPDSReading(w http.ResponseWriter, r *http.Request) {
-	items, err := s.store.ListIssuesInProgress(100)
+	items, err := s.store.ListIssuesInProgress(userFrom(r), 100)
 	if err != nil {
 		s.serverError(w, err)
 		return
@@ -242,7 +241,7 @@ func (s *Server) handleIssuePage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.FormValue("track") != "0" {
-		if err := s.store.SetReadingProgress(issue.ID, page+1); err != nil {
+		if err := s.store.SetReadingProgress(userFrom(r), issue.ID, page+1); err != nil {
 			log.Printf("opds: progress for issue %d: %v", issue.ID, err)
 		}
 	}
@@ -265,7 +264,7 @@ func canStreamPages(path string) bool {
 
 // handleOPDSSeriesList serves the paged navigation feed of all series.
 func (s *Server) handleOPDSSeriesList(w http.ResponseWriter, r *http.Request) {
-	series, err := s.store.ListSeries("", store.SeriesSortName, store.SeriesFilterAll)
+	series, err := s.store.ListSeries(userFrom(r), "", store.SeriesSortName, store.SeriesFilterAll)
 	if err != nil {
 		s.serverError(w, err)
 		return
@@ -377,7 +376,7 @@ func (s *Server) handleOPDSSeries(w http.ResponseWriter, r *http.Request) {
 	}
 	f.TotalResults, f.ItemsPerPage, f.StartIndex = len(issues), opdsPageSize, from+1
 
-	progress, err := s.progressFor(issues[from:to])
+	progress, err := s.progressFor(userFrom(r), issues[from:to])
 	if err != nil {
 		s.serverError(w, err)
 		return
@@ -415,7 +414,7 @@ func (s *Server) handleOPDSRecent(w http.ResponseWriter, r *http.Request) {
 	}
 	f.TotalResults, f.ItemsPerPage, f.StartIndex = total, opdsPageSize, from+1
 
-	if err := s.appendIssueEntries(f, base, issues); err != nil {
+	if err := s.appendIssueEntries(userFrom(r), f, base, issues); err != nil {
 		s.serverError(w, err)
 		return
 	}
@@ -424,12 +423,12 @@ func (s *Server) handleOPDSRecent(w http.ResponseWriter, r *http.Request) {
 
 // appendIssueEntries adds publication entries (with reading progress) for
 // issues joined with their series name.
-func (s *Server) appendIssueEntries(f *opds.Feed, base string, issues []store.IssueWithSeries) error {
+func (s *Server) appendIssueEntries(user string, f *opds.Feed, base string, issues []store.IssueWithSeries) error {
 	ids := make([]int64, len(issues))
 	for i, is := range issues {
 		ids[i] = is.ID
 	}
-	progress, err := s.store.ReadingProgressFor(ids)
+	progress, err := s.store.ReadingProgressFor(user, ids)
 	if err != nil {
 		return err
 	}
@@ -455,7 +454,7 @@ func (s *Server) handleOPDSSearch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		f.TotalResults, f.ItemsPerPage, f.StartIndex = len(issues), len(issues), 1
-		if err := s.appendIssueEntries(f, base, issues); err != nil {
+		if err := s.appendIssueEntries(userFrom(r), f, base, issues); err != nil {
 			s.serverError(w, err)
 			return
 		}

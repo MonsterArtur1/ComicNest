@@ -73,18 +73,27 @@ data_dir: "./data"             # baza sqlite + cache okładek
 comicvine_api_key: ""          # puste = funkcje ComicVine wyłączone (UI to komunikuje)
 opds:
   enabled: false               # katalog OPDS pod /opds (patrz §9a)
-  username: ""                 # oba puste = katalog bez logowania;
-  password: ""                 # oba ustawione = HTTP Basic auth na /opds/*
+users:                         # konta; puste = brak logowania (jeden anonimowy czytelnik)
+  - name: artur
+    password: sekret           # plaintext — świadomie (osobista aplikacja w LAN)
+  - name: kasia
+    password: inne
 ```
 
 Przy braku pliku aplikacja zapisuje domyślny config i loguje instrukcję uzupełnienia.
 Klucz API **nigdy nie trafia do kodu** (w starym projekcie był zahardkodowany — patrz §10).
-Walidacja: `username`/`password` muszą być ustawione razem (jedno bez drugiego = błąd startu).
 
-Interfejs WWW nie ma logowania, dlatego domyślnie nasłuch jest tylko na `localhost`.
-Ustawienie `listen: 0.0.0.0` wystawia **całą aplikację** (także edycję metadanych) w sieci
-lokalnej — świadoma decyzja użytkownika na zaufanej sieci domowej; opcjonalne hasło OPDS
-chroni wyłącznie katalog dla czytników, nie UI.
+**Konta użytkowników (`users`).** Jedno źródło prawdy dla logowania do WWW (formularz
+`/login`, sesja w ciasteczku `comicnest_session`: HttpOnly, SameSite=Strict, 30 dni, tabela sesji
+w pamięci — restart wylogowuje) i dla OPDS (HTTP Basic z tymi samymi parami nazwa/hasło).
+Postęp czytania jest per użytkownik (§5). Walidacja: nazwa i hasło wymagane, nazwy unikalne, bez
+`:` (Basic auth). Brak `users` = stare zachowanie: wszystko otwarte, postęp anonimowego czytelnika
+(`user = ''`). Zgodność wstecz: stare `opds.username`/`opds.password` bez `users` stają się
+jedynym kontem (oznaczone jako deprecated). Przy starcie z kontami postęp anonimowy przechodzi na
+pierwsze konto z listy (`Store.AdoptAnonymousProgress`).
+
+Domyślnie nasłuch tylko na `localhost`. `listen: 0.0.0.0` wystawia aplikację w sieci lokalnej —
+wtedy warto zdefiniować `users`, bo bez kont UI (także edycja metadanych) jest otwarte.
 
 ## 5. Model danych (SQLite)
 
@@ -146,9 +155,12 @@ prowadzi wprost do zeszytu. Scrape: zeszyt bez numeru + wolumen z jednym zeszyte
 **Strumieniowanie i postęp czytania** (migracja 3): kolumna `issues.file_pages` — rzeczywista
 liczba wpisów graficznych w archiwum (0 = jeszcze nieliczona; `page_count` pozostaje
 metadaną z ComicInfo, edytowalną i potencjalnie błędną) — oraz tabela
-`reading_progress(issue_id PK → issues ON DELETE CASCADE, page, updated_at)`, gdzie `page`
-to ostatnia przeczytana strona 1-based (konwencja OPDS-PSE). Zapis przez `UPSERT` z
-`MAX(page, nowa)`. Skan uzupełnia `file_pages` dla nowych plików i dla starych z wartością 0.
+`reading_progress(user, issue_id → issues ON DELETE CASCADE, page, updated_at; PK (user, issue_id))`
+(migracja 4 — wcześniej PK po samym `issue_id`; stare wiersze dostały `user = ''`), gdzie `user` to
+nazwa konta z `config.yaml` (`''` = anonimowy czytelnik bez kont), a `page` to ostatnia
+przeczytana strona 1-based (konwencja OPDS-PSE). Zapis przez `UPSERT` z `MAX(page, nowa)`.
+Skan uzupełnia `file_pages` dla nowych plików i dla starych z wartością 0. Wszystkie zapytania o
+postęp (`ListSeries` agregaty, `ListIssuesInProgress`, `ReadingProgressFor`, …) przyjmują `user`.
 
 ## 6. Skanowanie biblioteki
 
@@ -229,6 +241,7 @@ postępu skanu, dialogu dopasowania ComicVine. Każdy widok działa też bez JS
 
 | Metoda i ścieżka | Widok / akcja |
 |---|---|
+| `GET /login` → `POST /login` (`name`, `password`, `next`) / `POST /logout` | logowanie (tylko gdy `users` zdefiniowane; bez kont → redirect na `/`). Middleware `withAuth`: bez sesji GET → 303 na `/login?next=…`, inne metody → 401; `/opds/*`, `/login`, `/logout`, `/static/*` poza bramką. Nazwa użytkownika w kontekście żądania (`userFrom(r)`), w layoucie „👤 nazwa" + „Wyloguj" (`currentUser` bindowane per żądanie na klonie szablonu) |
 | `GET /?sort=&filter=` | grid serii (okładka, nazwa, liczba zeszytów, zielony znaczek ✓ gdy wszystkie dostępne zeszyty przeczytane); sort: nazwa / ostatnio dodane; filtry: wszystkie / nieczytane (żaden zeszyt nie ma postępu) / w trakcie czytania (jest postęp, nie wszystko skończone) / przeczytane (każdy dostępny zeszyt doczytany, ≥1 zeszyt) / bez metadanych z ComicVine (jakiś zeszyt ze źródłem `filename` lub `comicinfo`) / brakujące pliki (jakiś zeszyt `file_missing`). Agregaty liczone w `ListSeries` (`LEFT JOIN reading_progress`, HAVING) |
 | `GET /series/{id}` | strona serii: metadane + lista zeszytów (okładka, numer, tytuł, data, rozmiar, badge źródła metadanych, pasek postępu czytania pod okładką + „czytane: str. X z N (P%)" / „✓ przeczytane") |
 | `GET /series/{id}/edit` → `POST /series/{id}` | formularz edycji serii (nazwa, wydawca, opis) |
@@ -255,8 +268,9 @@ Filtry na stronie serii i w gridzie: wszystkie / bez metadanych (`metadata_sourc
 
 OPDS 1.2 (Atom) — format obsługiwany przez czytniki komiksów (Panels, Chunky, Moon+ Reader,
 Librera, KOReader, Mihon przez rozszerzenie). Cały katalog — feedy, okładki i pliki — żyje pod
-prefiksem `/opds`, żeby opcjonalne Basic auth (`opds.username`/`password`) obejmowało wszystko,
-czego dotyka czytnik; endpointy UI (`/issues/{id}/download`, `/cover`) pozostają bez zmian.
+prefiksem `/opds`, żeby HTTP Basic auth (konta z `users`, §4) obejmowało wszystko, czego dotyka
+czytnik; zalogowany użytkownik trafia do kontekstu żądania, więc `pse:lastRead`, „Aktualnie
+czytane" i postęp ze strumieniowania są jego. Bez kont katalog jest otwarty (czytelnik anonimowy).
 Gdy OPDS jest wyłączony, trasy nie są rejestrowane (404 z catch-alla).
 
 | Ścieżka | Feed |

@@ -43,7 +43,7 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
-	rows, err := s.issueRows(issues)
+	rows, err := s.issueRows(userFrom(r), issues)
 	if err != nil {
 		s.serverError(w, err)
 		return
@@ -53,5 +53,5 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 	if filter != store.IssueFilterAll {
 		next += "?filter=" + string(filter)
 	}
-	s.render(w, "series.html", seriesData{Series: series, Issues: rows, Filter: string(filter), Next: next})
+	s.render(w, r, "series.html", seriesData{Series: series, Issues: rows, Filter: string(filter), Next: next})
 }

@@ -12,30 +12,34 @@ type ReadingProgress struct {
 	UpdatedAt string // SQLite datetime text, UTC
 }
 
-// SetReadingProgress records that the reader reached page (1-based). Readers
+// The user argument throughout is the account name from config.yaml, or ""
+// for the anonymous reader when no accounts are configured.
+
+// SetReadingProgress records that user reached page (1-based). Readers
 // stream pages in order (with some read-ahead), so the highest page seen so
 // far is kept — jumping back to re-read does not erase progress.
-func (s *Store) SetReadingProgress(issueID int64, page int) error {
+func (s *Store) SetReadingProgress(user string, issueID int64, page int) error {
 	_, err := s.db.Exec(`
-		INSERT INTO reading_progress (issue_id, page, updated_at)
-		VALUES (?, ?, datetime('now'))
-		ON CONFLICT(issue_id) DO UPDATE SET
+		INSERT INTO reading_progress (user, issue_id, page, updated_at)
+		VALUES (?, ?, ?, datetime('now'))
+		ON CONFLICT(user, issue_id) DO UPDATE SET
 			page = MAX(page, excluded.page),
-			updated_at = excluded.updated_at`, issueID, page)
+			updated_at = excluded.updated_at`, user, issueID, page)
 	return err
 }
 
-// ClearReadingProgress forgets the issue's progress (marks it unread).
-func (s *Store) ClearReadingProgress(issueID int64) error {
-	_, err := s.db.Exec(`DELETE FROM reading_progress WHERE issue_id = ?`, issueID)
+// ClearReadingProgress forgets the user's progress on the issue (unread).
+func (s *Store) ClearReadingProgress(user string, issueID int64) error {
+	_, err := s.db.Exec(`DELETE FROM reading_progress WHERE user = ? AND issue_id = ?`, user, issueID)
 	return err
 }
 
-// GetReadingProgress returns the issue's progress, or nil when never read.
-func (s *Store) GetReadingProgress(issueID int64) (*ReadingProgress, error) {
+// GetReadingProgress returns the user's progress, or nil when never read.
+func (s *Store) GetReadingProgress(user string, issueID int64) (*ReadingProgress, error) {
 	var p ReadingProgress
-	err := s.db.QueryRow(`SELECT page, updated_at FROM reading_progress WHERE issue_id = ?`, issueID).
-		Scan(&p.Page, &p.UpdatedAt)
+	err := s.db.QueryRow(`
+		SELECT page, updated_at FROM reading_progress WHERE user = ? AND issue_id = ?`,
+		user, issueID).Scan(&p.Page, &p.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -45,20 +49,21 @@ func (s *Store) GetReadingProgress(issueID int64) (*ReadingProgress, error) {
 	return &p, nil
 }
 
-// ReadingProgressFor returns progress for the given issues (absent = unread),
-// in one query for catalog feeds.
-func (s *Store) ReadingProgressFor(issueIDs []int64) (map[int64]ReadingProgress, error) {
+// ReadingProgressFor returns the user's progress for the given issues
+// (absent = unread), in one query for catalog feeds and list views.
+func (s *Store) ReadingProgressFor(user string, issueIDs []int64) (map[int64]ReadingProgress, error) {
 	out := make(map[int64]ReadingProgress)
 	if len(issueIDs) == 0 {
 		return out, nil
 	}
-	args := make([]any, len(issueIDs))
-	for i, id := range issueIDs {
-		args[i] = id
+	args := make([]any, 0, len(issueIDs)+1)
+	args = append(args, user)
+	for _, id := range issueIDs {
+		args = append(args, id)
 	}
 	rows, err := s.db.Query(`
 		SELECT issue_id, page, updated_at FROM reading_progress
-		WHERE issue_id IN (`+strings.TrimSuffix(strings.Repeat("?,", len(issueIDs)), ",")+`)`, args...)
+		WHERE user = ? AND issue_id IN (`+strings.TrimSuffix(strings.Repeat("?,", len(issueIDs)), ",")+`)`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -80,20 +85,20 @@ type IssueInProgress struct {
 	Progress ReadingProgress
 }
 
-// ListIssuesInProgress returns started-but-unfinished issues (last read page
-// below the page total), most recently read first. Issues whose page total is
-// unknown count as unfinished.
-func (s *Store) ListIssuesInProgress(limit int) ([]IssueInProgress, error) {
+// ListIssuesInProgress returns the user's started-but-unfinished issues (last
+// read page below the page total), most recently read first. Issues whose
+// page total is unknown count as unfinished.
+func (s *Store) ListIssuesInProgress(user string, limit int) ([]IssueInProgress, error) {
 	rows, err := s.db.Query(`
 		SELECT `+issueWithSeriesColumns+`, rp.page, rp.updated_at
 		FROM reading_progress rp
 		JOIN issues i ON i.id = rp.issue_id
 		JOIN series s ON s.id = i.series_id
-		WHERE i.file_missing = 0
+		WHERE rp.user = ? AND i.file_missing = 0
 		  AND (CASE WHEN i.file_pages > 0 THEN i.file_pages ELSE i.page_count END = 0
 		       OR rp.page < CASE WHEN i.file_pages > 0 THEN i.file_pages ELSE i.page_count END)
 		ORDER BY rp.updated_at DESC
-		LIMIT ?`, limit)
+		LIMIT ?`, user, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -108,4 +113,23 @@ func (s *Store) ListIssuesInProgress(limit int) ([]IssueInProgress, error) {
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+// AdoptAnonymousProgress hands progress recorded before accounts existed
+// (empty user name) to the given user, keeping the user's own rows where
+// both exist. Returns how many rows moved.
+func (s *Store) AdoptAnonymousProgress(user string) (int64, error) {
+	if user == "" {
+		return 0, nil
+	}
+	res, err := s.db.Exec(`UPDATE OR IGNORE reading_progress SET user = ? WHERE user = ''`, user)
+	if err != nil {
+		return 0, err
+	}
+	moved, _ := res.RowsAffected()
+	// Rows that collided with the user's own progress stay anonymous; drop them.
+	if _, err := s.db.Exec(`DELETE FROM reading_progress WHERE user = ''`); err != nil {
+		return moved, err
+	}
+	return moved, nil
 }
