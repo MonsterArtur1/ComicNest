@@ -1,0 +1,29 @@
+{{define "scrape-status"}}
+{{if .Running}}
+<div class="scan-status running"
+     hx-get="/series/{{.SeriesID}}/scrape/status" hx-trigger="every 2s"
+     hx-target="#scrape-area" hx-swap="innerHTML">
+    <span class="spinner"></span>
+    <span>Pobieranie z ComicVine… {{.Done}}/{{.Total}}</span>
+</div>
+{{else}}
+<div class="scan-status">
+    {{if .CVEnabled}}
+        {{if .Matched}}
+        <form hx-post="/series/{{.SeriesID}}/scrape" hx-target="#scrape-area" hx-swap="innerHTML"
+              action="/series/{{.SeriesID}}/scrape" method="post">
+            <button type="submit" class="btn" title="Pobierz metadane ComicVine dla zeszytów bez nich">Pobierz brakujące metadane</button>
+        </form>
+        {{end}}
+        <a class="btn" href="/series/{{.SeriesID}}/match">{{if .Matched}}Zmień dopasowanie{{else}}Dopasuj w ComicVine{{end}}</a>
+    {{else}}
+    <span class="scan-note" title="Ustaw comicvine_api_key w config.yaml">ComicVine wyłączone (brak klucza API)</span>
+    {{end}}
+    {{if .Err}}
+    <span class="scan-note scan-error" title="{{.Err}}">błąd aktualizacji</span>
+    {{else if .Finished}}
+    <span class="scan-note">zaktualizowano: {{.Updated}}, pominięto: {{.Skipped}}{{if .Failed}}, błędy: {{.Failed}}{{end}}</span>
+    {{end}}
+</div>
+{{end}}
+{{end}}

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300">
+  <rect width="200" height="300" fill="#1f2229"/>
+  <rect x="8" y="8" width="184" height="284" rx="8" fill="none" stroke="#2e333d" stroke-width="2"/>
+  <g fill="#3a4150">
+    <rect x="45" y="90" width="110" height="80" rx="6"/>
+    <circle cx="75" cy="118" r="12" fill="#1f2229"/>
+    <path d="M45 158 l35 -30 25 20 30 -26 20 18 v30 h-110 z" fill="#1f2229"/>
+  </g>
+  <text x="100" y="215" text-anchor="middle" fill="#5a6274" font-family="Segoe UI, sans-serif" font-size="16">brak okładki</text>
+</svg>

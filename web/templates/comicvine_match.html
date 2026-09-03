@@ -1,0 +1,45 @@
+{{define "title"}}Dopasowanie ComicVine: {{.Series.Name}} — ComicNest{{end}}
+
+{{define "content"}}
+<nav class="breadcrumbs">
+    <a href="/">Biblioteka</a> <span>/</span>
+    <a href="/series/{{.Series.ID}}">{{.Series.Name}}</a> <span>/</span> dopasowanie ComicVine
+</nav>
+
+<div class="page-head"><h1>Dopasuj serię w ComicVine</h1></div>
+
+{{if .Series.ComicVineVolumeID.Valid}}
+<p class="hint">Obecne dopasowanie: wolumen ComicVine #{{.Series.ComicVineVolumeID.Int64}}. Wybór nowego nadpisze je.</p>
+{{end}}
+
+<form class="cv-search" action="/series/{{.Series.ID}}/match" method="get">
+    <input type="text" name="q" value="{{.Query}}" placeholder="Nazwa serii w ComicVine…">
+    <button type="submit" class="btn">Szukaj</button>
+</form>
+
+{{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
+
+{{if .Candidates}}
+<ul class="cv-candidates">
+    {{range .Candidates}}
+    <li class="cv-candidate">
+        <div class="cv-cover">
+            {{if .ImageURL}}<img src="{{.ImageURL}}" alt="" loading="lazy">{{else}}<img src="/static/placeholder.svg" alt="">{{end}}
+        </div>
+        <div class="cv-info">
+            <strong>{{.Name}}</strong>
+            <span class="cv-meta">
+                {{if .StartYear}}{{.StartYear}} · {{end}}{{if .Publisher}}{{.Publisher}} · {{end}}{{.CountOfIssues}} zeszytów
+            </span>
+            {{if .Description}}<p class="cv-desc">{{.Description}}</p>{{end}}
+        </div>
+        <form action="/series/{{$.Series.ID}}/match/{{.ID}}" method="post">
+            <button type="submit" class="btn-primary">Wybierz</button>
+        </form>
+    </li>
+    {{end}}
+</ul>
+{{else if and .Query (not .Error)}}
+<div class="empty-state"><p>Brak wyników dla „{{.Query}}".</p></div>
+{{end}}
+{{end}}

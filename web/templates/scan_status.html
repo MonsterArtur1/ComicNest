@@ -1,0 +1,24 @@
+{{define "scan-status"}}
+{{if .Running}}
+<div class="scan-status running"
+     hx-get="/scan/status" hx-trigger="every 2s" hx-target="#scan-area" hx-swap="innerHTML">
+    <span class="spinner"></span>
+    {{if .CVPhase}}
+    <span>Aktualizacja ComicVine… {{.CVDone}}/{{.CVTotal}}</span>
+    {{else}}
+    <span>Skanowanie… {{.Processed}}/{{.Found}}</span>
+    {{end}}
+</div>
+{{else}}
+<div class="scan-status">
+    <form hx-post="/scan" hx-target="#scan-area" hx-swap="innerHTML" action="/scan" method="post">
+        <button type="submit">Skanuj bibliotekę</button>
+    </form>
+    {{if .Err}}
+    <span class="scan-note scan-error" title="{{.Err}}">błąd skanowania</span>
+    {{else if .Finished}}
+    <span class="scan-note">ostatni skan: {{.Processed}} plików{{if .Missing}}, brakujących: {{.Missing}}{{end}}{{if .CVTotal}}, ComicVine: {{.CVUpdated}} zaktualizowano{{if .CVFailed}} ({{.CVFailed}} bez dopasowania){{end}}{{end}}</span>
+    {{end}}
+</div>
+{{end}}
+{{end}}

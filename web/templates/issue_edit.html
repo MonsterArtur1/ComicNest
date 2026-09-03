@@ -1,0 +1,61 @@
+{{define "title"}}Edycja zeszytu — ComicNest{{end}}
+
+{{define "content"}}
+<nav class="breadcrumbs">
+    <a href="/">Biblioteka</a> <span>/</span>
+    <a href="/series/{{.Issue.SeriesID}}">{{.SeriesName}}</a> <span>/</span>
+    <a href="/issues/{{.Issue.ID}}">{{if .Issue.IssueNumber}}#{{.Issue.IssueNumber}}{{else}}zeszyt{{end}}</a>
+    <span>/</span> edycja
+</nav>
+
+<div class="page-head"><h1>Edycja zeszytu</h1></div>
+
+{{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
+
+<div class="edit-layout">
+    <div class="edit-cover"><img src="/issues/{{.Issue.ID}}/cover" alt="okładka"></div>
+
+    <form class="edit-form" action="/issues/{{.Issue.ID}}" method="post">
+        <div class="form-row">
+            <label>Numer
+                <input type="text" name="issue_number" value="{{.Issue.IssueNumber}}">
+            </label>
+            <label>Data wydania
+                <input type="text" name="release_date" value="{{.Issue.ReleaseDate}}" placeholder="RRRR-MM-DD">
+            </label>
+            <label>Strony
+                <input type="number" name="page_count" value="{{.Issue.PageCount}}" min="0">
+            </label>
+        </div>
+        <label>Tytuł
+            <input type="text" name="title" value="{{.Issue.Title}}">
+        </label>
+        <label>Opis
+            <textarea name="summary" rows="6">{{.Issue.Summary}}</textarea>
+        </label>
+        <div class="form-row">
+            <label>Scenariusz
+                <input type="text" name="writer" value="{{.Issue.Writer}}">
+            </label>
+            <label>Rysunki
+                <input type="text" name="artist" value="{{.Issue.Artist}}">
+            </label>
+        </div>
+        <label>Wydawca
+            <input type="text" name="publisher" value="{{.Issue.Publisher}}">
+        </label>
+        <p class="hint">Zapis oznacza metadane jako ręczne 🔒 — skan i ComicVine ich nie nadpiszą.</p>
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">Zapisz</button>
+            <a class="btn" href="/issues/{{.Issue.ID}}">Anuluj</a>
+        </div>
+    </form>
+</div>
+
+{{if .Issue.MetadataLocked}}
+<form class="unlock-form" action="/issues/{{.Issue.ID}}/unlock" method="post">
+    <p class="hint">Metadane są zablokowane 🔒. Zdjęcie blokady pozwoli aktualizacjom z ComicVine je nadpisać (dane pozostają).</p>
+    <button type="submit" class="btn">Zdejmij blokadę</button>
+</form>
+{{end}}
+{{end}}

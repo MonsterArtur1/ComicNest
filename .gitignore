@@ -1,2 +1,4 @@
-/database.sqlite
-/*.exe
+config.yaml
+data/
+comicnest.exe
+Old/
