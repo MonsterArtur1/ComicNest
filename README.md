@@ -1,146 +1,130 @@
-# ComicNest
+<p align="center">
+  <img src="imgs/logo.png" alt="ComicNest logo" width="180">
+</p>
 
-Osobisty katalog komiksów jako aplikacja webowa — jedno binarium Go, lokalny serwer,
-biblioteka na Twoim dysku. Inspirowany [Komgą](https://komga.org/), ale prostszy i własny.
+<h1 align="center">ComicNest</h1>
 
-![Go](https://img.shields.io/badge/Go-1.25+-00ADD8) ![Build](https://github.com/MonsterArtur1/ComicNest/actions/workflows/go.yml/badge.svg) ![SQLite](https://img.shields.io/badge/SQLite-bez%20cgo-lightgrey)
+<p align="center">Your comic collection as a personal web library — on your PC or NAS, in your browser and in your comic reader apps.</p>
 
-## Funkcje
+---
 
-- **Skanowanie biblioteki** (`.cbz`, `.cbr`, `.pdf`) — serie z folderów, a dla plików
-  luzem z nazwy pliku; ponowny skan wykrywa nowe i brakujące pliki bez duplikatów.
-- **Metadane z ComicInfo.xml** osadzonego w archiwach (standard znany z Komgi).
-- **Ręczna edycja metadanych** serii i zeszytów; edycja blokuje rekord 🔒 przed
-  nadpisaniem przez automaty (blokadę można zdjąć).
-- **ComicVine**: dopasowanie serii do wolumenu (z listą kandydatów do wyboru),
-  pobieranie metadanych i okładek dla zeszytu lub całej serii, z rate limitem.
-- **Okładki** wyciągane z pierwszej strony archiwum (cache miniatur na dysku).
-- **Przeglądanie i wyszukiwanie**: grid serii, strona serii z filtrami
-  (bez metadanych / z ComicVine / brakujące pliki), szczegóły zeszytu, pobieranie pliku.
-- **Czytnik w przeglądarce** dla CBZ/CBR: strona po stronie, zoom (dopasowanie do
-  wysokości lub szerokości, skala), klawiatura, kliknięcia, gesty, pełny ekran; wznawia od
-  ostatniej strony i dzieli postęp z czytnikami OPDS.
-- **Serwer OPDS** (opcjonalny) — biblioteka dostępna w czytnikach komiksów na telefonie
-  i tablecie (Panels, Chunky, Moon+ Reader, Librera, KOReader…), z okładkami,
-  wyszukiwaniem i opcjonalnym hasłem.
-- Frontend: Go templates + HTMX, dark theme, działa też bez JavaScriptu.
+ComicNest is a small self-hosted server for a personal comic library. Point it at the folder
+where your `.cbz`, `.cbr` and `.pdf` files live, and it builds a catalog of series and issues
+with covers, metadata and reading progress. Everything runs locally: one program, one config
+file, no cloud account.
 
-## Uruchomienie
+**What it does**
 
-Gotowe binaria (Windows, Linux, macOS) są w zakładce **Releases** na GitHubie: pre-release
-`latest` to build z ostatniego commita na `main`, wydania `vX.Y.Z` to wersje stabilne. Obok
-binarium leży `config_example.yaml`. Nowe wydanie publikuje się tagiem:
+- **Scans your library** — folders become series, issue numbers and years are read from file
+  names, and metadata embedded in the archives (`ComicInfo.xml`) is picked up automatically.
+  Re-scanning finds new and missing files without creating duplicates.
+- **Shows covers** taken from the first page of each archive, cached on disk.
+- **Fetches metadata from ComicVine** — match a series to a ComicVine volume, then pull
+  descriptions, publishers, release dates and cover art for a single issue or the whole series.
+  Anything you edit by hand is locked and never overwritten by automatic updates.
+- **Lets you browse and search** — a series grid with sorting, filters (unread, in progress,
+  finished, missing ComicVine data, missing files) and pagination, series pages, issue details
+  and direct downloads.
+- **Reads comics in the browser** — a full-screen page reader for CBZ/CBR with zoom, keyboard,
+  mouse and touch paging. It resumes where you left off and shares progress with your reader
+  apps.
+- **Serves an OPDS catalog** for comic reader apps on phones and tablets (Panels, Chunky,
+  Moon+ Reader, Librera, KOReader, Thorium…). Readers can browse, search, download, or stream
+  pages straight from the server without downloading the file.
+- **Supports several users** — optional accounts with separate reading progress, used by both
+  the web interface and the OPDS catalog.
+- Dark theme, works without JavaScript.
 
-```
-git tag v1.2.0
-git push origin v1.2.0
-```
+## Screenshots
 
-Do kompilacji ze źródeł wymagany Go 1.25+ (bez cgo — działa od ręki na Windows).
+<p align="center">
+  <img src="imgs/scrn1.jpg" alt="Library grid with covers, sorting and reading filters" width="800">
+</p>
+<p align="center"><em>The library: every series as a tile, with sorting, reading filters and pagination.</em></p>
 
-```
-go build -o comicnest.exe ./cmd/comicnest
-./comicnest.exe
-```
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="imgs/scrn2.jpg" alt="Series page with the list of issues">
+      <br><em>A series: description from ComicVine, issue list with metadata source, read marks, read and download buttons.</em>
+    </td>
+    <td align="center" width="50%">
+      <img src="imgs/scrn3.jpg" alt="Issue details with cover and metadata">
+      <br><em>An issue: cover, summary, credits, file details and actions (read, download, edit, mark as read, fetch from ComicVine).</em>
+    </td>
+  </tr>
+</table>
 
-Pierwsze uruchomienie tworzy `config.yaml` — uzupełnij ścieżkę biblioteki i uruchom
-ponownie. Aplikacja wystartuje na `http://localhost:8080/` (nasłuchuje tylko na
-localhost; brak logowania — to aplikacja osobista). Kliknij **Skanuj bibliotekę**.
+## Getting started
 
-## Konfiguracja (`config.yaml`)
+### 1. Download
 
-Pełny, opisany spis opcji znajduje się w `config_example.yaml` w repozytorium — każdy klucz ma
-tam komentarz z wyjaśnieniem. Możesz skopiować go jako `config.yaml` i dostosować. Gdy w aplikacji
-pojawia się nowa opcja, ląduje najpierw właśnie tam, razem z opisem.
+Grab the file for your system from the **Releases** page on GitHub:
+
+| System | File |
+|---|---|
+| Windows | `comicnest-windows-amd64.exe` |
+| Linux (x64) | `comicnest-linux-amd64` |
+| Linux (ARM, e.g. Raspberry Pi) | `comicnest-linux-arm64` |
+| macOS (Apple Silicon) | `comicnest-darwin-arm64` |
+
+The `latest` pre-release is always the newest build; numbered releases (`v1.2.0`) are the
+stable ones. Prefer Docker? Skip to [Running with Docker](#running-with-docker).
+
+### 2. First run
+
+Put the file in a folder of its own and start it (double-click on Windows, or run it from a
+terminal). The first start creates `config.yaml` next to it and stops with a hint. Open that
+file, set `library` to your comics folder, and start the program again.
+
+Now open **http://localhost:8080/** in your browser and click **Skanuj bibliotekę** (scan
+library) in the top bar. The first scan of a large collection takes a while, because covers are
+extracted and pages counted; a progress bar shows where it is. Later scans are much faster.
+
+To start with a different config file location, run `comicnest -config /path/to/config.yaml`.
+
+### 3. Configuration
+
+All options live in `config.yaml`. A fully commented example is in the repository as
+[`config_example.yaml`](config_example.yaml); you can copy it and edit. The keys:
 
 ```yaml
-port: 8080
-listen: localhost            # "0.0.0.0", żeby inne urządzenia w sieci widziały serwer
-library: "D:/Komiksy"        # korzeń biblioteki komiksów
-data_dir: "./data"           # baza SQLite + cache okładek
-comicvine_api_key: ""        # klucz z https://comicvine.gamespot.com/api/
-opds_enabled: false          # katalog OPDS pod http://…/opds
-page_size: 60                # serii na stronę biblioteki (0 = wszystko na jednej stronie)
-users:                       # konta (opcjonalne); puste = brak logowania
-  - name: artur
-    password: sekret         # hasło zapisane jawnie
+port: 8080                    # HTTP port of the server
+listen: localhost             # "localhost" = this computer only; "0.0.0.0" = the whole local network (needed for OPDS reader apps)
+library: "D:/Comics"          # root folder of your comics (scanned recursively: cbz / cbr / pdf)
+data_dir: ./data              # runtime data: SQLite database and cover cache
+comicvine_api_key: ""         # key from https://comicvine.gamespot.com/api/ — leave empty to disable ComicVine features
+opds_enabled: false           # OPDS catalog at http://<host>:8080/opds for reader apps
+page_size: 60                 # series tiles per page in the library grid; 0 = everything on one page
+users:                        # accounts (optional); no section = no login, one anonymous reader
+  - name: alice               # login name for the web UI and OPDS — must not contain ":"
+    password: secret          # stored in plain text on purpose (personal app on a home network)
+  - name: bob                 # every account has its own reading progress
+    password: other
 ```
 
-## Konta użytkowników
+A few things worth knowing:
 
-Wpisz konta w sekcji `users`. Od tej chwili interfejs WWW wymaga zalogowania (formularz na
-`/login`, „Wyloguj" w nagłówku), a czytniki OPDS pytają o tę samą nazwę i hasło. Każdy
-użytkownik ma własny postęp czytania: pasek postępu, znaczki „przeczytane", filtry i sekcja
-„Aktualnie czytane" pokazują tylko jego dane. Postęp sprzed wprowadzenia kont trafia na
-pierwsze konto z listy. Bez sekcji `users` wszystko działa jak dotąd, bez logowania.
-Hasła są w pliku jawnym tekstem, więc trzymaj `config.yaml` poza repozytorium.
+- **Opening the server to your network.** By default ComicNest listens on `localhost` only.
+  Set `listen: 0.0.0.0` to reach it from phones, tablets and other computers. If you do that,
+  add `users`, otherwise anyone on the network can edit your library.
+- **User accounts.** With `users` defined, the web interface asks for a login and reader apps
+  ask for the same name and password. Each user has their own progress: progress bars,
+  "read" marks, filters and the "currently reading" list are personal. Progress recorded before
+  accounts existed is assigned to the first user in the list.
+- **ComicVine.** Without a key everything works, but matching and metadata download are
+  disabled and the interface says so. Get a free key at comicvine.gamespot.com/api.
+- **Environment variables.** Every key except `users` can be overridden with
+  `COMICNEST_<KEY>` (for example `COMICNEST_LISTEN=0.0.0.0` or
+  `COMICNEST_COMICVINE_API_KEY=…`). `COMICNEST_CONFIG` sets the config file path. Values from
+  the environment win over the file. This is what the Docker image uses, but it works anywhere.
 
-Bez klucza ComicVine aplikacja działa normalnie — funkcje dopasowania/scrape'u są
-wyłączone z podpowiedzią w UI. Klucz trzymaj wyłącznie w `config.yaml` (plik jest
-w `.gitignore`).
+### 4. Organising your comics
 
-## Docker
-
-Obraz `ghcr.io/monsterartur1/comicnest` (linux amd64 i arm64, ok. 15 MB, bez shella) buduje się
-z każdego commita na `main` (tag `latest`) i z każdego wydania (`1.2.0`, `1.2`, `1`). Skopiuj
-`docker-compose.yml` z repozytorium, wpisz ścieżkę do komiksów i uruchom:
-
-```
-docker compose up -d
-```
-
-Kontener używa trzech katalogów: `/comics` (biblioteka, tylko do odczytu), `/config`
-(`config.yaml`, tworzony przy pierwszym starcie z poprawnymi ścieżkami) i `/data` (baza SQLite
-i okładki — trzymaj na lokalnym dysku, nie na udziale SMB/NFS). Zmiennymi `PUID` i `PGID` podaj
-użytkownika, jako który ma działać aplikacja (na Synology: UID Twojego konta, zwykle 1026, i GID 100
-grupy `users`; sprawdzisz przez `id <login>` po SSH). Kontener startuje jako root, przepisuje
-własność `config` i `data` na tego użytkownika i zrzuca uprawnienia, zanim otworzy bazę — dokładnie
-tak jak obrazy linuxserver.io. Bez `PUID`/`PGID` działa jako root. Dopisz konta i klucz ComicVine
-do `config/config.yaml`, zrestartuj kontener i kliknij **Skanuj bibliotekę**.
-
-Zmienne środowiskowe `COMICNEST_*` nadpisują wartości z pliku: `COMICNEST_CONFIG` (ścieżka
-configu), `COMICNEST_LISTEN`, `COMICNEST_PORT`, `COMICNEST_LIBRARY`, `COMICNEST_DATA_DIR`,
-`COMICNEST_COMICVINE_API_KEY`, `COMICNEST_OPDS_ENABLED`, `COMICNEST_PAGE_SIZE`. Działają też poza
-Dockerem; konta (`users`) są wyłącznie w pliku. Ścieżkę configu poda się także flagą `-config`.
-Endpoint `GET /healthz` (bez logowania) służy do sprawdzania stanu, a `comicnest -healthcheck`
-odpytuje go z wnętrza kontenera.
-
-## Czytniki komiksów (OPDS)
-
-Ustaw `opds_enabled: true` i `listen: 0.0.0.0`, uruchom ponownie, a w czytniku dodaj
-katalog OPDS o adresie `http://<adres-komputera>:8080/opds` (adres IP komputera
-z biblioteką w sieci domowej). Katalog oferuje:
-
-- **Wszystkie serie** (alfabetycznie, z okładkami) → zeszyty serii do pobrania,
-- **Aktualnie czytane** — zeszyty zaczęte w czytniku, ale nieprzeczytane do końca,
-- **Ostatnio dodane** — zeszyty w kolejności trafienia do biblioteki,
-- **wyszukiwanie** po nazwie serii, tytule i numerze zeszytu (OpenSearch),
-- **czytanie bez pobierania** (OPDS-PSE): czytniki takie jak Panels, Chunky, Librera czy
-  Moon+ Reader strumieniują strony CBZ/CBR bezpośrednio z serwera i wznawiają od ostatniej
-  strony. Postęp zapisuje się na serwerze podczas czytania; PDF-y są tylko do pobrania.
-
-Postęp czytania widać też w interfejsie WWW: pasek pod okładką na liście zeszytów serii,
-liczba przeczytanych stron i data ostatniego czytania na stronie zeszytu, a na gridzie
-biblioteki zielony znaczek ✓ przy seriach przeczytanych do końca. Grid ma filtry:
-nieczytane, w trakcie czytania, przeczytane, bez metadanych z ComicVine, brakujące pliki.
-Zeszyt można też ręcznie oznaczyć jako przeczytany lub nieprzeczytany (przyciski na
-stronie zeszytu i na liście zeszytów serii).
-
-Na tym samym komputerze (np. Thorium Reader na PC) użyj `http://127.0.0.1:8080/opds` —
-Thorium odrzuca adresy bez domeny, więc `http://localhost:8080/opds` kończy się błędem
-„Błąd dostępu do kanału". Serwer wypisuje przy starcie wszystkie działające adresy.
-
-Jeśli zdefiniujesz konta w `users`, czytnik zapyta o login (HTTP Basic) i będzie widział
-postęp tego użytkownika. Przy `listen: 0.0.0.0` bez kont interfejs WWW jest otwarty
-w sieci lokalnej, dlatego w takim układzie warto konta dodać. Zeszyty oznaczone jako
-brakujące na dysku nie pojawiają się w katalogu.
-
-## Organizacja biblioteki
-
-Preferowana struktura — **folder = seria**:
+The preferred layout is **one folder per series**:
 
 ```
-D:/Komiksy/
+D:/Comics/
 ├── Batman/
 │   ├── Batman #001.cbz
 │   └── Batman #002.cbz
@@ -148,24 +132,94 @@ D:/Komiksy/
     └── Saga 055 (2020) (Digital).cbz
 ```
 
-Pliki leżące luzem w korzeniu też są obsługiwane — seria powstaje z nazwy pliku.
-Rozpoznawane wzorce nazw: `Tytuł #012`, `Tytuł 012 (2020)`, `Tytuł v2 015`;
-grupy w nawiasach po numerze (np. `(Digital)`) są ignorowane, rok `(RRRR)` trafia
-do daty wydania. Jeśli archiwum zawiera `ComicInfo.xml`, jego dane mają
-pierwszeństwo nad nazwą pliku.
+Loose files in the root folder are fine too; the series name is then taken from the file
+name. Recognised patterns include `Title #012`, `Title 012 (2020)` and `Title v2 015`.
+Bracketed groups after the number, such as `(Digital)`, are ignored, and a `(YEAR)` becomes
+the release year. A single unnumbered file in its own folder is treated as a one-shot.
 
-### Priorytety metadanych
+Metadata sources are ranked: **file name → ComicInfo.xml → ComicVine → your manual edits**.
+A scan or a ComicVine update never overwrites data from a higher-ranked source, and a manual
+edit locks the record (🔒) until you unlock it.
 
-`nazwa pliku → ComicInfo.xml → ComicVine → edycja ręczna` — skan i scrape nigdy nie
-nadpisują danych z wyższego źródła; ręczna edycja dodatkowo blokuje rekord 🔒.
+## Running with Docker
 
-## Rozwój
+The image `ghcr.io/monsterartur1/comicnest` is about 15 MB and is built for `linux/amd64`
+and `linux/arm64`, so it runs on x86 servers, Raspberry Pi and ARM-based NAS units. Tags:
+`latest` is the newest build, `1.2.0` / `1.2` / `1` are stable releases.
 
-- Dokumentacja projektowa: [docs/SPECIFICATION.md](docs/SPECIFICATION.md),
-  plan wersji: [docs/ROADMAP.md](docs/ROADMAP.md).
-- Testy i lint: `go test ./...`, `go vet ./...`.
-- Struktura: `cmd/comicnest` (main), `internal/` (config, store, library, covers,
-  comicvine, server), `web/` (szablony + statyki, wkompilowane przez `embed`).
+The container uses three directories:
 
-Plany na v2: czytnik stron w przeglądarce, zapis do ComicInfo.xml, okładki z PDF,
-automatyczne wykrywanie zmian w bibliotece.
+| Path in container | Purpose | Mount as |
+|---|---|---|
+| `/comics` | your comic library | read-only |
+| `/config` | `config.yaml` | read-write |
+| `/data` | SQLite database and cover cache | read-write, on a **local disk** (SQLite on SMB/NFS shares can corrupt) |
+
+### docker-compose
+
+Copy [`docker-compose.yml`](docker-compose.yml) from the repository, change the comics path
+and the `PUID`/`PGID` values, and run:
+
+```
+docker compose up -d
+```
+
+```yaml
+services:
+  comicnest:
+    image: ghcr.io/monsterartur1/comicnest:latest
+    container_name: comicnest
+    ports:
+      - "8080:8080"
+    volumes:
+      - /path/to/your/comics:/comics:ro
+      - ./config:/config
+      - ./data:/data
+    environment:
+      # PUID: "1026"          # run as this user — see below
+      # PGID: "100"
+      TZ: Europe/Warsaw
+      # Optional overrides; anything set here beats config.yaml:
+      # COMICNEST_COMICVINE_API_KEY: ""
+      # COMICNEST_OPDS_ENABLED: "true"
+    healthcheck:
+      test: ["CMD", "/comicnest", "-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+```
+
+**PUID / PGID.** The container starts as root, gives ownership of `/config` and `/data` to
+the user you specify, and then drops to that user before opening anything — the same
+convention as linuxserver.io images, so your files end up owned by you, not by root. On a
+Synology NAS use the UID of your account (usually `1026`; check with `id <username>` over
+SSH) and GID `100` (the `users` group). On Unraid use `99` / `100`. If you leave both out,
+the container keeps running as root.
+
+**First start.** The container creates `config/config.yaml` with the right paths already
+filled in (`listen: 0.0.0.0`, `library: /comics`, `data_dir: /data`). Add your accounts
+and ComicVine key to that file, run `docker compose restart`, then open
+`http://<your-host>:8080/` and click **Skanuj bibliotekę**.
+
+**Updating.** `docker compose pull` followed by `docker compose up -d`. Database migrations
+run automatically on start.
+
+## Reader apps (OPDS)
+
+Set `opds_enabled: true` and `listen: 0.0.0.0` (already the case in Docker), restart, and add
+a catalog in your reader app with the address:
+
+```
+http://<address-of-your-server>:8080/opds
+```
+
+The catalog offers **all series** with covers, **currently reading**, **recently added** and
+**search**. Readers that support page streaming (Panels, Chunky, Librera, Moon+ Reader…) open
+CBZ/CBR issues directly from the server without downloading the file, resume at the last page,
+and their progress shows up in the web interface as well. PDFs are download-only.
+
+If you defined `users`, the reader will ask for a login and see that user's progress. On the
+same computer (for example Thorium Reader on a PC) use `http://127.0.0.1:8080/opds` — Thorium
+refuses `localhost`. The server prints all working addresses when it starts.
