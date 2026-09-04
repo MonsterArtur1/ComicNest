@@ -27,12 +27,15 @@ var flashMessages = map[string]struct {
 	text  string
 	isErr bool
 }{
-	"cv_ok":       {"Metadane zaktualizowane z ComicVine.", false},
-	"cv_nomatch":  {"Nie znaleziono zeszytu o tym numerze w dopasowanym wolumenie ComicVine.", true},
-	"cv_locked":   {"Metadane są zablokowane — najpierw zdejmij blokadę.", true},
-	"cv_novolume": {"Seria nie jest dopasowana do wolumenu ComicVine.", true},
-	"cv_nokey":    {"Brak klucza API ComicVine w config.yaml.", true},
-	"cv_error":    {"Aktualizacja z ComicVine nie powiodła się — szczegóły w logu serwera.", true},
+	"cv_ok":        {"Metadane zaktualizowane z ComicVine.", false},
+	"cv_nomatch":   {"Nie znaleziono zeszytu o tym numerze w dopasowanym wolumenie ComicVine.", true},
+	"cv_locked":    {"Metadane są zablokowane — najpierw zdejmij blokadę.", true},
+	"cv_novolume":  {"Seria nie jest dopasowana do wolumenu ComicVine.", true},
+	"cv_nokey":     {"Brak klucza API ComicVine w config.yaml.", true},
+	"cv_error":     {"Aktualizacja z ComicVine nie powiodła się — szczegóły w logu serwera.", true},
+	"read_ok":      {"Zeszyt oznaczony jako przeczytany.", false},
+	"unread_ok":    {"Zeszyt oznaczony jako nieprzeczytany.", false},
+	"read_nopages": {"Nie można oznaczyć jako przeczytany — nieznana liczba stron (brak pliku lub format bez stron).", true},
 }
 
 // getIssueFromPath resolves the {id} path value to an issue, writing the
@@ -66,7 +69,7 @@ func (s *Server) handleIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	progress, err := s.store.GetReadingProgress(issue.ID)
+	progress, err := s.store.GetReadingProgress(userFrom(r), issue.ID)
 	if err != nil {
 		s.serverError(w, err)
 		return
@@ -84,7 +87,7 @@ func (s *Server) handleIssue(w http.ResponseWriter, r *http.Request) {
 		data.Msg = flash.text
 		data.MsgError = flash.isErr
 	}
-	s.render(w, "issue.html", data)
+	s.render(w, r, "issue.html", data)
 }
 
 // handleIssueDelete removes the record of an issue whose file disappeared
@@ -96,7 +99,7 @@ func (s *Server) handleIssueDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !issue.FileMissing {
-		s.errorPage(w, http.StatusConflict,
+		s.errorPage(w, r, http.StatusConflict,
 			"Ten zeszyt ma plik na dysku — rekordów istniejących plików nie można usuwać.")
 		return
 	}

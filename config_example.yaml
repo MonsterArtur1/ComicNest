@@ -1,0 +1,11 @@
+port: 8080
+library: "D:/Library"
+data_dir: ./data
+listen: 0.0.0.0
+comicvine_api_key: ""
+opds_enabled: true            # katalog OPDS pod /opds (patrz §9a); logowanie kontami z `users`
+users:
+  - name: artur
+    password: sekret
+  - name: kasia
+    password: inne

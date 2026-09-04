@@ -19,11 +19,11 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	filter := store.ParseSeriesFilter(r.FormValue("filter"))
 
-	series, err := s.store.ListSeries("", sort, filter)
+	series, err := s.store.ListSeries(userFrom(r), "", sort, filter)
 	if err != nil {
 		s.serverError(w, err)
 		return
 	}
 
-	s.render(w, "index.html", homeData{Series: series, Sort: string(sort), Filter: string(filter)})
+	s.render(w, r, "index.html", homeData{Series: series, Sort: string(sort), Filter: string(filter)})
 }

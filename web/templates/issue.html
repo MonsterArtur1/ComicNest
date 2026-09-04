@@ -51,10 +51,29 @@
         </dl>
 
         <div class="detail-actions">
+            {{if and (not .Issue.FileMissing) (canRead .Issue.Path)}}
+            <a class="btn btn-primary" href="/issues/{{.Issue.ID}}/read">
+                {{if and .Reading (not .Reading.Finished)}}Czytaj dalej (str. {{.Reading.Page}}){{else if .Reading}}Czytaj od nowa{{else}}Czytaj{{end}}
+            </a>
+            {{end}}
             {{if not .Issue.FileMissing}}
-            <a class="btn btn-primary" href="/issues/{{.Issue.ID}}/download">Pobierz plik</a>
+            <a class="btn {{if not (canRead .Issue.Path)}}btn-primary{{end}}" href="/issues/{{.Issue.ID}}/download">Pobierz plik</a>
             {{end}}
             <a class="btn" href="/issues/{{.Issue.ID}}/edit">Edytuj metadane</a>
+            {{if and .Reading .Reading.Finished}}
+            <form action="/issues/{{.Issue.ID}}/unread" method="post">
+                <button type="submit" class="btn" title="Wyzeruj postęp czytania">Oznacz jako nieprzeczytany</button>
+            </form>
+            {{else}}
+            <form action="/issues/{{.Issue.ID}}/read" method="post">
+                <button type="submit" class="btn" title="Ustaw postęp na ostatnią stronę">Oznacz jako przeczytany</button>
+            </form>
+            {{if .Reading}}
+            <form action="/issues/{{.Issue.ID}}/unread" method="post">
+                <button type="submit" class="btn" title="Wyzeruj postęp czytania">Oznacz jako nieprzeczytany</button>
+            </form>
+            {{end}}
+            {{end}}
             {{if .CVEnabled}}
             <form action="/issues/{{.Issue.ID}}/scrape" method="post">
                 <button type="submit" class="btn" {{if not .CVMatched}}disabled title="Najpierw dopasuj serię w ComicVine"{{else}}title="Pobierz metadane tego zeszytu z ComicVine"{{end}}>

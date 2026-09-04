@@ -330,7 +330,7 @@ func (s *Server) handleMatchPage(w http.ResponseWriter, r *http.Request) {
 			data.Error = "Wyszukiwanie w ComicVine nie powiodło się: " + err.Error()
 		}
 	}
-	s.render(w, "comicvine_match.html", data)
+	s.render(w, r, "comicvine_match.html", data)
 }
 
 // handleMatchSave stores the chosen volume and enriches empty series fields.

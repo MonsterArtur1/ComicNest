@@ -66,6 +66,25 @@ var migrations = []string{
 		updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 	);
 	`,
+
+	// 4: user accounts — progress is kept per user name (accounts live in
+	// config.yaml, not in the database). Existing rows become the anonymous
+	// reader's ('') and are handed to the first configured user at startup
+	// (see Store.AdoptAnonymousProgress).
+	`
+	CREATE TABLE reading_progress_v4 (
+		user       TEXT NOT NULL DEFAULT '',
+		issue_id   INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+		page       INTEGER NOT NULL,
+		updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+		PRIMARY KEY (user, issue_id)
+	);
+	INSERT INTO reading_progress_v4 (user, issue_id, page, updated_at)
+		SELECT '', issue_id, page, updated_at FROM reading_progress;
+	DROP TABLE reading_progress;
+	ALTER TABLE reading_progress_v4 RENAME TO reading_progress;
+	CREATE INDEX idx_progress_issue ON reading_progress(issue_id);
+	`,
 }
 
 func migrate(db *sql.DB) error {

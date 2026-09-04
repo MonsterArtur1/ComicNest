@@ -38,7 +38,7 @@ func (s *Server) handleSeriesEditForm(w http.ResponseWriter, r *http.Request) {
 	if series == nil {
 		return
 	}
-	s.render(w, "series_edit.html", seriesEditData{Series: series})
+	s.render(w, r, "series_edit.html", seriesEditData{Series: series})
 }
 
 func (s *Server) handleSeriesEditSave(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +53,7 @@ func (s *Server) handleSeriesEditSave(w http.ResponseWriter, r *http.Request) {
 		series.Publisher = strings.TrimSpace(r.FormValue("publisher"))
 		series.Description = strings.TrimSpace(r.FormValue("description"))
 		series.OneShot = oneShot
-		s.render(w, "series_edit.html", seriesEditData{Series: series, Error: "Nazwa serii nie może być pusta."})
+		s.render(w, r, "series_edit.html", seriesEditData{Series: series, Error: "Nazwa serii nie może być pusta."})
 		return
 	}
 
@@ -98,7 +98,7 @@ func (s *Server) handleIssueEditForm(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
-	s.render(w, "issue_edit.html", issueEditData{Issue: issue, SeriesName: series.Name})
+	s.render(w, r, "issue_edit.html", issueEditData{Issue: issue, SeriesName: series.Name})
 }
 
 func (s *Server) handleIssueEditSave(w http.ResponseWriter, r *http.Request) {

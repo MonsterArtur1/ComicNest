@@ -29,6 +29,9 @@ type Server struct {
 	scrape    *scrapeJob
 	templates map[string]*template.Template
 	partials  *template.Template
+	reader    *template.Template // standalone full-screen reader page
+	login     *template.Template // standalone login page
+	sessions  *sessions
 	mux       *http.ServeMux
 }
 
@@ -39,8 +42,9 @@ func New(cfg config.Config, st *store.Store, cv *covers.Cache, sc *library.Scann
 		covers:  cv,
 		scanner: sc,
 		cv:      cvc,
-		scrape:  &scrapeJob{},
-		mux:     http.NewServeMux(),
+		scrape:   &scrapeJob{},
+		sessions: newSessions(),
+		mux:      http.NewServeMux(),
 	}
 	if err := s.parseTemplates(); err != nil {
 		return nil, err
@@ -58,7 +62,11 @@ func (s *Server) funcMap() template.FuncMap {
 		"prettySize":  prettySize,
 		"sourceLabel": sourceLabel,
 		"truncate":    truncateText,
-		"opdsEnabled": func() bool { return s.cfg.OPDS.Enabled },
+		"opdsEnabled": func() bool { return s.cfg.OPDSEnabled },
+		"canRead":     canStreamPages, // in-browser reader works for CBZ/CBR only
+		// currentUser is overridden per request in renderStatus; this default
+		// only satisfies parse-time resolution.
+		"currentUser": func() string { return "" },
 	}
 }
 
@@ -129,6 +137,19 @@ func (s *Server) parseTemplates() error {
 		return fmt.Errorf("parsing partials: %w", err)
 	}
 	s.partials = partials
+
+	// The reader has its own chrome-less document instead of the layout.
+	reader, err := template.New("reader.html").Funcs(s.funcMap()).ParseFS(web.FS, "templates/reader.html")
+	if err != nil {
+		return fmt.Errorf("parsing reader template: %w", err)
+	}
+	s.reader = reader
+
+	login, err := template.New("login.html").Funcs(s.funcMap()).ParseFS(web.FS, "templates/login.html")
+	if err != nil {
+		return fmt.Errorf("parsing login template: %w", err)
+	}
+	s.login = login
 	return nil
 }
 
@@ -139,6 +160,9 @@ func (s *Server) routes() {
 	}
 	s.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
 	s.mux.HandleFunc("GET /{$}", s.handleHome)
+	s.mux.HandleFunc("GET /login", s.handleLoginForm)
+	s.mux.HandleFunc("POST /login", s.handleLogin)
+	s.mux.HandleFunc("POST /logout", s.handleLogout)
 	s.mux.HandleFunc("GET /series/{id}", s.handleSeries)
 	s.mux.HandleFunc("GET /series/{id}/edit", s.handleSeriesEditForm)
 	s.mux.HandleFunc("POST /series/{id}", s.handleSeriesEditSave)
@@ -153,12 +177,17 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /issues/{id}/unlock", s.handleIssueUnlock)
 	s.mux.HandleFunc("POST /issues/{id}/scrape", s.handleIssueScrape)
 	s.mux.HandleFunc("POST /issues/{id}/delete", s.handleIssueDelete)
+	s.mux.HandleFunc("POST /issues/{id}/read", s.handleIssueMarkRead)
+	s.mux.HandleFunc("POST /issues/{id}/unread", s.handleIssueMarkUnread)
+	s.mux.HandleFunc("GET /issues/{id}/read", s.handleReader)
+	s.mux.HandleFunc("GET /issues/{id}/pages/{page}", s.handleIssuePage)
+	s.mux.HandleFunc("POST /issues/{id}/progress", s.handleIssueProgress)
 	s.mux.HandleFunc("GET /issues/{id}/cover", s.handleIssueCover)
 	s.mux.HandleFunc("GET /issues/{id}/download", s.handleIssueDownload)
 	s.mux.HandleFunc("GET /search", s.handleSearch)
 	s.mux.HandleFunc("POST /scan", s.handleScanStart)
 	s.mux.HandleFunc("GET /scan/status", s.handleScanStatus)
-	if s.cfg.OPDS.Enabled {
+	if s.cfg.OPDSEnabled {
 		s.opdsRoutes()
 	}
 	s.mux.HandleFunc("/", s.handleNotFound) // catch-all: styled 404
@@ -204,7 +233,7 @@ func (s *Server) ListenAndServe() error {
 		}
 		fmt.Printf("%s http://%s:%d/\n", label, h, s.cfg.Port)
 	}
-	if s.cfg.OPDS.Enabled {
+	if s.cfg.OPDSEnabled {
 		for _, h := range hosts {
 			fmt.Printf("OPDS catalog: http://%s:%d/opds\n", h, s.cfg.Port)
 		}
@@ -213,7 +242,7 @@ func (s *Server) ListenAndServe() error {
 		// official builds), so "localhost" is rejected while IPs pass.
 		fmt.Println("OPDS note: Thorium Reader rejects \"localhost\" — use an IP address (127.0.0.1 or the LAN address above)")
 	}
-	return http.ListenAndServe(addr, s.withLogging(s.mux))
+	return http.ListenAndServe(addr, s.withLogging(s.withAuth(s.mux)))
 }
 
 // reachableHosts lists hosts a client can use to reach the server: just the
@@ -253,22 +282,33 @@ func (s *Server) reachableHosts() []string {
 
 // Handler exposes the routed handler (without request logging) for tests.
 func (s *Server) Handler() http.Handler {
-	return s.mux
+	return s.withAuth(s.mux)
 }
 
 // render writes a full page with status 200.
-func (s *Server) render(w http.ResponseWriter, page string, data any) {
-	s.renderStatus(w, http.StatusOK, page, data)
+func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, data any) {
+	s.renderStatus(w, r, http.StatusOK, page, data)
 }
 
 // renderStatus executes a page into a buffer first, so a template failure
-// becomes a clean 500 instead of a half-written response.
-func (s *Server) renderStatus(w http.ResponseWriter, status int, page string, data any) {
+// becomes a clean 500 instead of a half-written response. r may be nil (no
+// user shown). The parsed templates are never executed directly: each render
+// works on a clone with the request's user bound to currentUser, because
+// html/template forbids cloning after the first execution.
+func (s *Server) renderStatus(w http.ResponseWriter, r *http.Request, status int, page string, data any) {
 	t, ok := s.templates[page]
 	if !ok {
 		s.serverError(w, fmt.Errorf("unknown template %q", page))
 		return
 	}
+	t, err := t.Clone()
+	if err != nil {
+		s.serverError(w, fmt.Errorf("clone template %s: %w", page, err))
+		return
+	}
+	user := userFrom(r)
+	t.Funcs(template.FuncMap{"currentUser": func() string { return user }})
+
 	var buf bytes.Buffer
 	if err := t.ExecuteTemplate(&buf, "layout", data); err != nil {
 		s.serverError(w, fmt.Errorf("render %s: %w", page, err))
@@ -285,13 +325,22 @@ type errorData struct {
 }
 
 // errorPage renders the styled error view (falling back to plain text if
-// even that template fails).
-func (s *Server) errorPage(w http.ResponseWriter, status int, message string) {
+// even that template fails). r may be nil.
+func (s *Server) errorPage(w http.ResponseWriter, r *http.Request, status int, message string) {
 	t, ok := s.templates["error.html"]
 	if !ok {
 		http.Error(w, message, status)
 		return
 	}
+	t, err := t.Clone()
+	if err != nil {
+		log.Printf("clone error page: %v", err)
+		http.Error(w, message, status)
+		return
+	}
+	user := userFrom(r)
+	t.Funcs(template.FuncMap{"currentUser": func() string { return user }})
+
 	var buf bytes.Buffer
 	if err := t.ExecuteTemplate(&buf, "layout", errorData{Status: status, Message: message}); err != nil {
 		log.Printf("render error page: %v", err)
@@ -304,7 +353,7 @@ func (s *Server) errorPage(w http.ResponseWriter, status int, message string) {
 }
 
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
-	s.errorPage(w, http.StatusNotFound, "Nie znaleziono takiej strony ani zasobu.")
+	s.errorPage(w, r, http.StatusNotFound, "Nie znaleziono takiej strony ani zasobu.")
 }
 
 func (s *Server) handleNotFound(w http.ResponseWriter, r *http.Request) {
@@ -321,6 +370,6 @@ func (s *Server) renderPartial(w http.ResponseWriter, file, name string, data an
 
 func (s *Server) serverError(w http.ResponseWriter, err error) {
 	log.Printf("server error: %v", err)
-	s.errorPage(w, http.StatusInternalServerError,
+	s.errorPage(w, nil, http.StatusInternalServerError,
 		"Wystąpił błąd serwera — szczegóły w logu aplikacji.")
 }

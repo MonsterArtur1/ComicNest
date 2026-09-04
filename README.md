@@ -17,6 +17,9 @@ biblioteka na Twoim dysku. Inspirowany [Komgą](https://komga.org/), ale prostsz
 - **Okładki** wyciągane z pierwszej strony archiwum (cache miniatur na dysku).
 - **Przeglądanie i wyszukiwanie**: grid serii, strona serii z filtrami
   (bez metadanych / z ComicVine / brakujące pliki), szczegóły zeszytu, pobieranie pliku.
+- **Czytnik w przeglądarce** dla CBZ/CBR: strona po stronie, zoom (dopasowanie do
+  wysokości lub szerokości, skala), klawiatura, kliknięcia, gesty, pełny ekran; wznawia od
+  ostatniej strony i dzieli postęp z czytnikami OPDS.
 - **Serwer OPDS** (opcjonalny) — biblioteka dostępna w czytnikach komiksów na telefonie
   i tablecie (Panels, Chunky, Moon+ Reader, Librera, KOReader…), z okładkami,
   wyszukiwaniem i opcjonalnym hasłem.
@@ -43,11 +46,20 @@ listen: localhost            # "0.0.0.0", żeby inne urządzenia w sieci widzia�
 library: "D:/Komiksy"        # korzeń biblioteki komiksów
 data_dir: "./data"           # baza SQLite + cache okładek
 comicvine_api_key: ""        # klucz z https://comicvine.gamespot.com/api/
-opds:
-  enabled: false             # katalog OPDS pod http://…/opds
-  username: ""               # opcjonalne logowanie do katalogu (oba pola razem)
-  password: ""
+opds_enabled: false          # katalog OPDS pod http://…/opds
+users:                       # konta (opcjonalne); puste = brak logowania
+  - name: artur
+    password: sekret         # hasło zapisane jawnie
 ```
+
+## Konta użytkowników
+
+Wpisz konta w sekcji `users`. Od tej chwili interfejs WWW wymaga zalogowania (formularz na
+`/login`, „Wyloguj" w nagłówku), a czytniki OPDS pytają o tę samą nazwę i hasło. Każdy
+użytkownik ma własny postęp czytania: pasek postępu, znaczki „przeczytane", filtry i sekcja
+„Aktualnie czytane" pokazują tylko jego dane. Postęp sprzed wprowadzenia kont trafia na
+pierwsze konto z listy. Bez sekcji `users` wszystko działa jak dotąd, bez logowania.
+Hasła są w pliku jawnym tekstem, więc trzymaj `config.yaml` poza repozytorium.
 
 Bez klucza ComicVine aplikacja działa normalnie — funkcje dopasowania/scrape'u są
 wyłączone z podpowiedzią w UI. Klucz trzymaj wyłącznie w `config.yaml` (plik jest
@@ -55,7 +67,7 @@ w `.gitignore`).
 
 ## Czytniki komiksów (OPDS)
 
-Ustaw `opds.enabled: true` i `listen: 0.0.0.0`, uruchom ponownie, a w czytniku dodaj
+Ustaw `opds_enabled: true` i `listen: 0.0.0.0`, uruchom ponownie, a w czytniku dodaj
 katalog OPDS o adresie `http://<adres-komputera>:8080/opds` (adres IP komputera
 z biblioteką w sieci domowej). Katalog oferuje:
 
@@ -71,15 +83,17 @@ Postęp czytania widać też w interfejsie WWW: pasek pod okładką na liście z
 liczba przeczytanych stron i data ostatniego czytania na stronie zeszytu, a na gridzie
 biblioteki zielony znaczek ✓ przy seriach przeczytanych do końca. Grid ma filtry:
 nieczytane, w trakcie czytania, przeczytane, bez metadanych z ComicVine, brakujące pliki.
+Zeszyt można też ręcznie oznaczyć jako przeczytany lub nieprzeczytany (przyciski na
+stronie zeszytu i na liście zeszytów serii).
 
 Na tym samym komputerze (np. Thorium Reader na PC) użyj `http://127.0.0.1:8080/opds` —
 Thorium odrzuca adresy bez domeny, więc `http://localhost:8080/opds` kończy się błędem
 „Błąd dostępu do kanału". Serwer wypisuje przy starcie wszystkie działające adresy.
 
-Jeśli ustawisz `opds.username` i `opds.password`, czytnik zapyta o login (HTTP Basic).
-Pamiętaj, że przy `listen: 0.0.0.0` interfejs WWW (bez logowania) także jest widoczny
-w sieci lokalnej — hasło OPDS chroni tylko katalog dla czytników. Zeszyty oznaczone
-jako brakujące na dysku nie pojawiają się w katalogu.
+Jeśli zdefiniujesz konta w `users`, czytnik zapyta o login (HTTP Basic) i będzie widział
+postęp tego użytkownika. Przy `listen: 0.0.0.0` bez kont interfejs WWW jest otwarty
+w sieci lokalnej, dlatego w takim układzie warto konta dodać. Zeszyty oznaczone jako
+brakujące na dysku nie pojawiają się w katalogu.
 
 ## Organizacja biblioteki
 

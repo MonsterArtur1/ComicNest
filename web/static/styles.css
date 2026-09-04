@@ -27,6 +27,95 @@ code {
     padding: 0 4px;
 }
 
+/* --- reader (full-screen page viewer) --- */
+.reader-body { overflow: hidden; background: #000; }
+.reader {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    background: #000;
+    user-select: none;
+}
+.reader-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    background: rgba(22, 24, 29, 0.92);
+    border-bottom: 1px solid var(--border);
+    transition: opacity 0.25s, transform 0.25s;
+}
+.reader-top { top: 0; }
+.reader-bottom { bottom: 0; border-bottom: 0; border-top: 1px solid var(--border); }
+.bars-hidden .reader-top { opacity: 0; transform: translateY(-100%); pointer-events: none; }
+.bars-hidden .reader-bottom { opacity: 0; transform: translateY(100%); pointer-events: none; }
+.reader-back { font-size: 20px; padding: 0 6px; color: var(--text-dim); }
+.reader-back:hover { color: var(--text); }
+.reader-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.reader-counter { color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.reader-tools { display: flex; align-items: center; gap: 4px; }
+.reader-bar button {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    min-width: 30px;
+    height: 30px;
+    font-size: 15px;
+    cursor: pointer;
+}
+.reader-bar button:hover { border-color: var(--text-dim); }
+.reader-bar button.active { color: var(--accent); border-color: var(--accent); }
+.reader-zoom-label { min-width: 44px; text-align: center; font-size: 12px; color: var(--text-dim); }
+.reader-bottom input[type="range"] { flex: 1; accent-color: var(--accent); }
+
+.reader-stage {
+    position: absolute;
+    inset: 0;
+    overflow: auto;
+    display: flex;
+}
+.reader-page { display: block; margin: auto; }
+.zoom-fit-h .reader-page { max-width: 100%; max-height: 100%; object-fit: contain; }
+.zoom-fit-w .reader-page { width: 100%; height: auto; }
+.zoom-custom .reader-page { max-width: none; height: auto; }
+.reader-zone { position: fixed; top: 48px; bottom: 48px; z-index: 2; cursor: pointer; }
+.reader-zone-prev { left: 0; width: 30%; }
+.reader-zone-menu { left: 30%; width: 40%; cursor: default; }
+.reader-zone-next { right: 0; width: 30%; }
+.reader-loading {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    padding: 8px 14px;
+    border-radius: 6px;
+    background: rgba(22, 24, 29, 0.85);
+    color: var(--text-dim);
+    font-size: 13px;
+    z-index: 3;
+}
+.reader-issue-link {
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    min-width: 30px;
+    height: 30px;
+    line-height: 28px;
+    text-align: center;
+    font-size: 12px;
+    letter-spacing: -2px;
+}
+.reader-issue-link:hover { color: var(--accent); border-color: var(--accent); }
+@media (max-width: 600px) {
+    .reader-tools [data-zoom="out"], .reader-tools [data-zoom="in"], .reader-zoom-label { display: none; }
+}
+
 /* --- top bar --- */
 .topbar {
     display: flex;
@@ -70,6 +159,33 @@ code {
     text-decoration: none;
 }
 .opds-badge:hover { color: var(--accent); border-color: var(--accent); }
+
+.user-box { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); }
+.user-name { white-space: nowrap; }
+
+/* --- login page --- */
+.login-body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.login-box {
+    width: min(360px, 92vw);
+    padding: 28px 28px 24px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.login-box .brand { margin: 0 0 6px; font-size: 26px; }
+.login-hint { color: var(--text-dim); font-size: 13px; margin: 0 0 16px; }
+.login-form { display: flex; flex-direction: column; gap: 12px; }
+.login-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-dim); }
+.login-form input {
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+}
+.login-form input:focus { outline: 1px solid var(--accent); }
+.login-form .btn { margin-top: 6px; justify-content: center; text-align: center; }
 
 /* --- scan widget --- */
 .scan-area { margin-left: auto; }
@@ -327,6 +443,8 @@ details.desc .series-desc { margin: 12px 0 4px; }
 .badge-lock      { border: none; }
 
 .btn.download { flex: none; font-size: 13px; }
+.btn-mini { flex: none; font-size: 12px; padding: 4px 8px; color: var(--text-dim); white-space: nowrap; }
+.btn-mini:hover { color: var(--text); }
 .btn-primary {
     display: inline-block;
     background: var(--accent);

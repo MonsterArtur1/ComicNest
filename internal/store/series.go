@@ -216,9 +216,9 @@ func (f SeriesFilter) having() string {
 }
 
 // ListSeries returns series that have at least one issue, optionally filtered
-// by a case-insensitive name substring and a SeriesFilter, with reading
-// aggregates filled in.
-func (s *Store) ListSeries(nameFilter string, sort SeriesSort, filter SeriesFilter) ([]Series, error) {
+// by a case-insensitive name substring and a SeriesFilter, with the given
+// user's reading aggregates filled in.
+func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter SeriesFilter) ([]Series, error) {
 	order := "s.name COLLATE NOCASE ASC"
 	if sort == SeriesSortRecent {
 		order = "MAX(i.created_at) DESC"
@@ -247,13 +247,13 @@ func (s *Store) ListSeries(nameFilter string, sort SeriesSort, filter SeriesFilt
 		                    AND ` + total + ` > 0 AND rp.page >= ` + total + `), 0) AS read_cnt
 		FROM series s
 		JOIN issues i ON i.series_id = s.id
-		LEFT JOIN reading_progress rp ON rp.issue_id = i.id
+		LEFT JOIN reading_progress rp ON rp.issue_id = i.id AND rp.user = ?
 		WHERE (? = '' OR s.name LIKE '%' || ? || '%')
 		GROUP BY s.id
 		` + filter.having() + `
 		ORDER BY ` + order
 
-	rows, err := s.db.Query(query, nameFilter, nameFilter)
+	rows, err := s.db.Query(query, user, nameFilter, nameFilter)
 	if err != nil {
 		return nil, err
 	}
