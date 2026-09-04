@@ -1,0 +1,9 @@
+.git
+.github
+Old/
+data/
+config.yaml
+comicnest.exe
+docs/
+*.md
+logo.png

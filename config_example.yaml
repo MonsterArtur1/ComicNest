@@ -1,6 +1,9 @@
 # Przykładowa konfiguracja ComicNest. Skopiuj do config.yaml obok binarium
 # i dostosuj. Każdy klucz obsługiwany przez aplikację ma tu wpis z opisem —
 # przy dodawaniu nowej opcji uzupełnij ten plik (patrz SPECIFICATION §4).
+# Każdy klucz poza `users` można nadpisać zmienną środowiskową COMICNEST_<KLUCZ>
+# (np. COMICNEST_LISTEN=0.0.0.0, COMICNEST_COMICVINE_API_KEY=...); ścieżkę
+# tego pliku wskazuje flaga -config albo COMICNEST_CONFIG.
 
 port: 8080                    # port HTTP serwera
 listen: 0.0.0.0               # interfejs nasłuchu: "localhost" = tylko ten komputer, "0.0.0.0" = cała sieć lokalna (potrzebne czytnikom OPDS)

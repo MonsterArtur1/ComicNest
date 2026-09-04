@@ -79,6 +79,30 @@ Bez klucza ComicVine aplikacja działa normalnie — funkcje dopasowania/scrape'
 wyłączone z podpowiedzią w UI. Klucz trzymaj wyłącznie w `config.yaml` (plik jest
 w `.gitignore`).
 
+## Docker
+
+Obraz `ghcr.io/monsterartur1/comicnest` (linux amd64 i arm64, ok. 15 MB, bez shella) buduje się
+z każdego commita na `main` (tag `latest`) i z każdego wydania (`1.2.0`, `1.2`, `1`). Skopiuj
+`docker-compose.yml` z repozytorium, wpisz ścieżkę do komiksów i uruchom:
+
+```
+docker compose up -d
+```
+
+Kontener używa trzech katalogów: `/comics` (biblioteka, tylko do odczytu), `/config`
+(`config.yaml`, tworzony przy pierwszym starcie z poprawnymi ścieżkami) i `/data` (baza SQLite
+i okładki — trzymaj na lokalnym dysku, nie na udziale SMB/NFS). Obraz działa jako użytkownik
+o UID 65532, więc nadaj mu prawa do `config` i `data` (`chown -R 65532:65532 config data`) albo
+ustaw `user:` w compose na własne UID. Dopisz konta i klucz ComicVine do `config/config.yaml`,
+zrestartuj kontener i kliknij **Skanuj bibliotekę**.
+
+Zmienne środowiskowe `COMICNEST_*` nadpisują wartości z pliku: `COMICNEST_CONFIG` (ścieżka
+configu), `COMICNEST_LISTEN`, `COMICNEST_PORT`, `COMICNEST_LIBRARY`, `COMICNEST_DATA_DIR`,
+`COMICNEST_COMICVINE_API_KEY`, `COMICNEST_OPDS_ENABLED`, `COMICNEST_PAGE_SIZE`. Działają też poza
+Dockerem; konta (`users`) są wyłącznie w pliku. Ścieżkę configu poda się także flagą `-config`.
+Endpoint `GET /healthz` (bez logowania) służy do sprawdzania stanu, a `comicnest -healthcheck`
+odpytuje go z wnętrza kontenera.
+
 ## Czytniki komiksów (OPDS)
 
 Ustaw `opds_enabled: true` i `listen: 0.0.0.0`, uruchom ponownie, a w czytniku dodaj

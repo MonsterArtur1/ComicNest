@@ -89,3 +89,51 @@ func TestPageSize(t *testing.T) {
 		t.Error("negative page_size should be a config error")
 	}
 }
+
+func TestEnvOverrides(t *testing.T) {
+	t.Setenv("COMICNEST_LISTEN", "0.0.0.0")
+	t.Setenv("COMICNEST_LIBRARY", "/comics")
+	t.Setenv("COMICNEST_DATA_DIR", "/data")
+	t.Setenv("COMICNEST_PORT", "9090")
+	t.Setenv("COMICNEST_PAGE_SIZE", "12")
+	t.Setenv("COMICNEST_OPDS_ENABLED", "true")
+	t.Setenv("COMICNEST_COMICVINE_API_KEY", "k-from-env")
+
+	// Existing file: env wins over file values.
+	cfg, err := load(t, "port: 8080\nlisten: localhost\nlibrary: D:/x\ncomicvine_api_key: k-file\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Listen != "0.0.0.0" || cfg.Library != "/comics" || cfg.DataDir != "/data" || cfg.Port != 9090 ||
+		cfg.PageSize != 12 || !cfg.OPDSEnabled || cfg.ComicVineAPIKey != "k-from-env" {
+		t.Errorf("env overrides not applied: %+v", cfg)
+	}
+
+	// Missing file: defaults + env are written to disk, so the created file
+	// already points at the right places.
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if _, err := Load(path); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(path)
+	for _, want := range []string{"listen: 0.0.0.0", "library: /comics", "data_dir: /data", "port: 9090"} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("created config missing %q:\n%s", want, raw)
+		}
+	}
+
+	// Empty value = not set; garbage is an error.
+	t.Setenv("COMICNEST_PORT", "")
+	if cfg, err := load(t, "port: 8081\n"); err != nil || cfg.Port != 8081 {
+		t.Errorf("empty env should be ignored: %d, %v", cfg.Port, err)
+	}
+	t.Setenv("COMICNEST_PORT", "abc")
+	if _, err := load(t, "port: 8081\n"); err == nil {
+		t.Error("non-numeric COMICNEST_PORT should be an error")
+	}
+	t.Setenv("COMICNEST_PORT", "")
+	t.Setenv("COMICNEST_OPDS_ENABLED", "maybe")
+	if _, err := load(t, "port: 8081\n"); err == nil {
+		t.Error("non-boolean COMICNEST_OPDS_ENABLED should be an error")
+	}
+}
