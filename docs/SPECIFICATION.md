@@ -59,7 +59,7 @@ ComicNextClaude/
 │   ├── templates/               # layout.html + widoki + partiale HTMX
 │   └── static/                  # htmx.min.js, styles.css, placeholder.svg, favicon.png, favicon-32.png, favicon.ico, apple-touch-icon.png
 ├── docs/                        # ta dokumentacja
-├── .github/workflows/build.yml  # CI: testy + binaria (Win/Linux/macOS) po każdym commicie, pre-release "latest" z main, wydania z tagów v*
+├── .github/workflows/go.yml  # CI: testy + binaria (Win/Linux/macOS) po każdym commicie, pre-release "latest" z main, wydania z tagów v*
 ├── logo.png                     # źródło ikony aplikacji (1254 px); favicony w web/static są z niego skalowane
 ├── config_example.yaml          # wzorzec konfiguracji z opisem każdej opcji (wersjonowany, §4)
 ├── config.yaml                  # tworzony przy pierwszym starcie (gitignore)
