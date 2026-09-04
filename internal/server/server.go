@@ -62,6 +62,8 @@ func (s *Server) funcMap() template.FuncMap {
 		"prettySize":  prettySize,
 		"sourceLabel": sourceLabel,
 		"truncate":    truncateText,
+		"inc":         func(n int) int { return n + 1 },
+		"dec":         func(n int) int { return n - 1 },
 		"opdsEnabled": func() bool { return s.cfg.OPDSEnabled },
 		"canRead":     canStreamPages, // in-browser reader works for CBZ/CBR only
 		// currentUser is overridden per request in renderStatus; this default

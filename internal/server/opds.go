@@ -76,19 +76,13 @@ func opdsBaseURL(r *http.Request) string {
 
 // opdsPage reads the 1-based ?page= parameter (default 1).
 func opdsPage(r *http.Request) int {
-	p, err := strconv.Atoi(r.FormValue("page"))
-	if err != nil || p < 1 {
-		return 1
-	}
-	return p
+	return pageParam(r)
 }
 
-// pageBounds clips a page window to [0, total) and reports whether a next
-// page exists.
+// pageBounds clips an OPDS page window to [0, total) and reports whether a
+// next page exists.
 func pageBounds(page, total int) (from, to int, hasNext bool) {
-	from = min((page-1)*opdsPageSize, total)
-	to = min(from+opdsPageSize, total)
-	return from, to, to < total
+	return pageWindow(page, opdsPageSize, total)
 }
 
 // writeFeed serializes a feed with the right media type for its kind.

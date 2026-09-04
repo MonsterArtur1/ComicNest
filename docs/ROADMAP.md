@@ -64,6 +64,7 @@ i coś pokazywała. Szczegóły projektowe: [SPECIFICATION.md](SPECIFICATION.md)
 - [x] Czytnik stron w przeglądarce (`/issues/{id}/read`, `reader.html` + `reader.js`): zoom, przewracanie klawiaturą/klikiem/gestem/suwakiem, pełny ekran, wznawianie od ostatniej strony, postęp wspólny z OPDS (`POST /issues/{id}/progress`, strony z `?track=0`), linki do poprzedniego/następnego zeszytu na dolnym pasku (popup „Koniec zeszytu" usunięty na życzenie użytkownika)
 - [x] Ręczne oznaczanie zeszytu jako przeczytany / nieprzeczytany (przyciski na stronie zeszytu i na liście serii, `POST /issues/{id}/read|unread`, powrót przez `next`)
 - [x] Grid biblioteki: zielony znaczek ✓ na przeczytanych seriach i filtry (nieczytane / w trakcie / przeczytane / bez ComicVine / brakujące pliki) obok sortowania; agregaty czytania w `ListSeries` (`SeriesFilter`)
+- [x] Paginacja gridu biblioteki (`?page=N`, pager z oknem stron, sortowanie/filtr zachowane) — liczba kafelków na stronę w `config.yaml` (`page_size`, domyślnie 60, 0 = bez paginacji)
 
 ## Pomysły na v2 (nie robić teraz)
 - Czytnik: tryb dwóch stron obok siebie, kierunek czytania manga (prawo→lewo)

@@ -31,7 +31,13 @@ type Config struct {
 	// Users enables login. Empty = no accounts: the UI and OPDS are open and
 	// everything is tracked for one anonymous reader.
 	Users []User `yaml:"users"`
+	// PageSize is the number of series tiles per page of the library grid.
+	// 0 disables pagination (everything on one page).
+	PageSize int `yaml:"page_size"`
 }
+
+// DefaultPageSize is used when config.yaml does not set page_size.
+const DefaultPageSize = 60
 
 func defaults() Config {
 	return Config{
@@ -42,6 +48,7 @@ func defaults() Config {
 		ComicVineAPIKey: "",
 		OPDSEnabled:     false,
 		Users:           nil,
+		PageSize:        DefaultPageSize,
 	}
 }
 
@@ -86,6 +93,9 @@ func Load(path string) (Config, error) {
 	}
 	if cfg.DataDir == "" {
 		cfg.DataDir = defaults().DataDir
+	}
+	if cfg.PageSize < 0 {
+		return cfg, fmt.Errorf("invalid page_size %d in %s (0 = no pagination)", cfg.PageSize, path)
 	}
 	if err := cfg.normalizeUsers(path); err != nil {
 		return cfg, err

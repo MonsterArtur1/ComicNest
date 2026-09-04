@@ -66,3 +66,26 @@ func TestNoUsersMeansOpen(t *testing.T) {
 		t.Errorf("default listen = %q", cfg.Listen)
 	}
 }
+
+func TestPageSize(t *testing.T) {
+	cfg, err := load(t, "port: 8080\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.PageSize != DefaultPageSize {
+		t.Errorf("default page_size = %d, want %d", cfg.PageSize, DefaultPageSize)
+	}
+	cfg, err = load(t, "page_size: 24\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.PageSize != 24 {
+		t.Errorf("page_size: 24 not parsed, got %d", cfg.PageSize)
+	}
+	if cfg, err := load(t, "page_size: 0\n"); err != nil || cfg.PageSize != 0 {
+		t.Errorf("page_size: 0 (no pagination) should be accepted: %d, %v", cfg.PageSize, err)
+	}
+	if _, err := load(t, "page_size: -1\n"); err == nil {
+		t.Error("negative page_size should be a config error")
+	}
+}

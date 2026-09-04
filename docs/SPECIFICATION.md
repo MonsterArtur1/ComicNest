@@ -59,6 +59,7 @@ ComicNextClaude/
 │   ├── templates/               # layout.html + widoki + partiale HTMX
 │   └── static/                  # htmx.min.js, styles.css, placeholder.jpg
 ├── docs/                        # ta dokumentacja
+├── config_example.yaml          # wzorzec konfiguracji z opisem każdej opcji (wersjonowany, §4)
 ├── config.yaml                  # tworzony przy pierwszym starcie (gitignore)
 └── data/                        # runtime: database.sqlite, covers/ (gitignore)
 ```
@@ -72,6 +73,7 @@ library: "D:/Library"          # korzeń biblioteki komiksów
 data_dir: "./data"             # baza sqlite + cache okładek
 comicvine_api_key: ""          # puste = funkcje ComicVine wyłączone (UI to komunikuje)
 opds_enabled: false            # katalog OPDS pod /opds (patrz §9a)
+page_size: 60                  # kafelków serii na stronę biblioteki; 0 = bez paginacji
 users:                         # konta; puste = brak logowania (jeden anonimowy czytelnik)
   - name: artur
     password: sekret           # plaintext — świadomie (osobista aplikacja w LAN)
@@ -80,6 +82,12 @@ users:                         # konta; puste = brak logowania (jeden anonimowy 
 ```
 
 Przy braku pliku aplikacja zapisuje domyślny config i loguje instrukcję uzupełnienia.
+
+**Plik `config_example.yaml`** (w korzeniu repozytorium, wersjonowany) jest wzorcem dla użytkownika
+i jedynym pełnym spisem opcji: każdy klucz ma tam komentarz mówiący, co robi i jakie wartości
+przyjmuje. **Zasada:** każda zmiana w konfiguracji (nowy klucz, zmiana nazwy lub domyślnej wartości,
+usunięcie) trafia w tym samym commicie do `config_example.yaml` razem z opisem — a także do bloku
+powyżej i do README. Prawdziwy `config.yaml` (z hasłami i kluczem API) pozostaje w `.gitignore`.
 Klucz API **nigdy nie trafia do kodu** (w starym projekcie był zahardkodowany — patrz §10).
 
 **Konta użytkowników (`users`).** Jedno źródło prawdy dla logowania do WWW (formularz
@@ -90,6 +98,10 @@ Postęp czytania jest per użytkownik (§5). Walidacja: nazwa i hasło wymagane,
 (`user = ''`). Hasła do OPDS pochodzą wyłącznie z `users` — dawna sekcja `opds` (z `username`/`password`)
 została usunięta, a włącznik katalogu to klucz `opds_enabled`. Przy starcie z kontami postęp anonimowy przechodzi na
 pierwsze konto z listy (`Store.AdoptAnonymousProgress`).
+
+**Paginacja biblioteki (`page_size`).** Widok główny dzieli przefiltrowaną listę serii na strony po
+`page_size` kafelków (domyślnie 60; parametr `?page=N`, sortowanie i filtr zachowane w linkach pagera).
+`0` wyłącza paginację, wartość ujemna to błąd konfiguracji. Nie dotyczy OPDS (stała 50 wpisów).
 
 Domyślnie nasłuch tylko na `localhost`. `listen: 0.0.0.0` wystawia aplikację w sieci lokalnej —
 wtedy warto zdefiniować `users`, bo bez kont UI (także edycja metadanych) jest otwarte.

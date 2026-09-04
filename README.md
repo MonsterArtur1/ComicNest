@@ -40,6 +40,10 @@ localhost; brak logowania — to aplikacja osobista). Kliknij **Skanuj bibliotek
 
 ## Konfiguracja (`config.yaml`)
 
+Pełny, opisany spis opcji znajduje się w `config_example.yaml` w repozytorium — każdy klucz ma
+tam komentarz z wyjaśnieniem. Możesz skopiować go jako `config.yaml` i dostosować. Gdy w aplikacji
+pojawia się nowa opcja, ląduje najpierw właśnie tam, razem z opisem.
+
 ```yaml
 port: 8080
 listen: localhost            # "0.0.0.0", żeby inne urządzenia w sieci widziały serwer
@@ -47,6 +51,7 @@ library: "D:/Komiksy"        # korzeń biblioteki komiksów
 data_dir: "./data"           # baza SQLite + cache okładek
 comicvine_api_key: ""        # klucz z https://comicvine.gamespot.com/api/
 opds_enabled: false          # katalog OPDS pod http://…/opds
+page_size: 60                # serii na stronę biblioteki (0 = wszystko na jednej stronie)
 users:                       # konta (opcjonalne); puste = brak logowania
   - name: artur
     password: sekret         # hasło zapisane jawnie

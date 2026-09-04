@@ -45,6 +45,20 @@
     </li>
     {{end}}
 </ul>
+{{if gt .Pages 1}}
+<nav class="pager" aria-label="strony biblioteki">
+    {{if gt .Page 1}}<a class="pager-link" href="{{$.URL (.Page | dec)}}" rel="prev">&laquo; poprzednia</a>{{else}}<span class="pager-link disabled">&laquo; poprzednia</span>{{end}}
+    <span class="pager-pages">
+        {{range .PageLinks}}
+        {{if eq . 0}}<span class="pager-gap">&hellip;</span>
+        {{else if eq . $.Page}}<span class="pager-num active" aria-current="page">{{.}}</span>
+        {{else}}<a class="pager-num" href="{{$.URL .}}">{{.}}</a>{{end}}
+        {{end}}
+    </span>
+    {{if lt .Page .Pages}}<a class="pager-link" href="{{$.URL (.Page | inc)}}" rel="next">następna &raquo;</a>{{else}}<span class="pager-link disabled">następna &raquo;</span>{{end}}
+    <span class="pager-info">strona {{.Page}} z {{.Pages}} &middot; {{.Total}} {{if eq .Total 1}}seria{{else if and (ge .Total 2) (le .Total 4)}}serie{{else}}serii{{end}}</span>
+</nav>
+{{end}}
 {{else}}
 <div class="empty-state">
     {{if eq .Filter "all"}}
