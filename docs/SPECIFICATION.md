@@ -122,7 +122,14 @@ ze środowiska. `users` nie ma odpowiednika w środowisku. Mechanizm istnieje g�
 ## 4a. Docker
 
 Obraz (`Dockerfile`, wieloetapowy): binarium bez cgo kompilowane w `golang:alpine`, kopiowane do
-`gcr.io/distroless/static:nonroot` (certyfikaty CA dla ComicVine, brak shella, użytkownik UID 65532).
+`gcr.io/distroless/static` (certyfikaty CA dla ComicVine, brak shella). Kontener startuje jako root:
+przy ustawionych `PUID`/`PGID` (konwencja NAS — Synology, Unraid, linuxserver.io) aplikacja przepisuje
+własność katalogu configu i `data_dir` na tego użytkownika (pomijając wpisy już poprawne, więc restart
+z dużym cache okładek jest tani) i wywołuje `setgroups`/`setgid`/`setuid`, zanim otworzy bazę
+(`cmd/comicnest/privs_linux.go`; poza Linuksem no-op). Biblioteka nigdy nie jest chownowana. Bez
+`PUID`/`PGID` proces zostaje rootem — wariant `--user` z własnymi uprawnieniami katalogów też działa.
+Powód: wolumeny na NAS-ach należą do konta użytkownika (Synology: UID 1026, GID 100), a stały
+użytkownik `nonroot` z obrazu nie miał do nich zapisu.
 Obraz ustawia `COMICNEST_CONFIG=/config/config.yaml`, `COMICNEST_LISTEN=0.0.0.0`,
 `COMICNEST_LIBRARY=/comics`, `COMICNEST_DATA_DIR=/data`, więc trzy wolumeny (`/comics` tylko do
 odczytu, `/config`, `/data`) wystarczają, a pierwszy start tworzy poprawny `config.yaml`.

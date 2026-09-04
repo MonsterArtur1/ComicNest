@@ -44,6 +44,12 @@ func main() {
 	}
 	log.Printf("config: %s", *configPath)
 
+	// Containers: PUID/PGID → own the writable dirs and switch user before
+	// opening anything (see privs_linux.go).
+	if err := dropPrivileges(*configPath, cfg.DataDir); err != nil {
+		log.Fatalf("privileges: %v", err)
+	}
+
 	coversDir := filepath.Join(cfg.DataDir, "covers")
 	if err := os.MkdirAll(coversDir, 0o755); err != nil {
 		log.Fatalf("creating data dir: %v", err)

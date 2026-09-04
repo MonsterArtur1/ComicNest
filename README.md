@@ -91,10 +91,12 @@ docker compose up -d
 
 Kontener używa trzech katalogów: `/comics` (biblioteka, tylko do odczytu), `/config`
 (`config.yaml`, tworzony przy pierwszym starcie z poprawnymi ścieżkami) i `/data` (baza SQLite
-i okładki — trzymaj na lokalnym dysku, nie na udziale SMB/NFS). Obraz działa jako użytkownik
-o UID 65532, więc nadaj mu prawa do `config` i `data` (`chown -R 65532:65532 config data`) albo
-ustaw `user:` w compose na własne UID. Dopisz konta i klucz ComicVine do `config/config.yaml`,
-zrestartuj kontener i kliknij **Skanuj bibliotekę**.
+i okładki — trzymaj na lokalnym dysku, nie na udziale SMB/NFS). Zmiennymi `PUID` i `PGID` podaj
+użytkownika, jako który ma działać aplikacja (na Synology: UID Twojego konta, zwykle 1026, i GID 100
+grupy `users`; sprawdzisz przez `id <login>` po SSH). Kontener startuje jako root, przepisuje
+własność `config` i `data` na tego użytkownika i zrzuca uprawnienia, zanim otworzy bazę — dokładnie
+tak jak obrazy linuxserver.io. Bez `PUID`/`PGID` działa jako root. Dopisz konta i klucz ComicVine
+do `config/config.yaml`, zrestartuj kontener i kliknij **Skanuj bibliotekę**.
 
 Zmienne środowiskowe `COMICNEST_*` nadpisują wartości z pliku: `COMICNEST_CONFIG` (ścieżka
 configu), `COMICNEST_LISTEN`, `COMICNEST_PORT`, `COMICNEST_LIBRARY`, `COMICNEST_DATA_DIR`,

@@ -13,14 +13,16 @@ services:
       - ./config:/config                   # config.yaml
       - ./data:/data                       # SQLite database + cover cache (keep on a local disk, not SMB/NFS)
     environment:
+      # Run as this user: the app takes ownership of /config and /data for it
+      # and drops root before opening anything. Synology: your account's UID
+      # (`id <user>` over SSH, usually 1026) and GID 100 ("users"). Unraid: 99/100.
+      PUID: "1026"
+      PGID: "100"
+      TZ: Europe/Warsaw
       # Optional overrides; anything set here beats config.yaml.
       # COMICNEST_COMICVINE_API_KEY: ""
       # COMICNEST_OPDS_ENABLED: "true"
       # COMICNEST_PAGE_SIZE: "60"
-      TZ: Europe/Warsaw
-    # The image runs as UID 65532; make ./config and ./data writable for it
-    # (chown -R 65532:65532 config data) or run as your own user instead:
-    # user: "1000:1000"
     healthcheck:
       test: ["CMD", "/comicnest", "-healthcheck"]
       interval: 30s
