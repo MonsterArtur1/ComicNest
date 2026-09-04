@@ -1,6 +1,7 @@
 package library
 
 import (
+	"database/sql"
 	"errors"
 	"log"
 	"os"
@@ -19,9 +20,9 @@ var ErrScanRunning = errors.New("scan already running")
 // Status is a snapshot of scanner progress, safe to render in the UI.
 type Status struct {
 	Running    bool
-	Found      int // comic files discovered by the walk
-	Processed  int // files handled so far
-	Missing    int // records whose file disappeared (set when the scan ends)
+	Found      int  // comic files discovered by the walk
+	Processed  int  // files handled so far
+	Missing    int  // records whose file disappeared (set when the scan ends)
 	Finished   bool // at least one scan completed since the app started
 	Err        string
 	StartedAt  time.Time
@@ -193,7 +194,117 @@ func (sc *Scanner) scan() error {
 	}
 	sc.setStatus(func(st *Status) { st.Missing = len(missing) })
 
+	// Pass 3: a folder whose files name different series in ComicInfo.xml is
+	// really several series sharing a directory.
+	if err := sc.splitMixedFolders(); err != nil {
+		return err
+	}
+
 	return sc.store.ReconcileOneShots()
+}
+
+// splitMixedFolders regroups issues by their ComicInfo <Series> in every
+// library subfolder whose present files carry at least two distinct non-empty
+// Series values (compared trimmed, case-insensitively). Only issues that still
+// sit in their folder's own series are moved; a file already living in a
+// virtual series is never touched again, so renames (manual or ComicVine) of a
+// split-out series survive rescans. The move target is, in order: the series
+// another file of the same folder with the same Series value already lives
+// in (keeps late additions with the renamed/matched series), else the virtual
+// series named after the value (created on demand). A value equal to the
+// folder's name stays in the folder series (it would only duplicate it).
+// Folders with a single consistent Series value (even one differing from the
+// folder name) are left alone: folder = series remains the convention.
+func (sc *Scanner) splitMixedFolders() error {
+	refs, err := sc.store.ListIssueSeriesRefs()
+	if err != nil {
+		return err
+	}
+
+	byFolder := make(map[string][]store.IssueSeriesRef)
+	for _, r := range refs {
+		rel, err := filepath.Rel(sc.root, r.Path)
+		if err != nil || filepath.Dir(rel) == "." || strings.HasPrefix(rel, "..") {
+			continue // root-level files already take their series from ComicInfo
+		}
+		byFolder[filepath.Dir(r.Path)] = append(byFolder[filepath.Dir(r.Path)], r)
+	}
+
+	for folder, issues := range byFolder {
+		relDir, err := filepath.Rel(sc.root, folder)
+		if err != nil {
+			return err
+		}
+		folderPath := filepath.ToSlash(relDir) // what FindOrCreateSeriesByFolder stored
+		folderName := strings.ToLower(filepath.Base(folder))
+		inFolderSeries := func(r store.IssueSeriesRef) bool {
+			return r.SeriesFolder.Valid && r.SeriesFolder.String == folderPath
+		}
+
+		distinct := make(map[string]bool)
+		existing := make(map[string]int64) // normalized value → series already split out
+		for _, r := range issues {
+			name := comicInfoSeriesName(r.ComicInfoSeries)
+			if name == "" {
+				continue
+			}
+			key := strings.ToLower(name)
+			distinct[key] = true
+			if _, seen := existing[key]; !seen && !inFolderSeries(r) {
+				existing[key] = r.SeriesID
+			}
+		}
+		if len(distinct) < 2 {
+			continue
+		}
+
+		moved := 0
+		for _, r := range issues {
+			name := comicInfoSeriesName(r.ComicInfoSeries)
+			key := strings.ToLower(name)
+			if name == "" || !inFolderSeries(r) || key == folderName {
+				continue
+			}
+			target, ok := existing[key]
+			if !ok {
+				if target, err = sc.store.FindOrCreateSeriesByName(name); err != nil {
+					return err
+				}
+				existing[key] = target
+			}
+			if err := sc.store.SetIssueSeries(r.ID, target); err != nil {
+				return err
+			}
+			moved++
+		}
+		if moved > 0 {
+			log.Printf("scan: folder %s holds %d series by ComicInfo — moved %d issue(s) to their own series",
+				folder, len(distinct), moved)
+		}
+	}
+	return nil
+}
+
+// recordComicInfoSeries stores the ComicInfo Series value when it is unknown
+// or has changed (the archive may have been re-tagged).
+func (sc *Scanner) recordComicInfoSeries(issue *store.Issue, series string) error {
+	if issue.ComicInfoSeries.Valid && issue.ComicInfoSeries.String == series {
+		return nil
+	}
+	if err := sc.store.SetIssueComicInfoSeries(issue.ID, series); err != nil {
+		return err
+	}
+	issue.ComicInfoSeries = sql.NullString{String: series, Valid: true}
+	return nil
+}
+
+// comicInfoSeriesName normalizes a stored ComicInfo Series value ("" when
+// unknown or empty).
+func comicInfoSeriesName(v sql.NullString) string {
+	if !v.Valid {
+		return ""
+	}
+	return strings.TrimSpace(v.String)
 }
 
 func isComicFile(path string) bool {
@@ -226,14 +337,22 @@ func (sc *Scanner) addIssue(f foundFile) error {
 	}
 
 	var ci *ComicInfo
-	if isArchive(f.path) {
+	// comicinfo_series: "" for PDFs and archives without ComicInfo; left NULL
+	// when the archive could not be read, so a later scan retries (§5).
+	if !isArchive(f.path) {
+		issue.ComicInfoSeries = sql.NullString{String: "", Valid: true}
+	} else {
 		var found bool
 		var err error
 		ci, found, err = ReadComicInfo(f.path)
-		if err != nil {
+		switch {
+		case err != nil:
 			log.Printf("scan: comicinfo %s: %v", f.path, err)
-		} else if found {
+		case found:
 			applyComicInfo(&issue, ci)
+			issue.ComicInfoSeries = sql.NullString{String: strings.TrimSpace(ci.Series), Valid: true}
+		default:
+			issue.ComicInfoSeries = sql.NullString{String: "", Valid: true}
 		}
 		// The real page count drives page streaming; it also stands in for
 		// missing metadata.
@@ -278,15 +397,32 @@ func (sc *Scanner) refreshIssue(id int64, f foundFile) error {
 
 	canApply := !issue.MetadataLocked &&
 		store.SourceRank(issue.MetadataSource) <= store.SourceRank(store.SourceComicInfo)
-	if canApply && isArchive(f.path) {
+	// Rows from before the comicinfo_series column exist with NULL there; the
+	// first scan after the upgrade inspects them once (backfill), regardless
+	// of whether their metadata may still be overwritten.
+	inspect := !issue.ComicInfoSeries.Valid
+	if (canApply || inspect) && isArchive(f.path) {
 		ci, found, err := ReadComicInfo(f.path)
-		if err != nil {
+		switch {
+		case err != nil:
 			log.Printf("scan: comicinfo %s: %v", f.path, err)
-		} else if found {
-			applyComicInfo(issue, ci)
-			if err := sc.store.UpdateIssueMetadata(issue); err != nil {
+			inspect = false // unreadable archive: leave NULL, try again next scan
+		case found:
+			if err := sc.recordComicInfoSeries(issue, strings.TrimSpace(ci.Series)); err != nil {
 				return err
 			}
+			if canApply {
+				applyComicInfo(issue, ci)
+				if err := sc.store.UpdateIssueMetadata(issue); err != nil {
+					return err
+				}
+			}
+			inspect = false
+		}
+	}
+	if inspect { // no ComicInfo (or not an archive): mark as inspected, empty
+		if err := sc.recordComicInfoSeries(issue, ""); err != nil {
+			return err
 		}
 	}
 

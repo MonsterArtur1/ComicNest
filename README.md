@@ -135,7 +135,9 @@ D:/Comics/
 Loose files in the root folder are fine too; the series name is then taken from the file
 name. Recognised patterns include `Title #012`, `Title 012 (2020)` and `Title v2 015`.
 Bracketed groups after the number, such as `(Digital)`, are ignored, and a `(YEAR)` becomes
-the release year. A single unnumbered file in its own folder is treated as a one-shot.
+the release year. A single unnumbered file in its own folder is treated as a one-shot. If the
+files in one folder carry different `Series` values in their `ComicInfo.xml`, they are split
+into separate series accordingly (a folder whose files all agree stays one series).
 
 Metadata sources are ranked: **file name → ComicInfo.xml → ComicVine → your manual edits**.
 A scan or a ComicVine update never overwrites data from a higher-ranked source, and a manual
