@@ -59,7 +59,10 @@ ComicNextClaude/
 │   ├── templates/               # layout.html + widoki + partiale HTMX
 │   └── static/                  # htmx.min.js, styles.css, placeholder.svg, favicon.png, favicon-32.png, favicon.ico, apple-touch-icon.png
 ├── docs/                        # ta dokumentacja
-├── .github/workflows/go.yml  # CI: testy + binaria (Win/Linux/macOS) po każdym commicie, pre-release "latest" z main, wydania z tagów v*
+├── .github/workflows/go.yml     # CI: testy + binaria (Win/Linux/macOS) + obraz Docker (GHCR) po każdym pushu na main, wydania z tagów v*
+├── Dockerfile                   # obraz: static binary w distroless, wolumeny /comics /config /data (§4a)
+├── docker-compose.yml           # przykład uruchomienia dla użytkowników
+├── .dockerignore
 ├── logo.png                     # źródło ikony aplikacji (1254 px); favicony w web/static są z niego skalowane
 ├── config_example.yaml          # wzorzec konfiguracji z opisem każdej opcji (wersjonowany, §4)
 ├── config.yaml                  # tworzony przy pierwszym starcie (gitignore)
@@ -107,6 +110,28 @@ pierwsze konto z listy (`Store.AdoptAnonymousProgress`).
 
 Domyślnie nasłuch tylko na `localhost`. `listen: 0.0.0.0` wystawia aplikację w sieci lokalnej —
 wtedy warto zdefiniować `users`, bo bez kont UI (także edycja metadanych) jest otwarte.
+
+**Ścieżka configu i zmienne środowiskowe.** Plik wskazuje flaga `-config`, w drugiej kolejności
+`$COMICNEST_CONFIG`, domyślnie `./config.yaml`. Zmienne `COMICNEST_LISTEN`, `COMICNEST_PORT`,
+`COMICNEST_LIBRARY`, `COMICNEST_DATA_DIR`, `COMICNEST_COMICVINE_API_KEY`, `COMICNEST_OPDS_ENABLED`
+i `COMICNEST_PAGE_SIZE` nadpisują wartości z pliku (`Config.applyEnv`; pusta wartość = nieustawiona,
+błędny typ = błąd startu). Gdy pliku nie ma, do tworzonego domyślnego configu trafiają już wartości
+ze środowiska. `users` nie ma odpowiednika w środowisku. Mechanizm istnieje głównie dla Dockera
+(§4a), ale działa wszędzie.
+
+## 4a. Docker
+
+Obraz (`Dockerfile`, wieloetapowy): binarium bez cgo kompilowane w `golang:alpine`, kopiowane do
+`gcr.io/distroless/static:nonroot` (certyfikaty CA dla ComicVine, brak shella, użytkownik UID 65532).
+Obraz ustawia `COMICNEST_CONFIG=/config/config.yaml`, `COMICNEST_LISTEN=0.0.0.0`,
+`COMICNEST_LIBRARY=/comics`, `COMICNEST_DATA_DIR=/data`, więc trzy wolumeny (`/comics` tylko do
+odczytu, `/config`, `/data`) wystarczają, a pierwszy start tworzy poprawny `config.yaml`.
+`GET /healthz` (poza logowaniem i logiem żądań) zwraca `ok`; `comicnest -healthcheck` odpytuje go
+po `127.0.0.1:port` i kończy się kodem 0/1 — to `HEALTHCHECK` w `docker-compose.yml`, bo obraz nie
+ma `curl`. Publikacja: job `docker` w `.github/workflows/go.yml` buduje `linux/amd64` + `linux/arm64`
+(buildx + QEMU) i wypycha do `ghcr.io/monsterartur1/comicnest` — `latest` i `main-<sha>` z `main`,
+`X.Y.Z`/`X.Y`/`X` z tagów. Wersja trafia do obrazu przez `--build-arg VERSION`. Przykład użycia
+w `docker-compose.yml`; `/data` na lokalnym dysku (SQLite na SMB/NFS grozi uszkodzeniem bazy).
 
 ## 5. Model danych (SQLite)
 
@@ -273,6 +298,7 @@ postępu skanu, dialogu dopasowania ComicVine. Każdy widok działa też bez JS
 | `POST /scan` / `GET /scan/status` | start skanu / partial HTMX z postępem |
 | `GET /search?q=` | wyniki po nazwach serii, tytułach i numerach zeszytów (LIKE) |
 | `GET /static/...` | statyki z `embed.FS` |
+| `GET /healthz` | sonda stanu (`ok`, bez logowania) — Docker/orkiestratory |
 
 Filtry na stronie serii i w gridzie: wszystkie / bez metadanych (`metadata_source='filename'`)
 / z ComicVine / brakujące pliki — odpowiednik all/scraped/unscraped ze starego projektu.

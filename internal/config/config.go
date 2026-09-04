@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -65,13 +66,24 @@ func (c Config) FindUser(name string) *User {
 	return nil
 }
 
-// Load reads the config file at path. If the file does not exist, a default
-// config is written there and returned, so the user has a file to fill in.
+// EnvPrefix is the prefix of environment variables that override config.yaml
+// (COMICNEST_LISTEN, COMICNEST_PORT, COMICNEST_LIBRARY, COMICNEST_DATA_DIR,
+// COMICNEST_COMICVINE_API_KEY, COMICNEST_OPDS_ENABLED, COMICNEST_PAGE_SIZE).
+// The Docker image uses them to point at its volumes; they also let the API
+// key live outside the file. Accounts (`users`) are file-only.
+const EnvPrefix = "COMICNEST_"
+
+// Load reads the config file at path and applies environment overrides. If
+// the file does not exist, a default config (with the overrides baked in) is
+// written there and returned, so the user has a file to fill in.
 func Load(path string) (Config, error) {
 	cfg := defaults()
 
 	raw, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
+		if err := cfg.applyEnv(); err != nil {
+			return cfg, err
+		}
 		if werr := save(path, cfg); werr != nil {
 			return cfg, fmt.Errorf("writing default config: %w", werr)
 		}
@@ -84,6 +96,9 @@ func Load(path string) (Config, error) {
 
 	if err := yaml.Unmarshal(raw, &cfg); err != nil {
 		return cfg, fmt.Errorf("parsing %s: %w", path, err)
+	}
+	if err := cfg.applyEnv(); err != nil {
+		return cfg, err
 	}
 	if cfg.Port <= 0 || cfg.Port > 65535 {
 		return cfg, fmt.Errorf("invalid port %d in %s", cfg.Port, path)
@@ -101,6 +116,43 @@ func Load(path string) (Config, error) {
 		return cfg, err
 	}
 	return cfg, nil
+}
+
+// applyEnv overrides fields from COMICNEST_* environment variables (empty
+// values are ignored).
+func (c *Config) applyEnv() error {
+	str := func(key string, dst *string) {
+		if v, ok := os.LookupEnv(EnvPrefix + key); ok && v != "" {
+			*dst = v
+		}
+	}
+	str("LISTEN", &c.Listen)
+	str("LIBRARY", &c.Library)
+	str("DATA_DIR", &c.DataDir)
+	str("COMICVINE_API_KEY", &c.ComicVineAPIKey)
+
+	for _, f := range []struct {
+		key string
+		dst *int
+	}{{"PORT", &c.Port}, {"PAGE_SIZE", &c.PageSize}} {
+		v, ok := os.LookupEnv(EnvPrefix + f.key)
+		if !ok || v == "" {
+			continue
+		}
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return fmt.Errorf("%s%s: %q is not a number", EnvPrefix, f.key, v)
+		}
+		*f.dst = n
+	}
+	if v, ok := os.LookupEnv(EnvPrefix + "OPDS_ENABLED"); ok && v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return fmt.Errorf("%sOPDS_ENABLED: %q is not a boolean", EnvPrefix, v)
+		}
+		c.OPDSEnabled = b
+	}
+	return nil
 }
 
 // normalizeUsers validates accounts: names required and unique, passwords

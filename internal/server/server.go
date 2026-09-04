@@ -179,6 +179,11 @@ func (s *Server) routes() {
 		http.ServeFileFS(w, r, static, "favicon.ico")
 	})
 	s.mux.HandleFunc("GET /{$}", s.handleHome)
+	// Liveness probe for Docker/orchestrators: 200 once the server answers.
+	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Write([]byte("ok"))
+	})
 	s.mux.HandleFunc("GET /login", s.handleLoginForm)
 	s.mux.HandleFunc("POST /login", s.handleLogin)
 	s.mux.HandleFunc("POST /logout", s.handleLogout)
@@ -228,7 +233,7 @@ func (w *statusWriter) WriteHeader(status int) {
 func (s *Server) withLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
-		if strings.HasPrefix(p, "/static/") || p == "/favicon.ico" || p == "/scan/status" ||
+		if strings.HasPrefix(p, "/static/") || p == "/favicon.ico" || p == "/healthz" || p == "/scan/status" ||
 			strings.HasSuffix(p, "/scrape/status") || strings.HasSuffix(p, "/cover") {
 			next.ServeHTTP(w, r)
 			return

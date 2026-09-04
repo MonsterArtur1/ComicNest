@@ -1,8 +1,12 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"time"
 	"path/filepath"
 	"strings"
 
@@ -19,12 +23,26 @@ import (
 var version = "dev"
 
 func main() {
+	// Config path: -config flag, else $COMICNEST_CONFIG, else ./config.yaml.
+	defaultPath := os.Getenv(config.EnvPrefix + "CONFIG")
+	if defaultPath == "" {
+		defaultPath = "config.yaml"
+	}
+	configPath := flag.String("config", defaultPath, "path to config.yaml (also $COMICNEST_CONFIG)")
+	healthcheck := flag.Bool("healthcheck", false, "probe the running server's /healthz and exit (Docker HEALTHCHECK)")
+	flag.Parse()
+
+	if *healthcheck {
+		os.Exit(probeHealth(*configPath))
+	}
+
 	log.Printf("ComicNest %s", version)
 	server.Version = version
-	cfg, err := config.Load("config.yaml")
+	cfg, err := config.Load(*configPath)
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
+	log.Printf("config: %s", *configPath)
 
 	coversDir := filepath.Join(cfg.DataDir, "covers")
 	if err := os.MkdirAll(coversDir, 0o755); err != nil {
@@ -80,4 +98,27 @@ func main() {
 		log.Fatalf("server: %v", err)
 	}
 	log.Fatal(srv.ListenAndServe())
+}
+
+// probeHealth GETs /healthz on the configured port and returns a process exit
+// code (0 = healthy). Used as the container HEALTHCHECK, since the distroless
+// image has no curl or shell.
+func probeHealth(configPath string) int {
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "healthcheck: config:", err)
+		return 1
+	}
+	client := http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/healthz", cfg.Port))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "healthcheck:", err)
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintln(os.Stderr, "healthcheck: status", resp.Status)
+		return 1
+	}
+	return 0
 }
