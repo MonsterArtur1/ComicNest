@@ -32,6 +32,10 @@ func TestFaviconServedWithoutLogin(t *testing.T) {
 		if !strings.Contains(body, `<link rel="icon" href="/static/favicon-32.png"`) {
 			t.Errorf("%s: no favicon link", path)
 		}
+		// The top bar (and the login card) show the logo next to the name.
+		if path != "/issues/1/read" && !strings.Contains(body, `<img class="brand-logo" src="/static/favicon.png"`) {
+			t.Errorf("%s: no brand logo", path)
+		}
 	}
 }
 

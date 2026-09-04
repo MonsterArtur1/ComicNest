@@ -130,11 +130,16 @@ code {
 }
 
 .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
     font-size: 20px;
     font-weight: 700;
     letter-spacing: 0.5px;
 }
-.brand span { color: var(--accent); }
+.brand-name { white-space: nowrap; }
+.brand-name span { color: var(--accent); }
+.brand-logo { width: 32px; height: 32px; border-radius: 7px; flex-shrink: 0; }
 
 .search { flex: 1; max-width: 420px; }
 .search input {
@@ -172,7 +177,8 @@ code {
     border: 1px solid var(--border);
     border-radius: var(--radius);
 }
-.login-box .brand { margin: 0 0 6px; font-size: 26px; }
+.login-box .brand { display: flex; justify-content: center; margin: 0 0 6px; font-size: 26px; }
+.login-box .brand-logo { width: 40px; height: 40px; border-radius: 9px; }
 .login-hint { color: var(--text-dim); font-size: 13px; margin: 0 0 16px; }
 .login-form { display: flex; flex-direction: column; gap: 12px; }
 .login-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-dim); }

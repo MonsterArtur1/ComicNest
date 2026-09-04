@@ -12,7 +12,7 @@
 </head>
 <body class="login-body">
 <main class="login-box">
-    <h1 class="brand">Comic<span>Nest</span></h1>
+    <h1 class="brand"><img class="brand-logo" src="/static/favicon.png" alt="" width="40" height="40"><span class="brand-name">Comic<span>Nest</span></span></h1>
     <p class="login-hint">Zaloguj się kontem z <code>config.yaml</code>. To samo hasło działa w czytniku OPDS.</p>
     {{if .Error}}<p class="flash flash-error">{{.Error}}</p>{{end}}
     <form method="post" action="/login" class="login-form">
