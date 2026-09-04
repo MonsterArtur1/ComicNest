@@ -55,14 +55,14 @@ func main() {
 		log.Printf("users: none configured — no login, single anonymous reader")
 	}
 	switch {
-	case !cfg.OPDS.Enabled:
-		log.Printf("opds: disabled (set opds.enabled: true in config.yaml)")
+	case !cfg.OPDSEnabled:
+		log.Printf("opds: disabled (set opds_enabled: true in config.yaml)")
 	case cfg.AuthEnabled():
 		log.Printf("opds: enabled (basic auth with user accounts)")
 	default:
 		log.Printf("opds: enabled (no auth)")
 	}
-	if cfg.OPDS.Enabled && cfg.Listen == "localhost" {
+	if cfg.OPDSEnabled && cfg.Listen == "localhost" {
 		log.Printf("opds: listening on localhost only — set listen: 0.0.0.0 to reach the catalog from other devices")
 	}
 

@@ -46,8 +46,7 @@ listen: localhost            # "0.0.0.0", żeby inne urządzenia w sieci widzia�
 library: "D:/Komiksy"        # korzeń biblioteki komiksów
 data_dir: "./data"           # baza SQLite + cache okładek
 comicvine_api_key: ""        # klucz z https://comicvine.gamespot.com/api/
-opds:
-  enabled: false             # katalog OPDS pod http://…/opds
+opds_enabled: false          # katalog OPDS pod http://…/opds
 users:                       # konta (opcjonalne); puste = brak logowania
   - name: artur
     password: sekret         # hasło zapisane jawnie
@@ -68,7 +67,7 @@ w `.gitignore`).
 
 ## Czytniki komiksów (OPDS)
 
-Ustaw `opds.enabled: true` i `listen: 0.0.0.0`, uruchom ponownie, a w czytniku dodaj
+Ustaw `opds_enabled: true` i `listen: 0.0.0.0`, uruchom ponownie, a w czytniku dodaj
 katalog OPDS o adresie `http://<adres-komputera>:8080/opds` (adres IP komputera
 z biblioteką w sieci domowej). Katalog oferuje:
 

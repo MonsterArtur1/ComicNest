@@ -62,7 +62,7 @@ func (s *Server) funcMap() template.FuncMap {
 		"prettySize":  prettySize,
 		"sourceLabel": sourceLabel,
 		"truncate":    truncateText,
-		"opdsEnabled": func() bool { return s.cfg.OPDS.Enabled },
+		"opdsEnabled": func() bool { return s.cfg.OPDSEnabled },
 		"canRead":     canStreamPages, // in-browser reader works for CBZ/CBR only
 		// currentUser is overridden per request in renderStatus; this default
 		// only satisfies parse-time resolution.
@@ -187,7 +187,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /search", s.handleSearch)
 	s.mux.HandleFunc("POST /scan", s.handleScanStart)
 	s.mux.HandleFunc("GET /scan/status", s.handleScanStatus)
-	if s.cfg.OPDS.Enabled {
+	if s.cfg.OPDSEnabled {
 		s.opdsRoutes()
 	}
 	s.mux.HandleFunc("/", s.handleNotFound) // catch-all: styled 404
@@ -233,7 +233,7 @@ func (s *Server) ListenAndServe() error {
 		}
 		fmt.Printf("%s http://%s:%d/\n", label, h, s.cfg.Port)
 	}
-	if s.cfg.OPDS.Enabled {
+	if s.cfg.OPDSEnabled {
 		for _, h := range hosts {
 			fmt.Printf("OPDS catalog: http://%s:%d/opds\n", h, s.cfg.Port)
 		}

@@ -24,7 +24,7 @@ import (
 
 // newTestServer builds a Server over a fresh SQLite database in a temp dir,
 // seeded with one series holding two issues (one of them missing on disk).
-func newTestServer(t *testing.T, opdsCfg config.OPDSConfig) (*Server, string) {
+func newTestServer(t *testing.T, opdsEnabled bool) (*Server, string) {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -61,7 +61,7 @@ func newTestServer(t *testing.T, opdsCfg config.OPDSConfig) (*Server, string) {
 		t.Fatal(err)
 	}
 	cache := covers.New(coversDir)
-	cfg := config.Config{Port: 8080, Listen: "localhost", Library: dir, DataDir: dir, OPDS: opdsCfg}
+	cfg := config.Config{Port: 8080, Listen: "localhost", Library: dir, DataDir: dir, OPDSEnabled: opdsEnabled}
 	srv, err := New(cfg, st, cache, library.NewScanner(st, cache, dir), comicvine.New(""))
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
@@ -121,14 +121,14 @@ func assertXML(t *testing.T, rec *httptest.ResponseRecorder) string {
 }
 
 func TestOPDSDisabledByDefault(t *testing.T) {
-	srv, _ := newTestServer(t, config.OPDSConfig{})
+	srv, _ := newTestServer(t, false)
 	if rec := get(t, srv.Handler(), "/opds", nil); rec.Code != http.StatusNotFound {
 		t.Errorf("/opds with OPDS disabled: got %d, want 404", rec.Code)
 	}
 }
 
 func TestOPDSNavigation(t *testing.T) {
-	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	srv, _ := newTestServer(t, true)
 	h := srv.Handler()
 
 	rec := get(t, h, "/opds", nil)
@@ -161,7 +161,7 @@ func TestOPDSNavigation(t *testing.T) {
 }
 
 func TestOPDSSeriesAcquisitionFeed(t *testing.T) {
-	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	srv, _ := newTestServer(t, true)
 	rec := get(t, srv.Handler(), "/opds/series/1", nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("/opds/series/1: %d\n%s", rec.Code, rec.Body)
@@ -197,7 +197,7 @@ func TestOPDSSeriesAcquisitionFeed(t *testing.T) {
 }
 
 func TestOPDSRecentAndSearch(t *testing.T) {
-	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	srv, _ := newTestServer(t, true)
 	h := srv.Handler()
 
 	body := assertXML(t, get(t, h, "/opds/recent", nil))
@@ -222,7 +222,7 @@ func TestOPDSRecentAndSearch(t *testing.T) {
 }
 
 func TestOPDSFileDownload(t *testing.T) {
-	srv, cbz := newTestServer(t, config.OPDSConfig{Enabled: true})
+	srv, cbz := newTestServer(t, true)
 	rec := get(t, srv.Handler(), "/opds/issues/1/file", nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("download: %d", rec.Code)
@@ -246,7 +246,7 @@ func TestOPDSFileDownload(t *testing.T) {
 }
 
 func TestOPDSPageStreaming(t *testing.T) {
-	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	srv, _ := newTestServer(t, true)
 	h := srv.Handler()
 
 	// The series feed advertises page streaming with the real page count and
@@ -324,7 +324,7 @@ func TestOPDSPageStreaming(t *testing.T) {
 }
 
 func TestWebShowsReadingProgress(t *testing.T) {
-	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	srv, _ := newTestServer(t, true)
 	h := srv.Handler()
 
 	// Unread: no progress markup anywhere.
@@ -359,7 +359,7 @@ func TestWebShowsReadingProgress(t *testing.T) {
 }
 
 func TestHomeFiltersAndReadMark(t *testing.T) {
-	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	srv, _ := newTestServer(t, true)
 	h := srv.Handler()
 	lists := func(filter string) bool {
 		body := get(t, h, "/?filter="+filter, nil).Body.String()
@@ -425,7 +425,7 @@ func TestHomeFiltersAndReadMark(t *testing.T) {
 }
 
 func TestMarkReadUnread(t *testing.T) {
-	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	srv, _ := newTestServer(t, true)
 	h := srv.Handler()
 	post := func(target, form string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodPost, target, strings.NewReader(form))
@@ -499,7 +499,7 @@ func TestOPDSNoStreamingForPDF(t *testing.T) {
 }
 
 func TestOPDSBasicAuth(t *testing.T) {
-	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	srv, _ := newTestServer(t, true)
 	srv.cfg.Users = []config.User{{Name: "artur", Password: "sekret"}}
 	h := srv.Handler()
 

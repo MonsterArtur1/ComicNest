@@ -15,27 +15,19 @@ type User struct {
 	Password string `yaml:"password"` // plain text, by design (personal LAN app)
 }
 
-// OPDSConfig controls the OPDS catalog for external comic readers.
-type OPDSConfig struct {
-	Enabled bool `yaml:"enabled"`
-	// Deprecated: Username/Password define a single catalog login. When
-	// `users` is empty they are turned into the only user account, so old
-	// configs keep working; with `users` set they are ignored.
-	Username string `yaml:"username,omitempty"`
-	Password string `yaml:"password,omitempty"`
-}
-
 // Config holds all application settings, loaded from config.yaml.
 type Config struct {
 	Port int `yaml:"port"`
 	// Listen is the interface to bind to. "localhost" keeps the app private to
 	// this machine; "0.0.0.0" exposes it on the LAN (needed for OPDS readers on
 	// phones/tablets — define users then, so the UI is behind a login).
-	Listen          string     `yaml:"listen"`
-	Library         string     `yaml:"library"`
-	DataDir         string     `yaml:"data_dir"`
-	ComicVineAPIKey string     `yaml:"comicvine_api_key"`
-	OPDS            OPDSConfig `yaml:"opds"`
+	Listen          string `yaml:"listen"`
+	Library         string `yaml:"library"`
+	DataDir         string `yaml:"data_dir"`
+	ComicVineAPIKey string `yaml:"comicvine_api_key"`
+	// OPDSEnabled turns on the OPDS catalog for external comic readers. The
+	// catalog is protected with HTTP Basic auth using the `users` accounts.
+	OPDSEnabled bool `yaml:"opds_enabled"`
 	// Users enables login. Empty = no accounts: the UI and OPDS are open and
 	// everything is tracked for one anonymous reader.
 	Users []User `yaml:"users"`
@@ -48,7 +40,7 @@ func defaults() Config {
 		Library:         "",
 		DataDir:         "./data",
 		ComicVineAPIKey: "",
-		OPDS:            OPDSConfig{Enabled: false},
+		OPDSEnabled:     false,
 		Users:           nil,
 	}
 }
@@ -101,15 +93,9 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
-// normalizeUsers validates accounts and folds the legacy opds.username /
-// opds.password pair into the user list when no users are defined.
+// normalizeUsers validates accounts: names required and unique, passwords
+// required.
 func (c *Config) normalizeUsers(path string) error {
-	if (c.OPDS.Username == "") != (c.OPDS.Password == "") {
-		return fmt.Errorf("opds: username and password must be set together in %s", path)
-	}
-	if len(c.Users) == 0 && c.OPDS.Username != "" {
-		c.Users = []User{{Name: c.OPDS.Username, Password: c.OPDS.Password}}
-	}
 	seen := make(map[string]bool)
 	for i, u := range c.Users {
 		u.Name = strings.TrimSpace(u.Name)

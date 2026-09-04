@@ -71,8 +71,7 @@ listen: localhost              # "0.0.0.0" = dostęp z sieci lokalnej (potrzebne
 library: "D:/Library"          # korzeń biblioteki komiksów
 data_dir: "./data"             # baza sqlite + cache okładek
 comicvine_api_key: ""          # puste = funkcje ComicVine wyłączone (UI to komunikuje)
-opds:
-  enabled: false               # katalog OPDS pod /opds (patrz §9a)
+opds_enabled: false            # katalog OPDS pod /opds (patrz §9a)
 users:                         # konta; puste = brak logowania (jeden anonimowy czytelnik)
   - name: artur
     password: sekret           # plaintext — świadomie (osobista aplikacja w LAN)
@@ -88,8 +87,8 @@ Klucz API **nigdy nie trafia do kodu** (w starym projekcie był zahardkodowany �
 w pamięci — restart wylogowuje) i dla OPDS (HTTP Basic z tymi samymi parami nazwa/hasło).
 Postęp czytania jest per użytkownik (§5). Walidacja: nazwa i hasło wymagane, nazwy unikalne, bez
 `:` (Basic auth). Brak `users` = stare zachowanie: wszystko otwarte, postęp anonimowego czytelnika
-(`user = ''`). Zgodność wstecz: stare `opds.username`/`opds.password` bez `users` stają się
-jedynym kontem (oznaczone jako deprecated). Przy starcie z kontami postęp anonimowy przechodzi na
+(`user = ''`). Hasła do OPDS pochodzą wyłącznie z `users` — dawna sekcja `opds` (z `username`/`password`)
+została usunięta, a włącznik katalogu to klucz `opds_enabled`. Przy starcie z kontami postęp anonimowy przechodzi na
 pierwsze konto z listy (`Store.AdoptAnonymousProgress`).
 
 Domyślnie nasłuch tylko na `localhost`. `listen: 0.0.0.0` wystawia aplikację w sieci lokalnej —
@@ -264,7 +263,7 @@ postępu skanu, dialogu dopasowania ComicVine. Każdy widok działa też bez JS
 Filtry na stronie serii i w gridzie: wszystkie / bez metadanych (`metadata_source='filename'`)
 / z ComicVine / brakujące pliki — odpowiednik all/scraped/unscraped ze starego projektu.
 
-## 9a. Katalog OPDS (`opds.enabled: true`)
+## 9a. Katalog OPDS (`opds_enabled: true`)
 
 OPDS 1.2 (Atom) — format obsługiwany przez czytniki komiksów (Panels, Chunky, Moon+ Reader,
 Librera, KOReader, Mihon przez rozszerzenie). Cały katalog — feedy, okładki i pliki — żyje pod

@@ -12,7 +12,7 @@ import (
 // newAuthTestServer is newTestServer with two accounts and OPDS enabled.
 func newAuthTestServer(t *testing.T) *Server {
 	t.Helper()
-	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	srv, _ := newTestServer(t, true)
 	srv.cfg.Users = []config.User{{Name: "ania", Password: "a-pass"}, {Name: "bartek", Password: "b-pass"}}
 	return srv
 }
@@ -167,7 +167,7 @@ func TestProgressIsPerUser(t *testing.T) {
 }
 
 func TestAnonymousModeUnchanged(t *testing.T) {
-	srv, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	srv, _ := newTestServer(t, true)
 	h := srv.Handler()
 	if rec := get(t, h, "/", nil); rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), `action="/logout"`) {
 		t.Errorf("without accounts the UI is open and shows no user box: %d", rec.Code)
@@ -181,7 +181,7 @@ func TestAnonymousModeUnchanged(t *testing.T) {
 }
 
 func TestAdoptAnonymousProgress(t *testing.T) {
-	srv, _ := newTestServer(t, config.OPDSConfig{})
+	srv, _ := newTestServer(t, false)
 	st := srv.store
 	if err := st.SetReadingProgress("", 1, 2); err != nil {
 		t.Fatal(err)

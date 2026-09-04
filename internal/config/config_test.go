@@ -30,7 +30,6 @@ func TestUsersParsedAndValidated(t *testing.T) {
 		"missing name":     "users:\n  - password: x\n",
 		"duplicate":        "users:\n  - name: a\n    password: x\n  - name: a\n    password: y\n",
 		"colon in name":    "users:\n  - name: \"a:b\"\n    password: x\n",
-		"opds half pair":   "opds:\n  username: artur\n",
 	} {
 		if _, err := load(t, yaml); err == nil {
 			t.Errorf("%s: expected a config error", name)
@@ -38,21 +37,20 @@ func TestUsersParsedAndValidated(t *testing.T) {
 	}
 }
 
-func TestLegacyOPDSCredentialsBecomeUser(t *testing.T) {
-	cfg, err := load(t, "opds:\n  enabled: true\n  username: artur\n  password: sekret\n")
+func TestOPDSEnabledFlag(t *testing.T) {
+	cfg, err := load(t, "port: 8080\n")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cfg.Users) != 1 || cfg.Users[0] != (User{Name: "artur", Password: "sekret"}) {
-		t.Errorf("legacy opds credentials should become the single user, got %+v", cfg.Users)
+	if cfg.OPDSEnabled {
+		t.Error("opds_enabled should default to false")
 	}
-	// With users defined, the legacy pair is ignored.
-	cfg, err = load(t, "opds:\n  username: old\n  password: old\nusers:\n  - name: ania\n    password: a\n")
+	cfg, err = load(t, "opds_enabled: true\n")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cfg.Users) != 1 || cfg.Users[0].Name != "ania" {
-		t.Errorf("users should take precedence over legacy opds credentials: %+v", cfg.Users)
+	if !cfg.OPDSEnabled {
+		t.Error("opds_enabled: true not parsed")
 	}
 }
 

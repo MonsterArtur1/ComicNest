@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"comicnest/internal/config"
 	"comicnest/internal/store"
 )
 
@@ -23,7 +22,7 @@ func postForm(t *testing.T, h http.Handler, target, form string) *httptest.Respo
 }
 
 func TestReaderPageAndProgress(t *testing.T) {
-	srv, _ := newTestServer(t, config.OPDSConfig{})
+	srv, _ := newTestServer(t, false)
 	h := srv.Handler()
 
 	// Fresh issue: opens at page 1 with the real page count, no neighbours.
@@ -70,7 +69,7 @@ func TestReaderPageAndProgress(t *testing.T) {
 	}
 	// Same record as OPDS: the catalog shows lastRead="2" and the issue page
 	// offers "Czytaj dalej".
-	srv2, _ := newTestServer(t, config.OPDSConfig{Enabled: true})
+	srv2, _ := newTestServer(t, true)
 	postForm(t, srv2.Handler(), "/issues/1/progress", "page=2")
 	if body := get(t, srv2.Handler(), "/opds/series/1", nil).Body.String(); !strings.Contains(body, `pse:lastRead="2"`) {
 		t.Errorf("OPDS feed should reflect web progress:\n%s", body)
@@ -106,7 +105,7 @@ func TestReaderPageAndProgress(t *testing.T) {
 }
 
 func TestReaderNeighboursAndPDF(t *testing.T) {
-	srv, _ := newTestServer(t, config.OPDSConfig{})
+	srv, _ := newTestServer(t, false)
 	h := srv.Handler()
 	dir := t.TempDir()
 

@@ -3,10 +3,7 @@ library: "D:/Library"
 data_dir: ./data
 listen: 0.0.0.0
 comicvine_api_key: "38f4732067d47702b21621d27a828a5b7a51dde1"
-opds:
-  enabled: true               # katalog OPDS pod /opds (patrz §9a)
-  username: "artur"                 # oba puste = katalog bez logowania;
-  password: "artur"
+opds_enabled: true            # katalog OPDS pod /opds (patrz §9a); logowanie kontami z `users`
 users:
   - name: artur
     password: sekret
