@@ -57,7 +57,7 @@ ComicNextClaude/
 │   └── server/                  # handlery HTTP, routing, renderowanie szablonów (+ opds.go: katalog OPDS)
 ├── web/
 │   ├── templates/               # layout.html + widoki + partiale HTMX
-│   └── static/                  # htmx.min.js, styles.css, placeholder.jpg
+│   └── static/                  # htmx.min.js, styles.css, placeholder.svg, favicon.{svg,ico,png}, apple-touch-icon.png
 ├── docs/                        # ta dokumentacja
 ├── config_example.yaml          # wzorzec konfiguracji z opisem każdej opcji (wersjonowany, §4)
 ├── config.yaml                  # tworzony przy pierwszym starcie (gitignore)
@@ -284,6 +284,12 @@ czytnik; zalogowany użytkownik trafia do kontekstu żądania, więc `pse:lastRe
 czytane" i postęp ze strumieniowania są jego. Bez kont katalog jest otwarty (czytelnik anonimowy).
 Gdy OPDS jest wyłączony, trasy nie są rejestrowane (404 z catch-alla).
 
+Każdy feed niesie `<icon>` z absolutnym adresem `/static/favicon.png` (192×192) — czytniki pokazują
+ją obok nazwy katalogu. Ikona leży pod `/static`, czyli poza Basic auth, więc czytnik pobierze ją
+także bez poświadczeń. Ta sama grafika (`web/static/favicon.svg`, `.ico`, `apple-touch-icon.png`)
+jest faviconem stron WWW: linki w `<head>` layoutu, loginu i czytnika oraz trasa `GET /favicon.ico`
+(poza logowaniem, poza logiem żądań).
+
 | Ścieżka | Feed |
 |---|---|
 | `GET /opds` | nawigacyjny root: „Wszystkie serie", „Aktualnie czytane", „Ostatnio dodane" + link `search` |
@@ -293,7 +299,7 @@ Gdy OPDS jest wyłączony, trasy nie są rejestrowane (404 z catch-alla).
 | `GET /opds/reading` | akwizycyjny „Aktualnie czytane": zeszyty z `reading_progress`, których ostatnia strona < liczba stron (lub liczba stron nieznana), wg ostatniego czytania (LIMIT 100) |
 | `GET /opds/issues/{id}/pages/{n}?width=W` | strona `n` (0-based) z archiwum CBZ/CBR (OPDS-PSE); bez `width` oryginalny plik z typem po rozszerzeniu, z `width` przeskalowanie do W px (max 4000) i JPEG; pobranie strony zapisuje postęp `n+1` (`MAX` z dotychczasowym); 404 poza zakresem, dla PDF i brakujących plików |
 | `GET /opds/search?q=` | akwizycyjny: jedna płaska lista zeszytów po nazwie serii / tytule / numerze (LIMIT 200) |
-| `GET /opds/opensearch.xml` | OpenSearch description z szablonem `…/opds/search?q={searchTerms}` |
+| `GET /opds/opensearch.xml` | OpenSearch description z szablonem `…/opds/search?q={searchTerms}` i `<Image>` (ikona katalogu) |
 | `GET /opds/issues/{id}/file` | ten sam handler co `/issues/{id}/download` (Range/HEAD przez `http.ServeFile`) |
 | `GET /opds/issues/{id}/cover` | ten sam handler co `/issues/{id}/cover` |
 

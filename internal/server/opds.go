@@ -93,10 +93,16 @@ func (s *Server) writeFeed(w http.ResponseWriter, f *opds.Feed, kind string) {
 	}
 }
 
-// newOPDSFeed creates a feed with the common self/start/search links.
+// opdsIconPath is the catalog icon advertised in feeds (atom:icon) and the
+// OpenSearch description. It lives under /static, which is never behind auth.
+const opdsIconPath = "/static/favicon.png"
+
+// newOPDSFeed creates a feed with the common self/start/search links and the
+// catalog icon.
 func (s *Server) newOPDSFeed(r *http.Request, id, title string, updated time.Time) *opds.Feed {
 	base := opdsBaseURL(r)
 	f := opds.NewFeed("urn:comicnest:"+id, title, updated)
+	f.Icon = base + opdsIconPath
 	f.AddLink(opds.RelSelf, base+r.URL.RequestURI(), "")
 	f.AddLink(opds.RelStart, base+"/opds", opds.TypeNavigation)
 	f.AddLink(opds.RelSearch, base+"/opds/opensearch.xml", opds.TypeOpenSearch)
@@ -459,7 +465,8 @@ func (s *Server) handleOPDSSearch(w http.ResponseWriter, r *http.Request) {
 // handleOPDSOpenSearch serves the OpenSearch description document.
 func (s *Server) handleOPDSOpenSearch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", opds.TypeOpenSearch+";charset=utf-8")
-	if err := opds.WriteOpenSearch(w, opdsBaseURL(r)+"/opds/search?q={searchTerms}"); err != nil {
+	base := opdsBaseURL(r)
+	if err := opds.WriteOpenSearch(w, base+"/opds/search?q={searchTerms}", base+opdsIconPath); err != nil {
 		s.serverError(w, err)
 	}
 }

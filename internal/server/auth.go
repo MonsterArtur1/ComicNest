@@ -108,7 +108,7 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 		p := r.URL.Path
 		if !s.cfg.AuthEnabled() ||
 			p == "/opds" || strings.HasPrefix(p, "/opds/") ||
-			p == "/login" || p == "/logout" || strings.HasPrefix(p, "/static/") {
+			p == "/login" || p == "/logout" || p == "/favicon.ico" || strings.HasPrefix(p, "/static/") {
 			next.ServeHTTP(w, r)
 			return
 		}

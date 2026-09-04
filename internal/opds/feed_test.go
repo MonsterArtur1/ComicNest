@@ -68,7 +68,7 @@ func TestFeedWriteIsWellFormedAtom(t *testing.T) {
 
 func TestWriteOpenSearch(t *testing.T) {
 	var buf bytes.Buffer
-	if err := WriteOpenSearch(&buf, "http://host/opds/search?q={searchTerms}"); err != nil {
+	if err := WriteOpenSearch(&buf, "http://host/opds/search?q={searchTerms}", "http://host/static/favicon.png"); err != nil {
 		t.Fatalf("WriteOpenSearch: %v", err)
 	}
 	out := buf.String()
@@ -76,6 +76,7 @@ func TestWriteOpenSearch(t *testing.T) {
 		`<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">`,
 		`template="http://host/opds/search?q={searchTerms}"`,
 		`type="` + TypeAcquisition + `"`,
+		`<Image height="192" width="192" type="image/png">http://host/static/favicon.png</Image>`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("opensearch missing %q\n%s", want, out)

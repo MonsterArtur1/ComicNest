@@ -63,6 +63,9 @@ type Feed struct {
 	Title         string   `xml:"title"`
 	Updated       string   `xml:"updated"`
 	Author        *Author  `xml:"author,omitempty"`
+	// Icon is the catalog's square icon (atom:icon); readers show it next to
+	// the catalog name.
+	Icon          string   `xml:"icon,omitempty"`
 	Links         []Link   `xml:"link"`
 	TotalResults  int      `xml:"opensearch:totalResults,omitempty"`
 	ItemsPerPage  int      `xml:"opensearch:itemsPerPage,omitempty"`
@@ -157,11 +160,21 @@ type OpenSearchDescription struct {
 		Type     string `xml:"type,attr"`
 		Template string `xml:"template,attr"`
 	} `xml:"Url"`
+	Image *OpenSearchImage `xml:"Image,omitempty"`
+}
+
+// OpenSearchImage is the optional icon of an OpenSearch source.
+type OpenSearchImage struct {
+	Height int    `xml:"height,attr"`
+	Width  int    `xml:"width,attr"`
+	Type   string `xml:"type,attr"`
+	URL    string `xml:",chardata"`
 }
 
 // WriteOpenSearch writes an OpenSearch description whose template points at
 // searchURL, which must contain the literal placeholder "{searchTerms}".
-func WriteOpenSearch(w io.Writer, searchURL string) error {
+// iconURL (a square PNG) may be empty.
+func WriteOpenSearch(w io.Writer, searchURL, iconURL string) error {
 	d := OpenSearchDescription{
 		Xmlns:       "http://a9.com/-/spec/opensearch/1.1/",
 		ShortName:   "ComicNest",
@@ -171,6 +184,9 @@ func WriteOpenSearch(w io.Writer, searchURL string) error {
 	}
 	d.URL.Type = TypeAcquisition
 	d.URL.Template = searchURL
+	if iconURL != "" {
+		d.Image = &OpenSearchImage{Height: 192, Width: 192, Type: "image/png", URL: iconURL}
+	}
 
 	if _, err := io.WriteString(w, xml.Header); err != nil {
 		return err

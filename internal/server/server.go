@@ -161,6 +161,10 @@ func (s *Server) routes() {
 		panic(err) // embedded FS layout is fixed at compile time
 	}
 	s.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
+	// Browsers and some OPDS readers probe /favicon.ico directly.
+	s.mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFileFS(w, r, static, "favicon.ico")
+	})
 	s.mux.HandleFunc("GET /{$}", s.handleHome)
 	s.mux.HandleFunc("GET /login", s.handleLoginForm)
 	s.mux.HandleFunc("POST /login", s.handleLogin)
@@ -211,7 +215,7 @@ func (w *statusWriter) WriteHeader(status int) {
 func (s *Server) withLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
-		if strings.HasPrefix(p, "/static/") || p == "/scan/status" ||
+		if strings.HasPrefix(p, "/static/") || p == "/favicon.ico" || p == "/scan/status" ||
 			strings.HasSuffix(p, "/scrape/status") || strings.HasSuffix(p, "/cover") {
 			next.ServeHTTP(w, r)
 			return

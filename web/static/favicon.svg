@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- ComicNest: a stack of comic books on the app's dark background -->
+  <rect width="64" height="64" rx="12" fill="#16181d"/>
+  <rect x="12" y="8"  width="30" height="40" rx="3" fill="#a8722a"/>
+  <rect x="17" y="13" width="30" height="40" rx="3" fill="#c98a33"/>
+  <rect x="22" y="18" width="30" height="40" rx="3" fill="#e8a33d"/>
+  <rect x="22" y="18" width="5"  height="40" rx="1.5" fill="#16181d" opacity="0.35"/>
+  <path d="M31 27h16v13H37l-4 4v-4h-2z" fill="#16181d"/>
+</svg>
