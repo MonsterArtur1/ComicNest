@@ -50,23 +50,26 @@ type Issue struct {
 	MetadataSource   string
 	MetadataLocked   bool
 	HasComicInfo     bool
-	CoverCached      bool
-	CreatedAt        string
-	UpdatedAt        string
+	// ComicInfoSeries is the raw <Series> of the file's ComicInfo.xml: invalid
+	// (NULL) = never inspected, "" = none. Drives the mixed-folder split.
+	ComicInfoSeries sql.NullString
+	CoverCached     bool
+	CreatedAt       string
+	UpdatedAt       string
 }
 
 const issueColumns = `id, series_id, path, file_size, file_missing, issue_number,
 	title, summary, release_date, writer, artist, publisher, page_count, file_pages,
 	comicvine_issue_id, metadata_source, metadata_locked, has_comicinfo,
-	cover_cached, created_at, updated_at`
+	comicinfo_series, cover_cached, created_at, updated_at`
 
 // fields returns scan targets for issueColumns, in order.
 func (i *Issue) fields() []any {
 	return []any{&i.ID, &i.SeriesID, &i.Path, &i.FileSize, &i.FileMissing,
 		&i.IssueNumber, &i.Title, &i.Summary, &i.ReleaseDate, &i.Writer,
 		&i.Artist, &i.Publisher, &i.PageCount, &i.FilePages, &i.ComicVineIssueID,
-		&i.MetadataSource, &i.MetadataLocked, &i.HasComicInfo, &i.CoverCached,
-		&i.CreatedAt, &i.UpdatedAt}
+		&i.MetadataSource, &i.MetadataLocked, &i.HasComicInfo, &i.ComicInfoSeries,
+		&i.CoverCached, &i.CreatedAt, &i.UpdatedAt}
 }
 
 func scanIssue(row interface{ Scan(...any) error }) (*Issue, error) {
@@ -143,7 +146,7 @@ type IssueWithSeries struct {
 const issueWithSeriesColumns = `i.id, i.series_id, i.path, i.file_size, i.file_missing,
 	i.issue_number, i.title, i.summary, i.release_date, i.writer, i.artist, i.publisher,
 	i.page_count, i.file_pages, i.comicvine_issue_id, i.metadata_source, i.metadata_locked,
-	i.has_comicinfo, i.cover_cached, i.created_at, i.updated_at, s.name`
+	i.has_comicinfo, i.comicinfo_series, i.cover_cached, i.created_at, i.updated_at, s.name`
 
 func scanIssuesWithSeries(rows *sql.Rows) ([]IssueWithSeries, error) {
 	var out []IssueWithSeries
@@ -224,8 +227,8 @@ func (s *Store) IssuesNeedingComicVine() (map[int64][]Issue, error) {
 		SELECT i.id, i.series_id, i.path, i.file_size, i.file_missing, i.issue_number,
 			i.title, i.summary, i.release_date, i.writer, i.artist, i.publisher,
 			i.page_count, i.file_pages, i.comicvine_issue_id, i.metadata_source,
-			i.metadata_locked, i.has_comicinfo, i.cover_cached, i.created_at, i.updated_at,
-			s.comicvine_volume_id
+			i.metadata_locked, i.has_comicinfo, i.comicinfo_series, i.cover_cached,
+			i.created_at, i.updated_at, s.comicvine_volume_id
 		FROM issues i JOIN series s ON s.id = i.series_id
 		WHERE s.comicvine_volume_id IS NOT NULL
 		  AND i.metadata_locked = 0
@@ -271,11 +274,11 @@ func (s *Store) InsertIssue(i *Issue) error {
 	res, err := s.db.Exec(`
 		INSERT INTO issues (series_id, path, file_size, issue_number, title,
 			summary, release_date, writer, artist, publisher, page_count, file_pages,
-			metadata_source, has_comicinfo)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			metadata_source, has_comicinfo, comicinfo_series)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		i.SeriesID, i.Path, i.FileSize, i.IssueNumber, i.Title,
 		i.Summary, i.ReleaseDate, i.Writer, i.Artist, i.Publisher, i.PageCount, i.FilePages,
-		i.MetadataSource, i.HasComicInfo)
+		i.MetadataSource, i.HasComicInfo, i.ComicInfoSeries)
 	if err != nil {
 		return err
 	}
@@ -318,6 +321,54 @@ func (s *Store) TouchIssueFile(id int64, size int64) error {
 func (s *Store) SetIssueFilePages(id int64, pages int) error {
 	_, err := s.db.Exec(`UPDATE issues SET file_pages = ? WHERE id = ?`, pages, id)
 	return err
+}
+
+// SetIssueComicInfoSeries records the raw ComicInfo <Series> value ("" when
+// the file has none), marking the file as inspected.
+func (s *Store) SetIssueComicInfoSeries(id int64, series string) error {
+	_, err := s.db.Exec(`UPDATE issues SET comicinfo_series = ? WHERE id = ?`, series, id)
+	return err
+}
+
+// SetIssueSeries moves an issue to another series (used by the scanner when a
+// folder turns out to hold several series).
+func (s *Store) SetIssueSeries(issueID, seriesID int64) error {
+	_, err := s.db.Exec(`
+		UPDATE issues SET series_id = ?, updated_at = datetime('now')
+		WHERE id = ?`, seriesID, issueID)
+	return err
+}
+
+// IssueSeriesRef is the minimal view the scanner needs to regroup issues.
+type IssueSeriesRef struct {
+	ID              int64
+	Path            string
+	SeriesID        int64
+	SeriesFolder    sql.NullString // series.folder_path (NULL = virtual series)
+	ComicInfoSeries sql.NullString
+}
+
+// ListIssueSeriesRefs returns every present-on-disk issue with its current
+// series (and that series' folder) and ComicInfo series value.
+func (s *Store) ListIssueSeriesRefs() ([]IssueSeriesRef, error) {
+	rows, err := s.db.Query(`
+		SELECT i.id, i.path, i.series_id, s.folder_path, i.comicinfo_series
+		FROM issues i JOIN series s ON s.id = i.series_id
+		WHERE i.file_missing = 0`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []IssueSeriesRef
+	for rows.Next() {
+		var r IssueSeriesRef
+		if err := rows.Scan(&r.ID, &r.Path, &r.SeriesID, &r.SeriesFolder, &r.ComicInfoSeries); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
 }
 
 // SetCoverCached records whether a thumbnail exists for the issue.

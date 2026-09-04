@@ -173,6 +173,7 @@ CREATE TABLE issues (
     metadata_source    TEXT NOT NULL DEFAULT 'filename', -- filename | comicinfo | comicvine | manual
     metadata_locked    INTEGER NOT NULL DEFAULT 0,       -- 1 = ręcznie edytowane, nie nadpisuj
     has_comicinfo      INTEGER NOT NULL DEFAULT 0,
+    comicinfo_series   TEXT,                      -- <Series> z ComicInfo.xml (migracja 5): NULL = nie sprawdzono, '' = brak
     cover_cached       INTEGER NOT NULL DEFAULT 0,
     created_at         TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
@@ -207,6 +208,13 @@ przeczytana strona 1-based (konwencja OPDS-PSE). Zapis przez `UPSERT` z `MAX(pag
 Skan uzupełnia `file_pages` dla nowych plików i dla starych z wartością 0. Wszystkie zapytania o
 postęp (`ListSeries` agregaty, `ListIssuesInProgress`, `ReadingProgressFor`, …) przyjmują `user`.
 
+**Seria z ComicInfo** (migracja 5): kolumna `issues.comicinfo_series` przechowuje surową wartość
+`<Series>` z pliku, niezależnie od (edytowalnego) wiersza serii. `NULL` = wiersz z bazy sprzed
+migracji, jeszcze nie sprawdzony, **albo** archiwum, którego nie dało się odczytać (błąd zip/rar) —
+w obu przypadkach kolejny skan czyta ComicInfo ponownie (dla starych wierszy tylko po to; zablokowanych
+metadanych nie rusza) i wypełnia kolumnę; `''` = archiwum odczytane poprawnie, ale bez ComicInfo lub z
+pustym `<Series>`, oraz każdy PDF. Kolumna służy wyłącznie regule rozdzielania folderów (§6 pkt 2).
+
 ## 6. Skanowanie biblioteki
 
 Uruchamiane przyciskiem w UI (`POST /scan`), działa w goroutine; UI odpytuje status
@@ -222,6 +230,25 @@ Algorytm:
      liczy się bezpośredni rodzic;
    - plik bezpośrednio w korzeniu → seria z **nazwy pliku** (folder_path = NULL),
      seria tworzona/odnajdowana po nazwie.
+   - **Folder z kilkoma seriami** (przebieg 3, `Scanner.splitMixedFolders`, po synchronizacji
+     plików, przed `ReconcileOneShots`): gdy obecne na dysku pliki *jednego* podfolderu mają
+     co najmniej dwie różne niepuste wartości `<Series>` w ComicInfo.xml (porównanie po
+     `TrimSpace`, bez rozróżniania wielkości liter), folder jest „mieszany". Przenoszone są
+     **tylko zeszyty siedzące jeszcze w serii folderu** (`series.folder_path` = katalog pliku);
+     zeszyt, który już leży w serii wirtualnej, nie jest nigdy ruszany — dzięki temu zmiana nazwy
+     (ręczna, z blokadą) lub dopasowanie ComicVine rozdzielonej serii przeżywa kolejne skany.
+     Cel przeniesienia: najpierw seria, w której już leży inny plik tego folderu z tą samą
+     (znormalizowaną) wartością `Series` (pliki dodane później dołączają do przemianowanej
+     serii), w braku takiej — seria wirtualna o tej nazwie (`FindOrCreateSeriesByName`,
+     `folder_path NULL`). Zeszyty bez ComicInfo oraz te, których `Series` równa się nazwie
+     folderu (bez rozróżniania wielkości liter), zostają w serii folderu (druga „Mad Max" byłaby
+     duplikatem; wartość nadal liczy się przy ocenie, czy folder jest mieszany). Reguła patrzy na
+     pliki fizycznie w folderze, więc jest idempotentna. Folder ze spójną wartością `Series`
+     (nawet inną niż nazwa folderu) albo z ComicInfo tylko w części plików **nie** jest dzielony —
+     folder = seria pozostaje regułą. Blokada metadanych ani dopasowanie ComicVine nie chronią
+     przed pierwszym rozdzieleniem (blokada dotyczy tekstu metadanych). Opróżniona seria folderu
+     zostaje w bazie (listy ukrywają serie bez zeszytów). Przykład: `Mad Max/` z „Mad Max: Fury
+     Road" i „Mad Max: Fury Road: Max" → dwie serie.
 3. **Parsowanie nazwy pliku** (bez rozszerzenia) — kolejno próbowane wzorce:
    - `Tytuł #012` → seria "Tytuł", numer "012" (konwencja starego projektu),
    - `Tytuł 012 (2020)` → seria "Tytuł", numer "012", rok "2020",

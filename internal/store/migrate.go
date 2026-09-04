@@ -85,6 +85,14 @@ var migrations = []string{
 	ALTER TABLE reading_progress_v4 RENAME TO reading_progress;
 	CREATE INDEX idx_progress_issue ON reading_progress(issue_id);
 	`,
+
+	// 5: the Series value from the file's ComicInfo.xml, kept separately from
+	// the (editable) series row so the scanner can split a folder whose files
+	// belong to different series. NULL = not inspected yet (rows from before
+	// this migration, backfilled by the next scan), '' = no ComicInfo/Series.
+	`
+	ALTER TABLE issues ADD COLUMN comicinfo_series TEXT;
+	`,
 }
 
 func migrate(db *sql.DB) error {
