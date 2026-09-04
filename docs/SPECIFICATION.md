@@ -63,7 +63,7 @@ ComicNextClaude/
 ├── Dockerfile                   # obraz: static binary w distroless, wolumeny /comics /config /data (§4a)
 ├── docker-compose.yml           # przykład uruchomienia dla użytkowników
 ├── .dockerignore
-├── logo.png                     # źródło ikony aplikacji (1254 px); favicony w web/static są z niego skalowane
+├── imgs/                        # logo.png (źródło ikony, 1254 px; favicony w web/static są z niego skalowane) i screeny do README
 ├── config_example.yaml          # wzorzec konfiguracji z opisem każdej opcji (wersjonowany, §4)
 ├── config.yaml                  # tworzony przy pierwszym starcie (gitignore)
 └── data/                        # runtime: database.sqlite, covers/ (gitignore)
@@ -322,7 +322,7 @@ Gdy OPDS jest wyłączony, trasy nie są rejestrowane (404 z catch-alla).
 Każdy feed niesie `<icon>` z absolutnym adresem `/static/favicon.png` (192×192) — czytniki pokazują
 ją obok nazwy katalogu. Ikona leży pod `/static`, czyli poza Basic auth, więc czytnik pobierze ją
 także bez poświadczeń. Ta sama grafika (`web/static/favicon.png`, `favicon-32.png`, `favicon.ico`, `apple-touch-icon.png` —
-wszystkie przeskalowane z `logo.png` w korzeniu repozytorium, które jest źródłem ikony)
+wszystkie przeskalowane z `imgs/logo.png`, które jest źródłem ikony)
 jest faviconem stron WWW: linki w `<head>` layoutu, loginu i czytnika oraz trasa `GET /favicon.ico`
 (poza logowaniem, poza logiem żądań).
 
