@@ -57,8 +57,9 @@ ComicNextClaude/
 │   └── server/                  # handlery HTTP, routing, renderowanie szablonów (+ opds.go: katalog OPDS)
 ├── web/
 │   ├── templates/               # layout.html + widoki + partiale HTMX
-│   └── static/                  # htmx.min.js, styles.css, placeholder.svg, favicon.{svg,ico,png}, apple-touch-icon.png
+│   └── static/                  # htmx.min.js, styles.css, placeholder.svg, favicon.png, favicon-32.png, favicon.ico, apple-touch-icon.png
 ├── docs/                        # ta dokumentacja
+├── logo.png                     # źródło ikony aplikacji (1254 px); favicony w web/static są z niego skalowane
 ├── config_example.yaml          # wzorzec konfiguracji z opisem każdej opcji (wersjonowany, §4)
 ├── config.yaml                  # tworzony przy pierwszym starcie (gitignore)
 └── data/                        # runtime: database.sqlite, covers/ (gitignore)
@@ -286,7 +287,8 @@ Gdy OPDS jest wyłączony, trasy nie są rejestrowane (404 z catch-alla).
 
 Każdy feed niesie `<icon>` z absolutnym adresem `/static/favicon.png` (192×192) — czytniki pokazują
 ją obok nazwy katalogu. Ikona leży pod `/static`, czyli poza Basic auth, więc czytnik pobierze ją
-także bez poświadczeń. Ta sama grafika (`web/static/favicon.svg`, `.ico`, `apple-touch-icon.png`)
+także bez poświadczeń. Ta sama grafika (`web/static/favicon.png`, `favicon-32.png`, `favicon.ico`, `apple-touch-icon.png` —
+wszystkie przeskalowane z `logo.png` w korzeniu repozytorium, które jest źródłem ikony)
 jest faviconem stron WWW: linki w `<head>` layoutu, loginu i czytnika oraz trasa `GET /favicon.ico`
 (poza logowaniem, poza logiem żądań).
 

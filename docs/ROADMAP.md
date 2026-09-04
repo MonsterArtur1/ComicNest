@@ -65,7 +65,7 @@ i coś pokazywała. Szczegóły projektowe: [SPECIFICATION.md](SPECIFICATION.md)
 - [x] Ręczne oznaczanie zeszytu jako przeczytany / nieprzeczytany (przyciski na stronie zeszytu i na liście serii, `POST /issues/{id}/read|unread`, powrót przez `next`)
 - [x] Grid biblioteki: zielony znaczek ✓ na przeczytanych seriach i filtry (nieczytane / w trakcie / przeczytane / bez ComicVine / brakujące pliki) obok sortowania; agregaty czytania w `ListSeries` (`SeriesFilter`)
 - [x] Paginacja gridu biblioteki (`?page=N`, pager z oknem stron, sortowanie/filtr zachowane) — liczba kafelków na stronę w `config.yaml` (`page_size`, domyślnie 60, 0 = bez paginacji)
-- [x] Ikona aplikacji (stos komiksów w kolorze akcentu): `favicon.svg` + `favicon.ico` + `apple-touch-icon.png` w `<head>` każdej strony i pod `/favicon.ico` (bez logowania); w OPDS jako `<icon>` każdego feedu i `<Image>` w OpenSearch (`/static/favicon.png`)
+- [x] Ikona aplikacji z `logo.png` (pisklę czytające komiks w gnieździe; źródło 1254 px w korzeniu repo, warianty generowane przez skalowanie po przycięciu do obrysu): `favicon.png` 192 px + `favicon-32.png` + `favicon.ico` + `apple-touch-icon.png` w `<head>` każdej strony i pod `/favicon.ico` (bez logowania); w OPDS jako `<icon>` każdego feedu i `<Image>` w OpenSearch (`/static/favicon.png`)
 
 ## Pomysły na v2 (nie robić teraz)
 - Czytnik: tryb dwóch stron obok siebie, kierunek czytania manga (prawo→lewo)
