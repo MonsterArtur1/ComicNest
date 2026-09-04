@@ -57,8 +57,11 @@ ComicNextClaude/
 │   └── server/                  # handlery HTTP, routing, renderowanie szablonów (+ opds.go: katalog OPDS)
 ├── web/
 │   ├── templates/               # layout.html + widoki + partiale HTMX
-│   └── static/                  # htmx.min.js, styles.css, placeholder.jpg
+│   └── static/                  # htmx.min.js, styles.css, placeholder.svg, favicon.png, favicon-32.png, favicon.ico, apple-touch-icon.png
 ├── docs/                        # ta dokumentacja
+├── .github/workflows/go.yml  # CI: testy + binaria (Win/Linux/macOS) po każdym commicie, pre-release "latest" z main, wydania z tagów v*
+├── logo.png                     # źródło ikony aplikacji (1254 px); favicony w web/static są z niego skalowane
+├── config_example.yaml          # wzorzec konfiguracji z opisem każdej opcji (wersjonowany, §4)
 ├── config.yaml                  # tworzony przy pierwszym starcie (gitignore)
 └── data/                        # runtime: database.sqlite, covers/ (gitignore)
 ```
@@ -72,6 +75,7 @@ library: "D:/Library"          # korzeń biblioteki komiksów
 data_dir: "./data"             # baza sqlite + cache okładek
 comicvine_api_key: ""          # puste = funkcje ComicVine wyłączone (UI to komunikuje)
 opds_enabled: false            # katalog OPDS pod /opds (patrz §9a)
+page_size: 60                  # kafelków serii na stronę biblioteki; 0 = bez paginacji
 users:                         # konta; puste = brak logowania (jeden anonimowy czytelnik)
   - name: artur
     password: sekret           # plaintext — świadomie (osobista aplikacja w LAN)
@@ -80,6 +84,12 @@ users:                         # konta; puste = brak logowania (jeden anonimowy 
 ```
 
 Przy braku pliku aplikacja zapisuje domyślny config i loguje instrukcję uzupełnienia.
+
+**Plik `config_example.yaml`** (w korzeniu repozytorium, wersjonowany) jest wzorcem dla użytkownika
+i jedynym pełnym spisem opcji: każdy klucz ma tam komentarz mówiący, co robi i jakie wartości
+przyjmuje. **Zasada:** każda zmiana w konfiguracji (nowy klucz, zmiana nazwy lub domyślnej wartości,
+usunięcie) trafia w tym samym commicie do `config_example.yaml` razem z opisem — a także do bloku
+powyżej i do README. Prawdziwy `config.yaml` (z hasłami i kluczem API) pozostaje w `.gitignore`.
 Klucz API **nigdy nie trafia do kodu** (w starym projekcie był zahardkodowany — patrz §10).
 
 **Konta użytkowników (`users`).** Jedno źródło prawdy dla logowania do WWW (formularz
@@ -90,6 +100,10 @@ Postęp czytania jest per użytkownik (§5). Walidacja: nazwa i hasło wymagane,
 (`user = ''`). Hasła do OPDS pochodzą wyłącznie z `users` — dawna sekcja `opds` (z `username`/`password`)
 została usunięta, a włącznik katalogu to klucz `opds_enabled`. Przy starcie z kontami postęp anonimowy przechodzi na
 pierwsze konto z listy (`Store.AdoptAnonymousProgress`).
+
+**Paginacja biblioteki (`page_size`).** Widok główny dzieli przefiltrowaną listę serii na strony po
+`page_size` kafelków (domyślnie 60; parametr `?page=N`, sortowanie i filtr zachowane w linkach pagera).
+`0` wyłącza paginację, wartość ujemna to błąd konfiguracji. Nie dotyczy OPDS (stała 50 wpisów).
 
 Domyślnie nasłuch tylko na `localhost`. `listen: 0.0.0.0` wystawia aplikację w sieci lokalnej —
 wtedy warto zdefiniować `users`, bo bez kont UI (także edycja metadanych) jest otwarte.
@@ -272,6 +286,13 @@ czytnik; zalogowany użytkownik trafia do kontekstu żądania, więc `pse:lastRe
 czytane" i postęp ze strumieniowania są jego. Bez kont katalog jest otwarty (czytelnik anonimowy).
 Gdy OPDS jest wyłączony, trasy nie są rejestrowane (404 z catch-alla).
 
+Każdy feed niesie `<icon>` z absolutnym adresem `/static/favicon.png` (192×192) — czytniki pokazują
+ją obok nazwy katalogu. Ikona leży pod `/static`, czyli poza Basic auth, więc czytnik pobierze ją
+także bez poświadczeń. Ta sama grafika (`web/static/favicon.png`, `favicon-32.png`, `favicon.ico`, `apple-touch-icon.png` —
+wszystkie przeskalowane z `logo.png` w korzeniu repozytorium, które jest źródłem ikony)
+jest faviconem stron WWW: linki w `<head>` layoutu, loginu i czytnika oraz trasa `GET /favicon.ico`
+(poza logowaniem, poza logiem żądań).
+
 | Ścieżka | Feed |
 |---|---|
 | `GET /opds` | nawigacyjny root: „Wszystkie serie", „Aktualnie czytane", „Ostatnio dodane" + link `search` |
@@ -281,7 +302,7 @@ Gdy OPDS jest wyłączony, trasy nie są rejestrowane (404 z catch-alla).
 | `GET /opds/reading` | akwizycyjny „Aktualnie czytane": zeszyty z `reading_progress`, których ostatnia strona < liczba stron (lub liczba stron nieznana), wg ostatniego czytania (LIMIT 100) |
 | `GET /opds/issues/{id}/pages/{n}?width=W` | strona `n` (0-based) z archiwum CBZ/CBR (OPDS-PSE); bez `width` oryginalny plik z typem po rozszerzeniu, z `width` przeskalowanie do W px (max 4000) i JPEG; pobranie strony zapisuje postęp `n+1` (`MAX` z dotychczasowym); 404 poza zakresem, dla PDF i brakujących plików |
 | `GET /opds/search?q=` | akwizycyjny: jedna płaska lista zeszytów po nazwie serii / tytule / numerze (LIMIT 200) |
-| `GET /opds/opensearch.xml` | OpenSearch description z szablonem `…/opds/search?q={searchTerms}` |
+| `GET /opds/opensearch.xml` | OpenSearch description z szablonem `…/opds/search?q={searchTerms}` i `<Image>` (ikona katalogu) |
 | `GET /opds/issues/{id}/file` | ten sam handler co `/issues/{id}/download` (Range/HEAD przez `http.ServeFile`) |
 | `GET /opds/issues/{id}/cover` | ten sam handler co `/issues/{id}/cover` |
 

@@ -19,6 +19,18 @@ import (
 	"comicnest/web"
 )
 
+// Version is the build version shown in the page footer. main stamps it from
+// the binary; "dev" (a local `go build`) shows nothing.
+var Version = "dev"
+
+// displayVersion returns the version for the UI, or "" for local builds.
+func displayVersion() string {
+	if Version == "" || Version == "dev" {
+		return ""
+	}
+	return Version
+}
+
 // Server holds application dependencies shared by all HTTP handlers.
 type Server struct {
 	cfg       config.Config
@@ -62,7 +74,10 @@ func (s *Server) funcMap() template.FuncMap {
 		"prettySize":  prettySize,
 		"sourceLabel": sourceLabel,
 		"truncate":    truncateText,
+		"inc":         func(n int) int { return n + 1 },
+		"dec":         func(n int) int { return n - 1 },
 		"opdsEnabled": func() bool { return s.cfg.OPDSEnabled },
+		"appVersion":  displayVersion,
 		"canRead":     canStreamPages, // in-browser reader works for CBZ/CBR only
 		// currentUser is overridden per request in renderStatus; this default
 		// only satisfies parse-time resolution.
@@ -159,6 +174,10 @@ func (s *Server) routes() {
 		panic(err) // embedded FS layout is fixed at compile time
 	}
 	s.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
+	// Browsers and some OPDS readers probe /favicon.ico directly.
+	s.mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFileFS(w, r, static, "favicon.ico")
+	})
 	s.mux.HandleFunc("GET /{$}", s.handleHome)
 	s.mux.HandleFunc("GET /login", s.handleLoginForm)
 	s.mux.HandleFunc("POST /login", s.handleLogin)
@@ -209,7 +228,7 @@ func (w *statusWriter) WriteHeader(status int) {
 func (s *Server) withLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
-		if strings.HasPrefix(p, "/static/") || p == "/scan/status" ||
+		if strings.HasPrefix(p, "/static/") || p == "/favicon.ico" || p == "/scan/status" ||
 			strings.HasSuffix(p, "/scrape/status") || strings.HasSuffix(p, "/cover") {
 			next.ServeHTTP(w, r)
 			return

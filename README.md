@@ -3,7 +3,7 @@
 Osobisty katalog komiksów jako aplikacja webowa — jedno binarium Go, lokalny serwer,
 biblioteka na Twoim dysku. Inspirowany [Komgą](https://komga.org/), ale prostszy i własny.
 
-![Go](https://img.shields.io/badge/Go-1.24+-00ADD8) ![SQLite](https://img.shields.io/badge/SQLite-bez%20cgo-lightgrey)
+![Go](https://img.shields.io/badge/Go-1.25+-00ADD8) ![Build](https://github.com/MonsterArtur1/ComicNest/actions/workflows/go.yml/badge.svg) ![SQLite](https://img.shields.io/badge/SQLite-bez%20cgo-lightgrey)
 
 ## Funkcje
 
@@ -27,7 +27,16 @@ biblioteka na Twoim dysku. Inspirowany [Komgą](https://komga.org/), ale prostsz
 
 ## Uruchomienie
 
-Wymagany Go 1.24+ (kompilacja bez cgo — działa od ręki na Windows).
+Gotowe binaria (Windows, Linux, macOS) są w zakładce **Releases** na GitHubie: pre-release
+`latest` to build z ostatniego commita na `main`, wydania `vX.Y.Z` to wersje stabilne. Obok
+binarium leży `config_example.yaml`. Nowe wydanie publikuje się tagiem:
+
+```
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+Do kompilacji ze źródeł wymagany Go 1.25+ (bez cgo — działa od ręki na Windows).
 
 ```
 go build -o comicnest.exe ./cmd/comicnest
@@ -40,6 +49,10 @@ localhost; brak logowania — to aplikacja osobista). Kliknij **Skanuj bibliotek
 
 ## Konfiguracja (`config.yaml`)
 
+Pełny, opisany spis opcji znajduje się w `config_example.yaml` w repozytorium — każdy klucz ma
+tam komentarz z wyjaśnieniem. Możesz skopiować go jako `config.yaml` i dostosować. Gdy w aplikacji
+pojawia się nowa opcja, ląduje najpierw właśnie tam, razem z opisem.
+
 ```yaml
 port: 8080
 listen: localhost            # "0.0.0.0", żeby inne urządzenia w sieci widziały serwer
@@ -47,6 +60,7 @@ library: "D:/Komiksy"        # korzeń biblioteki komiksów
 data_dir: "./data"           # baza SQLite + cache okładek
 comicvine_api_key: ""        # klucz z https://comicvine.gamespot.com/api/
 opds_enabled: false          # katalog OPDS pod http://…/opds
+page_size: 60                # serii na stronę biblioteki (0 = wszystko na jednej stronie)
 users:                       # konta (opcjonalne); puste = brak logowania
   - name: artur
     password: sekret         # hasło zapisane jawnie

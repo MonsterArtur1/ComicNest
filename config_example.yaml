@@ -1,11 +1,16 @@
-port: 8080
-library: "D:/Library"
-data_dir: ./data
-listen: 0.0.0.0
-comicvine_api_key: ""
+# Przykładowa konfiguracja ComicNest. Skopiuj do config.yaml obok binarium
+# i dostosuj. Każdy klucz obsługiwany przez aplikację ma tu wpis z opisem —
+# przy dodawaniu nowej opcji uzupełnij ten plik (patrz SPECIFICATION §4).
+
+port: 8080                    # port HTTP serwera
+listen: 0.0.0.0               # interfejs nasłuchu: "localhost" = tylko ten komputer, "0.0.0.0" = cała sieć lokalna (potrzebne czytnikom OPDS)
+library: "D:/Library"         # korzeń biblioteki komiksów (skanowany rekursywnie: cbz/cbr/pdf)
+data_dir: ./data              # dane runtime: baza SQLite (database.sqlite) i cache okładek (covers/)
+comicvine_api_key: ""         # klucz z https://comicvine.gamespot.com/api/; puste = dopasowanie/scrape ComicVine wyłączone (UI to komunikuje)
 opds_enabled: true            # katalog OPDS pod /opds (patrz §9a); logowanie kontami z `users`
-users:
-  - name: artur
-    password: sekret
-  - name: kasia
+page_size: 60                 # kafelków serii na stronę biblioteki; 0 = bez paginacji
+users:                        # konta (opcjonalne); brak sekcji = bez logowania, jeden anonimowy czytelnik
+  - name: artur               # nazwa do logowania w WWW i OPDS (Basic auth) — bez znaku ":"
+    password: sekret          # hasło zapisane jawnym tekstem (świadomie: osobista aplikacja w LAN)
+  - name: kasia               # każde konto ma własny postęp czytania
     password: inne

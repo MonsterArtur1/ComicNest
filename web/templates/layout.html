@@ -4,13 +4,17 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{block "title" .}}ComicNest{{end}}</title>
+    <link rel="icon" href="/static/favicon-32.png" type="image/png" sizes="32x32">
+    <link rel="icon" href="/static/favicon.png" type="image/png" sizes="192x192">
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+    <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
     <link rel="stylesheet" href="/static/styles.css">
     {{if opdsEnabled}}<link rel="alternate" type="application/atom+xml;profile=opds-catalog;kind=navigation" title="ComicNest OPDS" href="/opds">{{end}}
     <script src="/static/htmx.min.js" defer></script>
 </head>
 <body>
 <header class="topbar">
-    <a class="brand" href="/">Comic<span>Nest</span></a>
+    <a class="brand" href="/"><img class="brand-logo" src="/static/favicon.png" alt="" width="32" height="32"><span class="brand-name">Comic<span>Nest</span></span></a>
     <form class="search" action="/search" method="get">
         <input type="search" name="q" placeholder="Szukaj serii lub zeszytu…" value="{{block "searchQuery" .}}{{end}}">
     </form>

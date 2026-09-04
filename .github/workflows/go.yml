@@ -1,26 +1,28 @@
-# Buduje ComicNest po każdym commicie: testy + binaria na kilka platform.
+# Builds ComicNest on every commit: tests + binaries for several platforms.
 #
-# - push na dowolną gałąź i pull request: go vet, go test, kompilacja na
-#   Windows/Linux/macOS; binaria trafiają do artefaktów workflow (90 dni).
-# - push na main: dodatkowo odświeżany jest pre-release "latest" z binariami,
-#   więc najnowszą wersję da się zawsze pobrać z zakładki Releases.
-# - tag v* (np. v1.2.0): pełne wydanie z binariami i notatkami z historii commitów.
+# - push to main and pull requests: go vet, go test, cross-compilation for
+#   Windows/Linux/macOS; binaries are kept as workflow artifacts (90 days).
+# - push to main: additionally refreshes the "latest" pre-release with the
+#   binaries, so the newest build can always be downloaded from Releases.
+# - tag v* (e.g. v1.2.0): full release with binaries and generated notes.
+#   Publish with: git tag v1.2.0 && git push origin v1.2.0
 name: Build
 
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
 permissions:
-  contents: write # potrzebne do publikowania release'ów
+  contents: write # required to publish releases
 
 env:
   GO_VERSION: "1.25"
 
 jobs:
   test:
-    name: Testy
+    name: Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +35,7 @@ jobs:
         run: go test ./...
 
   build:
-    name: Binarium ${{ matrix.goos }}/${{ matrix.goarch }}
+    name: Binary ${{ matrix.goos }}/${{ matrix.goarch }}
     needs: test
     runs-on: ubuntu-latest
     strategy:
@@ -46,11 +48,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # git describe potrzebuje tagów
+          fetch-depth: 0 # git describe needs the tags
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-      - name: Wersja
+      - name: Version
         id: ver
         run: echo "version=$(git describe --tags --always --dirty)" >> "$GITHUB_OUTPUT"
       - name: go build
@@ -71,18 +73,18 @@ jobs:
           retention-days: 90
 
   release:
-    name: Publikacja
+    name: Publish
     needs: build
-    # Pre-release "latest" po każdym commicie na main, pełne wydanie po tagu v*.
+    # "latest" pre-release after every commit on main, full release on a v* tag.
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
-    concurrency: release-${{ github.ref }} # dwa szybkie pushe na main nie ścigają się o "latest"
+    concurrency: release-${{ github.ref }} # two quick pushes to main must not race for "latest"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - name: Zbierz binaria
+      - name: Collect binaries
         run: |
           mkdir -p dist
           find artifacts -type f -name 'comicnest-*' -exec cp {} dist/ \;
@@ -96,9 +98,9 @@ jobs:
           gh release delete latest --cleanup-tag --yes || true
           gh release create latest dist/* \
             --prerelease --target "$GITHUB_SHA" \
-            --title "Najnowsza wersja (main @ ${GITHUB_SHA::7})" \
-            --notes "Automatyczny build z commita ${GITHUB_SHA} na gałęzi main. Ta wersja jest nadpisywana po każdym commicie — do stabilnej instalacji użyj wydania z numerem."
-      - name: Wydanie z tagu
+            --title "Latest build (main @ ${GITHUB_SHA::7})" \
+            --notes "Automatic build of commit ${GITHUB_SHA} on the main branch. This release is overwritten on every commit — for a stable install use a numbered release."
+      - name: Tagged release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}

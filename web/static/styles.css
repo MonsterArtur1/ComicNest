@@ -130,11 +130,16 @@ code {
 }
 
 .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
     font-size: 20px;
     font-weight: 700;
     letter-spacing: 0.5px;
 }
-.brand span { color: var(--accent); }
+.brand-name { white-space: nowrap; }
+.brand-name span { color: var(--accent); }
+.brand-logo { width: 32px; height: 32px; border-radius: 7px; flex-shrink: 0; }
 
 .search { flex: 1; max-width: 420px; }
 .search input {
@@ -172,7 +177,8 @@ code {
     border: 1px solid var(--border);
     border-radius: var(--radius);
 }
-.login-box .brand { margin: 0 0 6px; font-size: 26px; }
+.login-box .brand { display: flex; justify-content: center; margin: 0 0 6px; font-size: 26px; }
+.login-box .brand-logo { width: 40px; height: 40px; border-radius: 9px; }
 .login-hint { color: var(--text-dim); font-size: 13px; margin: 0 0 16px; }
 .login-form { display: flex; flex-direction: column; gap: 12px; }
 .login-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-dim); }
@@ -356,6 +362,30 @@ details.desc .series-desc { margin: 12px 0 4px; }
 }
 .chip:hover { color: var(--text); border-color: var(--text-dim); }
 .chip.active { color: var(--accent); border-color: var(--accent); }
+
+/* --- library pager --- */
+.pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 28px 0 12px;
+    font-size: 14px;
+}
+.pager-pages { display: flex; align-items: center; gap: 4px; }
+.pager-link, .pager-num {
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+}
+.pager-num { min-width: 34px; text-align: center; }
+.pager-link:hover, .pager-num:hover { color: var(--text); border-color: var(--text-dim); }
+.pager-num.active { color: var(--accent); border-color: var(--accent); }
+.pager-link.disabled { opacity: 0.4; pointer-events: none; }
+.pager-gap { color: var(--text-dim); padding: 0 4px; }
+.pager-info { flex-basis: 100%; text-align: center; color: var(--text-dim); font-size: 13px; }
 
 /* --- issue list --- */
 .issue-list { list-style: none; margin: 0; padding: 0; }
@@ -638,6 +668,17 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 /* --- empty state --- */
+/* --- library footer: version + GitHub link (CI builds only) --- */
+.site-footer {
+    margin: 48px 0 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: 14px;
+}
+.site-footer a { color: var(--text-dim); }
+.site-footer a:hover { color: var(--accent); }
+
 .empty-state {
     margin-top: 80px;
     text-align: center;
