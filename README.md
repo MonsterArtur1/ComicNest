@@ -3,7 +3,7 @@
 Osobisty katalog komiksów jako aplikacja webowa — jedno binarium Go, lokalny serwer,
 biblioteka na Twoim dysku. Inspirowany [Komgą](https://komga.org/), ale prostszy i własny.
 
-![Go](https://img.shields.io/badge/Go-1.24+-00ADD8) ![SQLite](https://img.shields.io/badge/SQLite-bez%20cgo-lightgrey)
+![Go](https://img.shields.io/badge/Go-1.25+-00ADD8) ![Build](https://github.com/MonsterArtur1/ComicNest/actions/workflows/build.yml/badge.svg) ![SQLite](https://img.shields.io/badge/SQLite-bez%20cgo-lightgrey)
 
 ## Funkcje
 
@@ -27,7 +27,11 @@ biblioteka na Twoim dysku. Inspirowany [Komgą](https://komga.org/), ale prostsz
 
 ## Uruchomienie
 
-Wymagany Go 1.24+ (kompilacja bez cgo — działa od ręki na Windows).
+Gotowe binaria (Windows, Linux, macOS) są w zakładce **Releases** na GitHubie: pre-release
+`latest` to build z ostatniego commita na `main`, wydania `vX.Y.Z` to wersje stabilne. Obok
+binarium leży `config_example.yaml`.
+
+Do kompilacji ze źródeł wymagany Go 1.25+ (bez cgo — działa od ręki na Windows).
 
 ```
 go build -o comicnest.exe ./cmd/comicnest

@@ -19,6 +19,18 @@ import (
 	"comicnest/web"
 )
 
+// Version is the build version shown in the page footer. main stamps it from
+// the binary; "dev" (a local `go build`) shows nothing.
+var Version = "dev"
+
+// displayVersion returns the version for the UI, or "" for local builds.
+func displayVersion() string {
+	if Version == "" || Version == "dev" {
+		return ""
+	}
+	return Version
+}
+
 // Server holds application dependencies shared by all HTTP handlers.
 type Server struct {
 	cfg       config.Config
@@ -65,6 +77,7 @@ func (s *Server) funcMap() template.FuncMap {
 		"inc":         func(n int) int { return n + 1 },
 		"dec":         func(n int) int { return n - 1 },
 		"opdsEnabled": func() bool { return s.cfg.OPDSEnabled },
+		"appVersion":  displayVersion,
 		"canRead":     canStreamPages, // in-browser reader works for CBZ/CBR only
 		// currentUser is overridden per request in renderStatus; this default
 		// only satisfies parse-time resolution.

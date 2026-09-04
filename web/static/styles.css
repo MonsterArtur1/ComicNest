@@ -668,6 +668,17 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 /* --- empty state --- */
+/* --- library footer: version + GitHub link (CI builds only) --- */
+.site-footer {
+    margin: 48px 0 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: 14px;
+}
+.site-footer a { color: var(--text-dim); }
+.site-footer a:hover { color: var(--accent); }
+
 .empty-state {
     margin-top: 80px;
     text-align: center;

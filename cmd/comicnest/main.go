@@ -14,7 +14,13 @@ import (
 	"comicnest/internal/store"
 )
 
+// version is stamped by the build (-ldflags "-X main.version=…"); "dev" for
+// plain `go build` / `go run`.
+var version = "dev"
+
 func main() {
+	log.Printf("ComicNest %s", version)
+	server.Version = version
 	cfg, err := config.Load("config.yaml")
 	if err != nil {
 		log.Fatalf("config: %v", err)
