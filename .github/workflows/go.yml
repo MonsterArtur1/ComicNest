@@ -119,7 +119,9 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.image.outputs.image }}:${{ github.ref_name }}
+          tags: |
+            ${{ steps.image.outputs.image }}:${{ github.ref_name }}
+            ${{ steps.image.outputs.image }}:latest
           build-args: |
             GO_VERSION=${{ env.GO_VERSION }}
             VERSION=${{ github.ref_name }}
