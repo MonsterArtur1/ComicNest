@@ -77,6 +77,7 @@ i coś pokazywała. Szczegóły projektowe: [SPECIFICATION.md](SPECIFICATION.md)
 - Zapis metadanych do ComicInfo.xml w archiwum
 - Konwertowanie PDF do CBR/CBZ
 - Nowe sekcje w OPDS: Przeczytane, nieczytane
+- pliki z rokiem w nazwie sa zle parsowane jako numery (The Boys 48 - Proper Preparation and Planning 1 (2010) (Digital-1920) (Kingpin-Empire).cbz rozpoznany jako #1 The Boys 52 - Barbary Coast 1 (2011) (HD) (digital-Empire).cbz)
 - Opcja łączenia 2 pozycji, jesli sa tą samą serią (przypadek Dantes)
 - Opcja usuniecia danych ComicVine z pozycji. (odpiecia z dopasowania)
 - Jesli jest zlinkowane z comicVine, link zeby otworzyc strone ComicVine danej pozycji
