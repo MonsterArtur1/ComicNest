@@ -71,6 +71,7 @@ i coś pokazywała. Szczegóły projektowe: [SPECIFICATION.md](SPECIFICATION.md)
 - [x] Fix: folder z kilkoma seriami wg ComicInfo (np. `Mad Max/` z „Mad Max: Fury Road" i „Mad Max: Fury Road: Max") był jedną serią. Skan zapamiętuje `<Series>` z ComicInfo (`issues.comicinfo_series`, migracja 5; backfill przy pierwszym skanie, NULL przy nieczytelnym archiwum = ponowna próba) i w przebiegu 3 (`splitMixedFolders`) rozdziela folder z ≥2 różnymi wartościami: przenosi tylko zeszyty siedzące jeszcze w serii folderu, do serii, w której już są inne pliki folderu z tą samą wartością, a dopiero w braku takiej do serii wirtualnej o tej nazwie — więc ręczna zmiana nazwy lub dopasowanie ComicVine rozdzielonej serii przeżywa kolejne skany; wartość równa nazwie folderu zostaje w serii folderu; folder ze spójną wartością lub bez ComicInfo bez zmian (SPECIFICATION §5, §6 pkt 2; testy `scanner_test.go`)
 
 ## Pomysły na v2 (nie robić teraz)
+- Panel admina, z mozliwoscia dodawania uzytkownikow w runtime. I uprawnien do uzywania ComicVine/skanowania library
 - Czytnik: tryb dwóch stron obok siebie, kierunek czytania manga (prawo→lewo)
 - Zapis metadanych do ComicInfo.xml w archiwum
 - Okładki z PDF
