@@ -72,8 +72,15 @@ i coś pokazywała. Szczegóły projektowe: [SPECIFICATION.md](SPECIFICATION.md)
 
 ## Pomysły na v2 (nie robić teraz)
 - Panel admina, z mozliwoscia dodawania uzytkownikow w runtime. I uprawnien do uzywania ComicVine/skanowania library
+- Co jeszcze  mozna dodac do panelu admina/settingsow?
 - Czytnik: tryb dwóch stron obok siebie, kierunek czytania manga (prawo→lewo)
 - Zapis metadanych do ComicInfo.xml w archiwum
-- Okładki z PDF
+- Konwertowanie PDF do CBR/CBZ
+- Nowe sekcje w OPDS: Przeczytane, nieczytane
+- Opcja łączenia 2 pozycji, jesli sa tą samą serią (przypadek Dantes)
+- Opcja usuniecia danych ComicVine z pozycji. (odpiecia z dopasowania)
+- Jesli jest zlinkowane z comicVine, link zeby otworzyc strone ComicVine danej pozycji
 - Obserwowanie zmian w bibliotece (fsnotify)
+- Jesli postep czytania to 0% nie oznaczaj jako rozpoczety czytanie
+- Deadpool polska - na comicvine nie ma nic poza okladka, wiec jest ignorowany. niech nie bedzie
 - Kolekcje / listy czytelnicze
