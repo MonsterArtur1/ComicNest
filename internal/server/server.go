@@ -191,6 +191,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /series/{id}/edit", s.handleSeriesEditForm)
 	s.mux.HandleFunc("POST /series/{id}", s.handleSeriesEditSave)
 	s.mux.HandleFunc("POST /series/{id}/unlock", s.handleSeriesUnlock)
+	s.mux.HandleFunc("POST /series/{id}/merge", s.handleSeriesMerge)
 	s.mux.HandleFunc("GET /series/{id}/match", s.handleMatchPage)
 	s.mux.HandleFunc("POST /series/{id}/match/{volumeID}", s.handleMatchSave)
 	s.mux.HandleFunc("POST /series/{id}/scrape", s.handleSeriesScrape)

@@ -44,6 +44,15 @@
         <label>Wydawca
             <input type="text" name="publisher" value="{{.Issue.Publisher}}">
         </label>
+        <label>Seria
+            <select name="series_id">
+                {{$current := .Issue.SeriesID}}
+                {{range .Series}}
+                <option value="{{.ID}}" {{if eq .ID $current}}selected{{end}}>{{.Name}}{{if .FolderPath.Valid}} · {{.FolderPath.String}}{{else}} · wirtualna{{end}}</option>
+                {{end}}
+            </select>
+        </label>
+        <p class="hint">Zmiana serii przenosi ten zeszyt do wybranej pozycji — przydatne, gdy trafił do złego katalogu.</p>
         <p class="hint">Zapis oznacza metadane jako ręczne 🔒 — skan i ComicVine ich nie nadpiszą.</p>
         <div class="form-actions">
             <button type="submit" class="btn-primary">Zapisz</button>

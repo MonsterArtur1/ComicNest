@@ -37,4 +37,22 @@
     <button type="submit" class="btn">Zdejmij blokadę</button>
 </form>
 {{end}}
+
+{{if .Options}}
+<form class="merge-form" action="/series/{{.Series.ID}}/merge" method="post"
+      onsubmit="return confirm('Połączyć tę serię z wybraną? Wszystkie jej zeszyty trafią do docelowej serii, a ta pozycja zniknie.');">
+    <label>Połącz z inną serią
+        <select name="into_id" required>
+            <option value="">— wybierz serię docelową —</option>
+            {{range .Options}}
+            <option value="{{.ID}}">{{.Name}}{{if .FolderPath.Valid}} · {{.FolderPath.String}}{{else}} · wirtualna{{end}} · {{.IssueCount}} {{if eq .IssueCount 1}}zeszyt{{else}}zeszytów{{end}}</option>
+            {{end}}
+        </select>
+    </label>
+    <p class="hint">Użyj tego, gdy ten sam tytuł został skatalogowany dwukrotnie jako osobne pozycje (np. z dwóch folderów). Wszystkie zeszyty przejdą do wybranej serii, a ta zostanie usunięta.</p>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-danger">Połącz serie</button>
+    </div>
+</form>
+{{end}}
 {{end}}

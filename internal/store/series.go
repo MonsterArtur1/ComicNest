@@ -1,6 +1,9 @@
 package store
 
-import "database/sql"
+import (
+	"database/sql"
+	"errors"
+)
 
 // Series is a comic series row plus aggregates used by list views.
 type Series struct {
@@ -128,6 +131,40 @@ func (s *Store) EnrichSeriesFromComicVine(id int64, name, publisher, description
 			updated_at  = datetime('now')
 		WHERE id = ? AND metadata_locked = 0`, name, name, publisher, description, id)
 	return err
+}
+
+// MergeSeries moves every issue from one series into another and deletes the
+// now-empty source series. Used when two library entries turn out to be the
+// same series (e.g. two folders scraped separately, corrected to the same
+// name). The target keeps its own metadata, filling only fields it still has
+// empty from the source, and is never itself locked or renamed by the merge.
+func (s *Store) MergeSeries(fromID, intoID int64) error {
+	if fromID == intoID {
+		return errors.New("cannot merge a series into itself")
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`
+		UPDATE series SET
+			publisher   = CASE WHEN publisher   = '' THEN (SELECT publisher FROM series WHERE id = ?) ELSE publisher END,
+			description = CASE WHEN description = '' THEN (SELECT description FROM series WHERE id = ?) ELSE description END,
+			updated_at  = datetime('now')
+		WHERE id = ?`, fromID, fromID, intoID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
+		UPDATE issues SET series_id = ?, updated_at = datetime('now')
+		WHERE series_id = ?`, intoID, fromID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM series WHERE id = ?`, fromID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // FindOrCreateSeriesByFolder returns the series backed by the given library
