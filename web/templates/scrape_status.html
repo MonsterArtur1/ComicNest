@@ -16,6 +16,13 @@
         </form>
         {{end}}
         <a class="btn" href="/series/{{.SeriesID}}/match">{{if .Matched}}Zmień dopasowanie{{else}}Dopasuj w ComicVine{{end}}</a>
+        {{if .Matched}}
+        <form hx-post="/series/{{.SeriesID}}/match/unlink" hx-target="#scrape-area" hx-swap="innerHTML"
+              action="/series/{{.SeriesID}}/match/unlink" method="post"
+              onsubmit="return confirm('Usunąć dopasowanie serii do ComicVine? Niezablokowane zeszyty pobrane z tego wolumenu wrócą do danych z pliku.');">
+            <button type="submit" class="btn btn-danger" title="Usuń dopasowanie serii do ComicVine">Usuń dopasowanie</button>
+        </form>
+        {{end}}
     {{else}}
     <span class="scan-note" title="Ustaw comicvine_api_key w config.yaml">ComicVine wyłączone (brak klucza API)</span>
     {{end}}

@@ -362,6 +362,39 @@ func (s *Server) handleMatchSave(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/series/"+strconv.FormatInt(series.ID, 10), http.StatusSeeOther)
 }
 
+// handleMatchUnlink removes the series' ComicVine volume match and rolls
+// back issues that came from it (see store.ClearSeriesComicVineVolume).
+func (s *Server) handleMatchUnlink(w http.ResponseWriter, r *http.Request) {
+	series := s.getSeriesFromPath(w, r)
+	if series == nil {
+		return
+	}
+	if err := s.store.ClearSeriesComicVineVolume(series.ID); err != nil {
+		s.serverError(w, err)
+		return
+	}
+	if r.Header.Get("HX-Request") == "true" {
+		series.ComicVineVolumeID = sql.NullInt64{}
+		s.renderPartial(w, "scrape_status.html", "scrape-status", s.scrapeDataFor(series))
+		return
+	}
+	http.Redirect(w, r, "/series/"+strconv.FormatInt(series.ID, 10), http.StatusSeeOther)
+}
+
+// handleIssueScrapeUnlink undoes a single issue's ComicVine match (see
+// store.ClearIssueComicVine).
+func (s *Server) handleIssueScrapeUnlink(w http.ResponseWriter, r *http.Request) {
+	issue := s.getIssueFromPath(w, r)
+	if issue == nil {
+		return
+	}
+	if err := s.store.ClearIssueComicVine(issue.ID); err != nil {
+		s.serverError(w, err)
+		return
+	}
+	http.Redirect(w, r, "/issues/"+strconv.FormatInt(issue.ID, 10)+"?msg=cv_unlinked", http.StatusSeeOther)
+}
+
 // --- helpers ---
 
 // applyComicVine overrides issue fields with non-empty ComicVine values.

@@ -300,6 +300,23 @@ func (s *Store) UpdateIssueMetadata(i *Issue) error {
 	return err
 }
 
+// ClearIssueComicVine undoes a single issue's ComicVine match: the matched
+// id is forgotten and the metadata source falls back to what the file
+// itself carries (ComicInfo.xml when present, else the filename), so a
+// future scan or scrape can pick the issue up again. Fields ComicVine wrote
+// (title, summary, credits...) are left as they are — only the "this came
+// from ComicVine" tag and id are removed, mirroring how unlocking keeps data
+// while lifting the write-protection.
+func (s *Store) ClearIssueComicVine(id int64) error {
+	_, err := s.db.Exec(`
+		UPDATE issues SET comicvine_issue_id = NULL,
+			metadata_source = CASE WHEN has_comicinfo THEN ? ELSE ? END,
+			updated_at = datetime('now')
+		WHERE id = ? AND metadata_source = ?`,
+		SourceComicInfo, SourceFilename, id, SourceComicVine)
+	return err
+}
+
 // SetIssueLocked toggles the issue metadata lock. Unlocking keeps the manual
 // data but lets a future explicit scrape overwrite it.
 func (s *Store) SetIssueLocked(id int64, locked bool) error {

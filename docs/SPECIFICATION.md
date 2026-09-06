@@ -303,6 +303,13 @@ starego projektu: brał ślepo pierwszy wynik wyszukiwania):
    zaktualizuj rekord (`metadata_source='comicvine'`) + pobierz okładkę z ComicVine
    do cache (zastępuje miniaturę z archiwum, bo zwykle lepsza).
 4. Rekordy `metadata_locked=1` pomijane z informacją w UI.
+5. Cofnięcie dopasowania: „Usuń dopasowanie" na stronie serii (`POST /series/{id}/match/unlink`)
+   czyści `series.comicvine_volume_id` i kaskadowo cofa jej niezablokowane zeszyty ze
+   źródłem `comicvine` (`comicvine_issue_id` → NULL, `metadata_source` → `comicinfo`/`filename`
+   wg `has_comicinfo`) — zablokowane zeszyty (edycja ręczna) zostają nietknięte. Osobno,
+   „Usuń dopasowanie ComicVine" przy zeszycie (`POST /issues/{id}/scrape/unlink`) cofa tylko
+   ten jeden zeszyt tym samym mechanizmem; pobrane wcześniej dane (tytuł, opis, twórcy…)
+   zostają — usuwany jest tylko sam znacznik źródła i dopasowany numer ComicVine.
 
 ## 9. Interfejs WWW — widoki i routing
 
