@@ -221,6 +221,44 @@ func TestOPDSRecentAndSearch(t *testing.T) {
 	}
 }
 
+func TestOPDSReadUnread(t *testing.T) {
+	srv, _ := newTestServer(t, true)
+	h := srv.Handler()
+
+	body := assertXML(t, get(t, h, "/opds", nil))
+	for _, want := range []string{
+		`href="http://nas.local:8080/opds/unread"`,
+		`href="http://nas.local:8080/opds/read"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("root feed missing %q\n%s", want, body)
+		}
+	}
+
+	// Never opened: shows up as unread, not as read.
+	body = assertXML(t, get(t, h, "/opds/unread", nil))
+	if !strings.Contains(body, "/opds/issues/1/file") {
+		t.Errorf("unread feed should list the untouched issue:\n%s", body)
+	}
+	body = assertXML(t, get(t, h, "/opds/read", nil))
+	if strings.Contains(body, "<entry>") {
+		t.Errorf("read feed should be empty before anything is read:\n%s", body)
+	}
+
+	// Finish the issue (3 pages) and it moves from unread to read.
+	if err := srv.store.SetReadingProgress("", 1, 3); err != nil {
+		t.Fatalf("SetReadingProgress: %v", err)
+	}
+	body = assertXML(t, get(t, h, "/opds/read", nil))
+	if !strings.Contains(body, "/opds/issues/1/file") {
+		t.Errorf("read feed should list the finished issue:\n%s", body)
+	}
+	body = assertXML(t, get(t, h, "/opds/unread", nil))
+	if strings.Contains(body, "<entry>") {
+		t.Errorf("unread feed should be empty once the only issue is read:\n%s", body)
+	}
+}
+
 func TestOPDSFileDownload(t *testing.T) {
 	srv, cbz := newTestServer(t, true)
 	rec := get(t, srv.Handler(), "/opds/issues/1/file", nil)
