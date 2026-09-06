@@ -1,6 +1,9 @@
 package store
 
-import "database/sql"
+import (
+	"database/sql"
+	"errors"
+)
 
 // Series is a comic series row plus aggregates used by list views.
 type Series struct {
@@ -10,6 +13,7 @@ type Series struct {
 	Publisher         string
 	Description       string
 	ComicVineVolumeID sql.NullInt64
+	ComicVineURL      string // comicvine.gamespot.com page, set together with ComicVineVolumeID
 	MetadataLocked    bool
 	OneShot           bool // single publication, not part of any series
 	CreatedAt         string
@@ -20,7 +24,7 @@ type Series struct {
 
 	// Reading aggregates over issues present on disk (list views only).
 	IssuesPresent int // issues whose file exists
-	IssuesStarted int // present issues with any reading progress
+	IssuesStarted int // present issues with real reading progress (page 2+, or finished)
 	IssuesRead    int // present issues read to the last page
 }
 
@@ -39,12 +43,12 @@ func (s *Store) GetSeries(id int64) (*Series, error) {
 	var sr Series
 	err := s.db.QueryRow(`
 		SELECT s.id, s.name, s.folder_path, s.publisher, s.description,
-		       s.comicvine_volume_id, s.metadata_locked, s.one_shot,
+		       s.comicvine_volume_id, s.comicvine_url, s.metadata_locked, s.one_shot,
 		       s.created_at, s.updated_at,
 		       (SELECT COUNT(*) FROM issues i WHERE i.series_id = s.id)
 		FROM series s WHERE s.id = ?`, id).
 		Scan(&sr.ID, &sr.Name, &sr.FolderPath, &sr.Publisher, &sr.Description,
-			&sr.ComicVineVolumeID, &sr.MetadataLocked, &sr.OneShot,
+			&sr.ComicVineVolumeID, &sr.ComicVineURL, &sr.MetadataLocked, &sr.OneShot,
 			&sr.CreatedAt, &sr.UpdatedAt, &sr.IssueCount)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -108,11 +112,39 @@ func (s *Store) ReconcileOneShots() error {
 // SetSeriesComicVineVolume records the user's ComicVine volume match. The
 // match itself is allowed even on locked series — the lock protects metadata
 // text, not the mapping.
-func (s *Store) SetSeriesComicVineVolume(id, volumeID int64) error {
+func (s *Store) SetSeriesComicVineVolume(id, volumeID int64, url string) error {
 	_, err := s.db.Exec(`
-		UPDATE series SET comicvine_volume_id = ?, updated_at = datetime('now')
-		WHERE id = ?`, volumeID, id)
+		UPDATE series SET comicvine_volume_id = ?, comicvine_url = ?, updated_at = datetime('now')
+		WHERE id = ?`, volumeID, url, id)
 	return err
+}
+
+// ClearSeriesComicVineVolume removes the series' ComicVine volume match and
+// rolls back its unlocked issues that came from that volume — their matched
+// id and metadata source are reset, same as ClearIssueComicVine — so a
+// future rematch starts clean instead of silently keeping stale ComicVine
+// ids around. Locked issues (the user's own edits) are left untouched.
+func (s *Store) ClearSeriesComicVineVolume(id int64) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`
+		UPDATE issues SET comicvine_issue_id = NULL, comicvine_url = '',
+			metadata_source = CASE WHEN has_comicinfo THEN ? ELSE ? END,
+			updated_at = datetime('now')
+		WHERE series_id = ? AND metadata_locked = 0 AND metadata_source = ?`,
+		SourceComicInfo, SourceFilename, id, SourceComicVine); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
+		UPDATE series SET comicvine_volume_id = NULL, comicvine_url = '', updated_at = datetime('now')
+		WHERE id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // EnrichSeriesFromComicVine applies ComicVine volume data to an unlocked
@@ -130,11 +162,82 @@ func (s *Store) EnrichSeriesFromComicVine(id int64, name, publisher, description
 	return err
 }
 
+// MergeSeries moves every issue from one series into another and deletes the
+// now-empty source series. Used when two library entries turn out to be the
+// same series (e.g. two folders scraped separately, corrected to the same
+// name). The target keeps its own metadata, filling only fields it still has
+// empty from the source, and is never itself locked or renamed by the merge.
+//
+// The source's own folder (or, for a virtual series, its own name) is
+// recorded as an alias to the target: a rescan resolves it there instead of
+// finding nothing, recreating the deleted series, and silently undoing the
+// merge. Aliases that already pointed at the source, from an earlier merge,
+// are repointed to the target too, so chained merges keep working.
+func (s *Store) MergeSeries(fromID, intoID int64) error {
+	if fromID == intoID {
+		return errors.New("cannot merge a series into itself")
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`
+		INSERT INTO series_folder_aliases (folder_path, series_id)
+		SELECT folder_path, ? FROM series WHERE id = ? AND folder_path IS NOT NULL
+		ON CONFLICT(folder_path) DO UPDATE SET series_id = excluded.series_id`,
+		intoID, fromID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO series_name_aliases (name, series_id)
+		SELECT name, ? FROM series WHERE id = ? AND folder_path IS NULL
+		ON CONFLICT(name) DO UPDATE SET series_id = excluded.series_id`,
+		intoID, fromID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE series_folder_aliases SET series_id = ? WHERE series_id = ?`, intoID, fromID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE series_name_aliases SET series_id = ? WHERE series_id = ?`, intoID, fromID); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(`
+		UPDATE series SET
+			publisher   = CASE WHEN publisher   = '' THEN (SELECT publisher FROM series WHERE id = ?) ELSE publisher END,
+			description = CASE WHEN description = '' THEN (SELECT description FROM series WHERE id = ?) ELSE description END,
+			updated_at  = datetime('now')
+		WHERE id = ?`, fromID, fromID, intoID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
+		UPDATE issues SET series_id = ?, updated_at = datetime('now')
+		WHERE series_id = ?`, intoID, fromID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM series WHERE id = ?`, fromID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // FindOrCreateSeriesByFolder returns the series backed by the given library
-// folder (relative path), creating it with the folder's base name when absent.
+// folder (relative path), creating it with the folder's base name when
+// absent. A folder that used to back its own series, merged away since (see
+// MergeSeries), resolves to the merge target instead of creating a fresh
+// series and silently undoing the merge.
 func (s *Store) FindOrCreateSeriesByFolder(folderPath, name string) (int64, error) {
 	var id int64
 	err := s.db.QueryRow(`SELECT id FROM series WHERE folder_path = ?`, folderPath).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if err != sql.ErrNoRows {
+		return 0, err
+	}
+	err = s.db.QueryRow(`SELECT series_id FROM series_folder_aliases WHERE folder_path = ?`, folderPath).Scan(&id)
 	if err == nil {
 		return id, nil
 	}
@@ -149,12 +252,22 @@ func (s *Store) FindOrCreateSeriesByFolder(folderPath, name string) (int64, erro
 }
 
 // FindOrCreateSeriesByName returns the "virtual" series (no backing folder)
-// with the given name, creating it when absent. Name match is case-insensitive.
+// with the given name, creating it when absent. Name match is
+// case-insensitive. A name that used to back its own virtual series, merged
+// away since (see MergeSeries), resolves to the merge target instead of
+// creating a fresh series and silently undoing the merge.
 func (s *Store) FindOrCreateSeriesByName(name string) (int64, error) {
 	var id int64
 	err := s.db.QueryRow(`
 		SELECT id FROM series
 		WHERE folder_path IS NULL AND name = ? COLLATE NOCASE`, name).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if err != sql.ErrNoRows {
+		return 0, err
+	}
+	err = s.db.QueryRow(`SELECT series_id FROM series_name_aliases WHERE name = ?`, name).Scan(&id)
 	if err == nil {
 		return id, nil
 	}
@@ -227,6 +340,9 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 	// An issue counts as read when its progress reached the page total
 	// (archive count, else metadata count); unknown totals never count.
 	const total = `CASE WHEN i.file_pages > 0 THEN i.file_pages ELSE i.page_count END`
+	// A lone first page (opened and closed right away) does not count as
+	// "started" — only real progress (page 2+) or an outright finish does.
+	const started = `rp.page IS NOT NULL AND (rp.page > 1 OR (` + total + ` > 0 AND rp.page >= ` + total + `))`
 
 	// The cover endpoint falls back to a placeholder on its own, so the
 	// representative issue is simply the series' first one.
@@ -242,7 +358,7 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 		           LIMIT 1
 		       ), 0),
 		       COALESCE(SUM(i.file_missing = 0), 0) AS present_cnt,
-		       COALESCE(SUM(i.file_missing = 0 AND rp.page IS NOT NULL), 0) AS started_cnt,
+		       COALESCE(SUM(i.file_missing = 0 AND ` + started + `), 0) AS started_cnt,
 		       COALESCE(SUM(i.file_missing = 0 AND rp.page IS NOT NULL
 		                    AND ` + total + ` > 0 AND rp.page >= ` + total + `), 0) AS read_cnt
 		FROM series s

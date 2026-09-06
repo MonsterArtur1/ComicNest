@@ -33,9 +33,12 @@
             </span>
             {{if .Description}}<p class="cv-desc">{{.Description}}</p>{{end}}
         </div>
-        <form action="/series/{{$.Series.ID}}/match/{{.ID}}" method="post">
-            <button type="submit" class="btn-primary">Wybierz</button>
-        </form>
+        <div class="cv-candidate-actions">
+            {{if .URL}}<a class="btn" href="{{.URL}}" target="_blank" rel="noopener">Otwórz stronę ↗</a>{{end}}
+            <form action="/series/{{$.Series.ID}}/match/{{.ID}}" method="post">
+                <button type="submit" class="btn-primary">Wybierz</button>
+            </form>
+        </div>
     </li>
     {{end}}
 </ul>

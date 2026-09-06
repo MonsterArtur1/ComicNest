@@ -93,6 +93,29 @@ var migrations = []string{
 	`
 	ALTER TABLE issues ADD COLUMN comicinfo_series TEXT;
 	`,
+
+	// 6: the ComicVine site page for a matched volume/issue, so the UI can
+	// link straight to it instead of just showing the numeric id.
+	`
+	ALTER TABLE series ADD COLUMN comicvine_url TEXT NOT NULL DEFAULT '';
+	ALTER TABLE issues ADD COLUMN comicvine_url TEXT NOT NULL DEFAULT '';
+	`,
+
+	// 7: aliases remembering how a series merged away (MergeSeries) used to be
+	// found — by its own library folder, or by its own name when it was a
+	// virtual (folder-less) series. Without this, a rescan re-resolves that
+	// folder/name to nothing, recreates the deleted series from scratch, and
+	// silently undoes the merge (see Store.FindOrCreateSeriesByFolder/Name).
+	`
+	CREATE TABLE series_folder_aliases (
+		folder_path TEXT PRIMARY KEY,
+		series_id   INTEGER NOT NULL REFERENCES series(id) ON DELETE CASCADE
+	);
+	CREATE TABLE series_name_aliases (
+		name        TEXT PRIMARY KEY COLLATE NOCASE,
+		series_id   INTEGER NOT NULL REFERENCES series(id) ON DELETE CASCADE
+	);
+	`,
 }
 
 func migrate(db *sql.DB) error {

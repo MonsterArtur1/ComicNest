@@ -10,7 +10,7 @@ type Parsed struct {
 	Series string // empty when nothing before the number looked like a series name
 	Number string // issue number as text ("012", "12.1", "Annual 1" stays in Title fallback)
 	Year   string // "2020" when a (YYYY) group is present
-	Title  string // fallback: whole cleaned name when no pattern matched
+	Title  string // subtitle after the issue number, or (no number found) the whole cleaned name
 }
 
 var (
@@ -52,18 +52,20 @@ func ParseFilename(name string) Parsed {
 		}
 	}
 
-	// Pattern 2/3: "Title 012 (2020)" or "Title v2 015" — the number is the
-	// last standalone whitespace-delimited token, whatever precedes it
-	// (including a "v2" volume marker) stays part of the series name.
-	if fields := strings.Fields(base); len(fields) > 0 {
-		last := fields[len(fields)-1]
-		if numberToken.MatchString(last) {
-			series := cleanSeriesSuffix(strings.Join(fields[:len(fields)-1], " "))
-			return Parsed{
-				Series: series,
-				Number: last,
-				Year:   year,
-			}
+	// Pattern 2/3: "Title 012 (2020)", "Title v2 015" or "Title 052 - Subtitle
+	// 1" — the issue number is the first standalone whitespace-delimited
+	// number token, skipping one that looks like an embedded year (e.g. the
+	// "2000" in "2000 AD 1957") as long as a later number token exists to use
+	// instead. Whatever precedes the chosen number (a "v2" volume marker
+	// included) stays the series name; whatever follows becomes the title
+	// instead of being mistaken for a second issue number (e.g. a subtitle
+	// like "Barbary Coast 1" that itself ends in a digit).
+	if series, number, title, ok := parseNumberedTitle(base); ok {
+		return Parsed{
+			Series: series,
+			Number: number,
+			Year:   year,
+			Title:  title,
 		}
 	}
 
@@ -120,4 +122,52 @@ func cleanSeriesSuffix(s string) string {
 	}
 	s = strings.TrimSuffix(s, ",")
 	return strings.TrimSpace(s)
+}
+
+// cleanTitlePrefix trims a leading "-" or "," left over after removing the
+// issue number from a subtitle candidate.
+func cleanTitlePrefix(s string) string {
+	s = strings.TrimSpace(s)
+	if strings.HasPrefix(s, "-") {
+		s = strings.TrimSpace(strings.TrimPrefix(s, "-"))
+	}
+	s = strings.TrimPrefix(s, ",")
+	return strings.TrimSpace(s)
+}
+
+// parseNumberedTitle splits base into a series/number/title triple around
+// its issue number token, or reports ok=false when it has none.
+//
+// The issue number is the first whitespace-delimited token made of digits
+// only — except when it looks like a bare embedded year (1900-2099, e.g. the
+// "2000" in "2000 AD 1957") and a later number token exists to use instead;
+// that later token is preferred and the year-like one stays part of the
+// series name. This keeps "2000 AD 1957" reading as series "2000 AD" #1957,
+// and "The Boys 52 - Barbary Coast 1" as series "The Boys" #52 with subtitle
+// "Barbary Coast 1", rather than picking up a subtitle's own trailing digit.
+func parseNumberedTitle(base string) (series, number, title string, ok bool) {
+	fields := strings.Fields(base)
+	var candidates []int
+	for i, f := range fields {
+		if numberToken.MatchString(f) {
+			candidates = append(candidates, i)
+		}
+	}
+	if len(candidates) == 0 {
+		return "", "", "", false
+	}
+
+	chosen := candidates[len(candidates)-1]
+	for ci, idx := range candidates {
+		if yearToken.MatchString(fields[idx]) && ci != len(candidates)-1 {
+			continue // looks like an embedded year, and a later number exists
+		}
+		chosen = idx
+		break
+	}
+
+	series = cleanSeriesSuffix(strings.Join(fields[:chosen], " "))
+	number = fields[chosen]
+	title = cleanTitlePrefix(strings.Join(fields[chosen+1:], " "))
+	return series, number, title, true
 }

@@ -102,6 +102,7 @@ type volumeRaw struct {
 	Description   string           `json:"description"`
 	Image         *imageField      `json:"image"`
 	Issues        []volumeIssueRaw `json:"issues"`
+	SiteDetailURL string           `json:"site_detail_url"`
 }
 
 // volumeIssueRaw is the wire format for one entry of a volume's issue list.
@@ -127,6 +128,7 @@ type issueRaw struct {
 	Description   string         `json:"description"`
 	Image         *imageField    `json:"image"`
 	PersonCredits []personCredit `json:"person_credits"`
+	SiteDetailURL string         `json:"site_detail_url"`
 }
 
 // Volume is a ComicVine volume (roughly: a comic series/run).
@@ -138,6 +140,7 @@ type Volume struct {
 	CountOfIssues int
 	Description   string // plain text (HTML stripped)
 	ImageURL      string // small cover URL, may be empty
+	URL           string // comicvine.gamespot.com page for this volume
 }
 
 // VolumeIssue is one entry of a volume's issue list.
@@ -158,6 +161,7 @@ type Issue struct {
 	Writers     string // comma-joined person names with a writer role
 	Artists     string // comma-joined names with penciler/artist/inker role
 	ImageURL    string // medium cover URL preferred, small as fallback
+	URL         string // comicvine.gamespot.com page for this issue
 }
 
 // volumeFromRaw converts the wire format into the public Volume type.
@@ -168,6 +172,7 @@ func volumeFromRaw(v volumeRaw) Volume {
 		StartYear:     v.StartYear,
 		CountOfIssues: v.CountOfIssues,
 		Description:   StripHTML(v.Description),
+		URL:           v.SiteDetailURL,
 	}
 	if v.Publisher != nil {
 		vol.Publisher = v.Publisher.Name
@@ -273,7 +278,7 @@ func (c *Client) SearchVolumes(query string) ([]Volume, error) {
 	params.Set("resources", "volume")
 	params.Set("query", query)
 	params.Set("limit", "20")
-	params.Set("field_list", "id,name,start_year,publisher,count_of_issues,description,image")
+	params.Set("field_list", "id,name,start_year,publisher,count_of_issues,description,image,site_detail_url")
 
 	raw, err := c.doRequest("/search/", params)
 	if err != nil {
@@ -299,7 +304,7 @@ func (c *Client) GetVolume(id int) (*Volume, []VolumeIssue, error) {
 	}
 
 	params := url.Values{}
-	params.Set("field_list", "id,name,start_year,publisher,count_of_issues,description,image,issues")
+	params.Set("field_list", "id,name,start_year,publisher,count_of_issues,description,image,issues,site_detail_url")
 
 	raw, err := c.doRequest(fmt.Sprintf("/volume/4050-%d/", id), params)
 	if err != nil {
@@ -332,7 +337,7 @@ func (c *Client) GetIssue(id int) (*Issue, error) {
 	}
 
 	params := url.Values{}
-	params.Set("field_list", "id,name,issue_number,cover_date,store_date,description,image,person_credits")
+	params.Set("field_list", "id,name,issue_number,cover_date,store_date,description,image,person_credits,site_detail_url")
 
 	raw, err := c.doRequest(fmt.Sprintf("/issue/4000-%d/", id), params)
 	if err != nil {
@@ -351,6 +356,7 @@ func (c *Client) GetIssue(id int) (*Issue, error) {
 		CoverDate:   normalizeDate(item.CoverDate),
 		StoreDate:   normalizeDate(item.StoreDate),
 		Description: StripHTML(item.Description),
+		URL:         item.SiteDetailURL,
 	}
 
 	if item.Image != nil {

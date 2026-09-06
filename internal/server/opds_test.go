@@ -221,6 +221,58 @@ func TestOPDSRecentAndSearch(t *testing.T) {
 	}
 }
 
+func TestOPDSReadUnread(t *testing.T) {
+	srv, _ := newTestServer(t, true)
+	h := srv.Handler()
+
+	body := assertXML(t, get(t, h, "/opds", nil))
+	for _, want := range []string{
+		`href="http://nas.local:8080/opds/unread"`,
+		`href="http://nas.local:8080/opds/read"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("root feed missing %q\n%s", want, body)
+		}
+	}
+
+	// Never opened: shows up as unread, not as read.
+	body = assertXML(t, get(t, h, "/opds/unread", nil))
+	if !strings.Contains(body, "/opds/issues/1/file") {
+		t.Errorf("unread feed should list the untouched issue:\n%s", body)
+	}
+	body = assertXML(t, get(t, h, "/opds/read", nil))
+	if strings.Contains(body, "<entry>") {
+		t.Errorf("read feed should be empty before anything is read:\n%s", body)
+	}
+
+	// Only the first page seen (opened and closed right away) still counts
+	// as unread, not as read or in progress.
+	if err := srv.store.SetReadingProgress("", 1, 1); err != nil {
+		t.Fatalf("SetReadingProgress: %v", err)
+	}
+	body = assertXML(t, get(t, h, "/opds/unread", nil))
+	if !strings.Contains(body, "/opds/issues/1/file") {
+		t.Errorf("unread feed should still list an issue with only its first page seen:\n%s", body)
+	}
+	body = assertXML(t, get(t, h, "/opds/reading", nil))
+	if strings.Contains(body, "<entry>") {
+		t.Errorf("reading feed should not list an issue with only its first page seen:\n%s", body)
+	}
+
+	// Finish the issue (3 pages) and it moves from unread to read.
+	if err := srv.store.SetReadingProgress("", 1, 3); err != nil {
+		t.Fatalf("SetReadingProgress: %v", err)
+	}
+	body = assertXML(t, get(t, h, "/opds/read", nil))
+	if !strings.Contains(body, "/opds/issues/1/file") {
+		t.Errorf("read feed should list the finished issue:\n%s", body)
+	}
+	body = assertXML(t, get(t, h, "/opds/unread", nil))
+	if strings.Contains(body, "<entry>") {
+		t.Errorf("unread feed should be empty once the only issue is read:\n%s", body)
+	}
+}
+
 func TestOPDSFileDownload(t *testing.T) {
 	srv, cbz := newTestServer(t, true)
 	rec := get(t, srv.Handler(), "/opds/issues/1/file", nil)
@@ -404,8 +456,15 @@ func TestHomeFiltersAndReadMark(t *testing.T) {
 		t.Error("'all' and unknown filters should list everything")
 	}
 
-	// Start reading → in progress.
+	// Opening and immediately closing (just the first page) must not count
+	// as "started" — it should still read as unread.
 	get(t, h, "/opds/issues/1/pages/0", nil)
+	if !lists("unread") || lists("reading") || lists("read") || hasMark() {
+		t.Error("a series with only its first page opened should still be listed as unread")
+	}
+
+	// Real progress (a second page) → in progress.
+	get(t, h, "/opds/issues/1/pages/1", nil)
 	if lists("unread") || !lists("reading") || lists("read") || hasMark() {
 		t.Error("started series should be listed only under 'reading', without the read mark")
 	}

@@ -249,10 +249,27 @@ Algorytm:
      przed pierwszym rozdzieleniem (blokada dotyczy tekstu metadanych). Opróżniona seria folderu
      zostaje w bazie (listy ukrywają serie bez zeszytów). Przykład: `Mad Max/` z „Mad Max: Fury
      Road" i „Mad Max: Fury Road: Max" → dwie serie.
+   - **Ręczne scalanie serii** (edycja serii → „Połącz z inną serią", `POST /series/{id}/merge`,
+     `Store.MergeSeries`): wszystkie zeszyty źródłowej serii przenoszone do docelowej (docelowa
+     zachowuje własne metadane, uzupełniane tylko pustymi polami źródłowej), źródłowa kasowana.
+     Sposób, w jaki źródłowa była dotąd odnajdywana — jej `folder_path` (seria z folderu) albo,
+     dla serii wirtualnej, jej `name` — zapisywany jest jako alias na docelową
+     (`series_folder_aliases` / `series_name_aliases`, migracja 7); `FindOrCreateSeriesByFolder`/
+     `FindOrCreateSeriesByName` sprawdzają te tabele, zanim utworzą nową serię. Bez tego kolejny
+     skan nie znajdowałby już wpisu dla tego folderu/nazwy i tworzyłby go od nowa — cichym
+     skutkiem byłoby rozłączenie właśnie scalonej serii przy każdym skanie. Aliasy wskazujące
+     wcześniej na źródłową (z poprzedniego scalenia) są przy kolejnym scaleniu przepinane na nowy
+     cel, więc łańcuchy scaleń (A→B, potem B→C) też przeżywają skan.
 3. **Parsowanie nazwy pliku** (bez rozszerzenia) — kolejno próbowane wzorce:
    - `Tytuł #012` → seria "Tytuł", numer "012" (konwencja starego projektu),
    - `Tytuł 012 (2020)` → seria "Tytuł", numer "012", rok "2020",
    - `Tytuł v2 015` → seria "Tytuł v2", numer "015",
+   - `Tytuł 052 - Podtytuł 1` → seria "Tytuł", numer "052", tytuł zeszytu "Podtytuł 1" —
+     numerem jest **pierwsza** napotkana liczba (nie ostatnia), żeby cyfra kończąca
+     podtytuł (np. "Barbary Coast 1") nie została wzięta za numer zeszytu zamiast
+     prawdziwego numeru stojącego zaraz po nazwie serii. Liczba wyglądająca jak rok
+     (1900–2099) jest pomijana na rzecz kolejnej liczby w nazwie, o ile taka istnieje
+     (np. `2000 AD 1957` → seria "2000 AD", numer "1957", nie "2000"),
    - brak dopasowania → cała nazwa jako tytuł zeszytu, numer pusty.
 4. Dla **nowego pliku**: wstaw rekord; jeśli CBZ/CBR — spróbuj wczytać `ComicInfo.xml`
    (nadpisuje dane z nazwy pliku, `metadata_source='comicinfo'`); wyciągnij okładkę
@@ -295,14 +312,25 @@ Przepływ dopasowania — **zawsze z potwierdzeniem użytkownika** (największa 
 starego projektu: brał ślepo pierwszy wynik wyszukiwania):
 
 1. Na stronie serii: „Dopasuj w ComicVine" → `POST /series/{id}/match` → lista
-   kandydatów (okładka, nazwa, wydawca, rok startu, liczba zeszytów) w modalu HTMX.
-2. Użytkownik wybiera → zapis `comicvine_volume_id` na serii.
+   kandydatów (okładka, nazwa, wydawca, rok startu, liczba zeszytów) w modalu HTMX,
+   każdy z przyciskiem „Otwórz stronę ↗" (link do `site_detail_url` na comicvine.gamespot.com,
+   żeby zweryfikować kandydata przed wyborem) obok „Wybierz".
+2. Użytkownik wybiera → zapis `comicvine_volume_id` + `comicvine_url` (`site_detail_url` z API) na serii.
 3. „Pobierz metadane" przy zeszycie (lub „dla wszystkich brakujących" na serii):
    po `comicvine_volume_id` pobierz listę zeszytów wolumenu, dopasuj po
    `issue_number` (porównanie znormalizowane: trim zer wiodących), pobierz szczegóły,
-   zaktualizuj rekord (`metadata_source='comicvine'`) + pobierz okładkę z ComicVine
-   do cache (zastępuje miniaturę z archiwum, bo zwykle lepsza).
+   zaktualizuj rekord (`metadata_source='comicvine'`, `comicvine_url`) + pobierz okładkę
+   z ComicVine do cache (zastępuje miniaturę z archiwum, bo zwykle lepsza). Zapisany
+   `comicvine_url` (serii i zeszytu) pokazuje się jako link „Zobacz na ComicVine ↗" na
+   stronie serii (pasek akcji) i na stronie zeszytu.
 4. Rekordy `metadata_locked=1` pomijane z informacją w UI.
+5. Cofnięcie dopasowania: „Usuń dopasowanie" na stronie serii (`POST /series/{id}/match/unlink`)
+   czyści `series.comicvine_volume_id` + `comicvine_url` i kaskadowo cofa jej niezablokowane
+   zeszyty ze źródłem `comicvine` (`comicvine_issue_id`/`comicvine_url` → NULL/'', `metadata_source`
+   → `comicinfo`/`filename` wg `has_comicinfo`) — zablokowane zeszyty (edycja ręczna) zostają
+   nietknięte. Osobno, „Usuń dopasowanie ComicVine" przy zeszycie (`POST /issues/{id}/scrape/unlink`)
+   cofa tylko ten jeden zeszyt tym samym mechanizmem; pobrane wcześniej dane (tytuł, opis, twórcy…)
+   zostają — usuwany jest tylko sam znacznik źródła, link i dopasowany numer ComicVine.
 
 ## 9. Interfejs WWW — widoki i routing
 
@@ -314,7 +342,7 @@ postępu skanu, dialogu dopasowania ComicVine. Każdy widok działa też bez JS
 | Metoda i ścieżka | Widok / akcja |
 |---|---|
 | `GET /login` → `POST /login` (`name`, `password`, `next`) / `POST /logout` | logowanie (tylko gdy `users` zdefiniowane; bez kont → redirect na `/`). Middleware `withAuth`: bez sesji GET → 303 na `/login?next=…`, inne metody → 401; `/opds/*`, `/login`, `/logout`, `/static/*` poza bramką. Nazwa użytkownika w kontekście żądania (`userFrom(r)`), w layoucie „👤 nazwa" + „Wyloguj" (`currentUser` bindowane per żądanie na klonie szablonu) |
-| `GET /?sort=&filter=` | grid serii (okładka, nazwa, liczba zeszytów, zielony znaczek ✓ gdy wszystkie dostępne zeszyty przeczytane); sort: nazwa / ostatnio dodane; filtry: wszystkie / nieczytane (żaden zeszyt nie ma postępu) / w trakcie czytania (jest postęp, nie wszystko skończone) / przeczytane (każdy dostępny zeszyt doczytany, ≥1 zeszyt) / bez metadanych z ComicVine (jakiś zeszyt ze źródłem `filename` lub `comicinfo`) / brakujące pliki (jakiś zeszyt `file_missing`). Agregaty liczone w `ListSeries` (`LEFT JOIN reading_progress`, HAVING) |
+| `GET /?sort=&filter=` | grid serii (okładka, nazwa, liczba zeszytów, zielony znaczek ✓ gdy wszystkie dostępne zeszyty przeczytane); sort: nazwa / ostatnio dodane; filtry: wszystkie / nieczytane (żaden zeszyt nie ma realnego postępu) / w trakcie czytania (jest realny postęp, nie wszystko skończone) / przeczytane (każdy dostępny zeszyt doczytany, ≥1 zeszyt) / bez metadanych z ComicVine (jakiś zeszyt ze źródłem `filename` lub `comicinfo`) / brakujące pliki (jakiś zeszyt `file_missing`). Agregaty liczone w `ListSeries` (`LEFT JOIN reading_progress`, HAVING). Samo otwarcie i zamknięcie zeszytu (tylko strona 1) nie liczy się jako „realny postęp" — próg to strona 2+, albo od razu koniec (zeszyt jednostronicowy) |
 | `GET /series/{id}` | strona serii: metadane + lista zeszytów (okładka, numer, tytuł, data, rozmiar, badge źródła metadanych, pasek postępu czytania pod okładką + „czytane: str. X z N (P%)" / „✓ przeczytane") |
 | `GET /series/{id}/edit` → `POST /series/{id}` | formularz edycji serii (nazwa, wydawca, opis) |
 | `POST /series/{id}/match` / `POST /series/{id}/match/{volumeID}` | wyszukanie kandydatów ComicVine / zapis wyboru |
@@ -355,11 +383,13 @@ jest faviconem stron WWW: linki w `<head>` layoutu, loginu i czytnika oraz trasa
 
 | Ścieżka | Feed |
 |---|---|
-| `GET /opds` | nawigacyjny root: „Wszystkie serie", „Aktualnie czytane", „Ostatnio dodane" + link `search` |
+| `GET /opds` | nawigacyjny root: „Wszystkie serie", „Aktualnie czytane", „Ostatnio dodane", „Nieczytane", „Przeczytane" + link `search` |
 | `GET /opds/series?page=N` | nawigacyjny: serie alfabetycznie (50/stronę, `next`/`previous`, `opensearch:totalResults`); wpis = link `subsection` do feedu serii + okładka pierwszego zeszytu |
 | `GET /opds/series/{id}?page=N` | akwizycyjny: zeszyty serii w kolejności numerów (bez `file_missing`) |
 | `GET /opds/recent?page=N` | akwizycyjny: zeszyty wg `created_at DESC` (rel `sort/new`) |
-| `GET /opds/reading` | akwizycyjny „Aktualnie czytane": zeszyty z `reading_progress`, których ostatnia strona < liczba stron (lub liczba stron nieznana), wg ostatniego czytania (LIMIT 100) |
+| `GET /opds/reading` | akwizycyjny „Aktualnie czytane": zeszyty z `reading_progress`, których ostatnia strona to 2+ i jest niższa niż liczba stron (lub liczba stron nieznana), wg ostatniego czytania (LIMIT 100). Sama strona 1 (otwarcie i zamknięcie) nie liczy się jako rozpoczęte czytanie |
+| `GET /opds/read?page=N` | akwizycyjny „Przeczytane": zeszyty, których ostatnia zapisana strona osiągnęła liczbę stron, wg czasu ukończenia malejąco (50/stronę) |
+| `GET /opds/unread?page=N` | akwizycyjny „Nieczytane": zeszyty bez wpisu w `reading_progress` dla danego użytkownika lub z postępem ograniczonym do samej strony 1 (i nieukończone), wg daty dodania malejąco (50/stronę) |
 | `GET /opds/issues/{id}/pages/{n}?width=W` | strona `n` (0-based) z archiwum CBZ/CBR (OPDS-PSE); bez `width` oryginalny plik z typem po rozszerzeniu, z `width` przeskalowanie do W px (max 4000) i JPEG; pobranie strony zapisuje postęp `n+1` (`MAX` z dotychczasowym); 404 poza zakresem, dla PDF i brakujących plików |
 | `GET /opds/search?q=` | akwizycyjny: jedna płaska lista zeszytów po nazwie serii / tytule / numerze (LIMIT 200) |
 | `GET /opds/opensearch.xml` | OpenSearch description z szablonem `…/opds/search?q={searchTerms}` i `<Image>` (ikona katalogu) |

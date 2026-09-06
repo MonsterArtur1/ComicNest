@@ -71,8 +71,17 @@ i coś pokazywała. Szczegóły projektowe: [SPECIFICATION.md](SPECIFICATION.md)
 - [x] Fix: folder z kilkoma seriami wg ComicInfo (np. `Mad Max/` z „Mad Max: Fury Road" i „Mad Max: Fury Road: Max") był jedną serią. Skan zapamiętuje `<Series>` z ComicInfo (`issues.comicinfo_series`, migracja 5; backfill przy pierwszym skanie, NULL przy nieczytelnym archiwum = ponowna próba) i w przebiegu 3 (`splitMixedFolders`) rozdziela folder z ≥2 różnymi wartościami: przenosi tylko zeszyty siedzące jeszcze w serii folderu, do serii, w której już są inne pliki folderu z tą samą wartością, a dopiero w braku takiej do serii wirtualnej o tej nazwie — więc ręczna zmiana nazwy lub dopasowanie ComicVine rozdzielonej serii przeżywa kolejne skany; wartość równa nazwie folderu zostaje w serii folderu; folder ze spójną wartością lub bez ComicInfo bez zmian (SPECIFICATION §5, §6 pkt 2; testy `scanner_test.go`)
 
 ## Pomysły na v2 (nie robić teraz)
+- Panel admina, z mozliwoscia dodawania uzytkownikow w runtime. I uprawnien do uzywania ComicVine/skanowania library
+- Co jeszcze  mozna dodac do panelu admina/settingsow?
 - Czytnik: tryb dwóch stron obok siebie, kierunek czytania manga (prawo→lewo)
 - Zapis metadanych do ComicInfo.xml w archiwum
-- Okładki z PDF
+- Konwertowanie PDF do CBR/CBZ
+- Nowe sekcje w OPDS: Przeczytane, nieczytane
+- pliki z rokiem w nazwie sa zle parsowane jako numery (The Boys 48 - Proper Preparation and Planning 1 (2010) (Digital-1920) (Kingpin-Empire).cbz rozpoznany jako #1 The Boys 52 - Barbary Coast 1 (2011) (HD) (digital-Empire).cbz)
+- Opcja łączenia 2 pozycji, jesli sa tą samą serią (przypadek Dantes)
+- Opcja usuniecia danych ComicVine z pozycji. (odpiecia z dopasowania)
+- Jesli jest zlinkowane z comicVine, link zeby otworzyc strone ComicVine danej pozycji
 - Obserwowanie zmian w bibliotece (fsnotify)
+- Jesli postep czytania to 0% nie oznaczaj jako rozpoczety czytanie
+- Deadpool polska - na comicvine nie ma nic poza okladka, wiec jest ignorowany. niech nie bedzie
 - Kolekcje / listy czytelnicze

@@ -557,7 +557,7 @@ details.desc .series-desc { margin: 12px 0 4px; }
     color: var(--text-dim);
     flex: 1;
 }
-.edit-form input, .edit-form textarea {
+.edit-form input, .edit-form textarea, .edit-form select, .merge-form select {
     background: var(--bg-raised);
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -598,6 +598,23 @@ details.desc .series-desc { margin: 12px 0 4px; }
     align-items: center;
 }
 
+.merge-form {
+    margin-top: 28px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    max-width: 640px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.merge-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--text-dim);
+}
+
 @media (max-width: 700px) {
     .edit-layout { flex-direction: column; }
     .form-row { flex-direction: column; }
@@ -634,6 +651,8 @@ details.desc .series-desc { margin: 12px 0 4px; }
     background: var(--bg);
 }
 .cv-info { flex: 1; min-width: 0; }
+.cv-candidate-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.cv-candidate-actions .btn, .cv-candidate-actions .btn-primary { text-align: center; white-space: nowrap; }
 .cv-meta { display: block; font-size: 13px; color: var(--text-dim); margin-top: 2px; }
 .cv-desc {
     font-size: 13px;

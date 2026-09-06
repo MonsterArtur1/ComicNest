@@ -34,6 +34,8 @@ func (s *Server) opdsRoutes() {
 	handle("GET /opds/series/{id}", s.handleOPDSSeries)
 	handle("GET /opds/recent", s.handleOPDSRecent)
 	handle("GET /opds/reading", s.handleOPDSReading)
+	handle("GET /opds/read", s.handleOPDSRead)
+	handle("GET /opds/unread", s.handleOPDSUnread)
 	handle("GET /opds/search", s.handleOPDSSearch)
 	handle("GET /opds/opensearch.xml", s.handleOPDSOpenSearch)
 	handle("GET /opds/issues/{id}/file", s.handleIssueDownload)
@@ -137,6 +139,20 @@ func (s *Server) handleOPDSRoot(w http.ResponseWriter, r *http.Request) {
 			Updated: opds.FormatTime(now),
 			Content: &opds.Text{Type: "text", Value: "Zeszyty w kolejności dodania do biblioteki"},
 			Links:   []opds.Link{{Rel: opds.RelNew, Href: base + "/opds/recent", Type: opds.TypeAcquisition}},
+		},
+		{
+			ID:      "urn:comicnest:unread",
+			Title:   "Nieczytane",
+			Updated: opds.FormatTime(now),
+			Content: &opds.Text{Type: "text", Value: "Zeszyty, których nikt jeszcze nie otworzył"},
+			Links:   []opds.Link{{Rel: opds.RelSubsection, Href: base + "/opds/unread", Type: opds.TypeAcquisition}},
+		},
+		{
+			ID:      "urn:comicnest:read",
+			Title:   "Przeczytane",
+			Updated: opds.FormatTime(now),
+			Content: &opds.Text{Type: "text", Value: "Zeszyty przeczytane do końca"},
+			Links:   []opds.Link{{Rel: opds.RelSubsection, Href: base + "/opds/read", Type: opds.TypeAcquisition}},
 		},
 	}
 	s.writeFeed(w, f, opds.TypeNavigation)
@@ -415,6 +431,77 @@ func (s *Server) handleOPDSRecent(w http.ResponseWriter, r *http.Request) {
 	f.TotalResults, f.ItemsPerPage, f.StartIndex = total, opdsPageSize, from+1
 
 	if err := s.appendIssueEntries(userFrom(r), f, base, issues); err != nil {
+		s.serverError(w, err)
+		return
+	}
+	s.writeFeed(w, f, opds.TypeAcquisition)
+}
+
+// handleOPDSRead serves issues the user has read to the end, most recently
+// finished first.
+func (s *Server) handleOPDSRead(w http.ResponseWriter, r *http.Request) {
+	user := userFrom(r)
+	total, err := s.store.CountReadIssues(user)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	page := opdsPage(r)
+	from, _, hasNext := pageBounds(page, total)
+	issues, err := s.store.ListReadIssues(user, opdsPageSize, from)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+
+	base := opdsBaseURL(r)
+	f := s.newOPDSFeed(r, "read", "Przeczytane", time.Now())
+	f.Links[0].Type = opds.TypeAcquisition
+	f.AddLink(opds.RelUp, base+"/opds", opds.TypeNavigation)
+	if hasNext {
+		f.AddLink(opds.RelNext, fmt.Sprintf("%s/opds/read?page=%d", base, page+1), opds.TypeAcquisition)
+	}
+	if page > 1 {
+		f.AddLink(opds.RelPrevious, fmt.Sprintf("%s/opds/read?page=%d", base, page-1), opds.TypeAcquisition)
+	}
+	f.TotalResults, f.ItemsPerPage, f.StartIndex = total, opdsPageSize, from+1
+
+	if err := s.appendIssueEntries(user, f, base, issues); err != nil {
+		s.serverError(w, err)
+		return
+	}
+	s.writeFeed(w, f, opds.TypeAcquisition)
+}
+
+// handleOPDSUnread serves issues the user has never opened, newest first.
+func (s *Server) handleOPDSUnread(w http.ResponseWriter, r *http.Request) {
+	user := userFrom(r)
+	total, err := s.store.CountUnreadIssues(user)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	page := opdsPage(r)
+	from, _, hasNext := pageBounds(page, total)
+	issues, err := s.store.ListUnreadIssues(user, opdsPageSize, from)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+
+	base := opdsBaseURL(r)
+	f := s.newOPDSFeed(r, "unread", "Nieczytane", time.Now())
+	f.Links[0].Type = opds.TypeAcquisition
+	f.AddLink(opds.RelUp, base+"/opds", opds.TypeNavigation)
+	if hasNext {
+		f.AddLink(opds.RelNext, fmt.Sprintf("%s/opds/unread?page=%d", base, page+1), opds.TypeAcquisition)
+	}
+	if page > 1 {
+		f.AddLink(opds.RelPrevious, fmt.Sprintf("%s/opds/unread?page=%d", base, page-1), opds.TypeAcquisition)
+	}
+	f.TotalResults, f.ItemsPerPage, f.StartIndex = total, opdsPageSize, from+1
+
+	if err := s.appendIssueEntries(user, f, base, issues); err != nil {
 		s.serverError(w, err)
 		return
 	}

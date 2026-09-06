@@ -83,6 +83,21 @@ func TestParseFilename(t *testing.T) {
 			in:   "Weird   Spacing   007",
 			want: Parsed{Series: "Weird Spacing", Number: "007"},
 		},
+		{
+			name: "subtitle ending in a digit is not mistaken for the issue number",
+			in:   "The Boys 52 - Barbary Coast 1 (2011) (HD) (digital-Empire).cbz",
+			want: Parsed{Series: "The Boys", Number: "52", Title: "Barbary Coast 1", Year: "2011"},
+		},
+		{
+			name: "worded subtitle after the issue number is kept as title",
+			in:   "The Boys 052 - Some Arc Name",
+			want: Parsed{Series: "The Boys", Number: "052", Title: "Some Arc Name"},
+		},
+		{
+			name: "leading number that looks like a year is skipped for a later one",
+			in:   "2000 AD 1957 (2015).cbr",
+			want: Parsed{Series: "2000 AD", Number: "1957", Year: "2015"},
+		},
 	}
 
 	for _, tc := range cases {
