@@ -253,6 +253,12 @@ Algorytm:
    - `Tytuł #012` → seria "Tytuł", numer "012" (konwencja starego projektu),
    - `Tytuł 012 (2020)` → seria "Tytuł", numer "012", rok "2020",
    - `Tytuł v2 015` → seria "Tytuł v2", numer "015",
+   - `Tytuł 052 - Podtytuł 1` → seria "Tytuł", numer "052", tytuł zeszytu "Podtytuł 1" —
+     numerem jest **pierwsza** napotkana liczba (nie ostatnia), żeby cyfra kończąca
+     podtytuł (np. "Barbary Coast 1") nie została wzięta za numer zeszytu zamiast
+     prawdziwego numeru stojącego zaraz po nazwie serii. Liczba wyglądająca jak rok
+     (1900–2099) jest pomijana na rzecz kolejnej liczby w nazwie, o ile taka istnieje
+     (np. `2000 AD 1957` → seria "2000 AD", numer "1957", nie "2000"),
    - brak dopasowania → cała nazwa jako tytuł zeszytu, numer pusty.
 4. Dla **nowego pliku**: wstaw rekord; jeśli CBZ/CBR — spróbuj wczytać `ComicInfo.xml`
    (nadpisuje dane z nazwy pliku, `metadata_source='comicinfo'`); wyciągnij okładkę
