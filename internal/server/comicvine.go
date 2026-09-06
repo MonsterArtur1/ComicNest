@@ -62,6 +62,7 @@ type scrapeStatusData struct {
 	scrapeStatus
 	CVEnabled bool
 	Matched   bool
+	URL       string // ComicVine page for the matched volume, "" when unmatched
 }
 
 func (s *Server) scrapeDataFor(series *store.Series) scrapeStatusData {
@@ -74,6 +75,7 @@ func (s *Server) scrapeDataFor(series *store.Series) scrapeStatusData {
 		scrapeStatus: st,
 		CVEnabled:    s.cv.Enabled(),
 		Matched:      series.ComicVineVolumeID.Valid,
+		URL:          series.ComicVineURL,
 	}
 }
 
@@ -345,13 +347,18 @@ func (s *Server) handleMatchSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.store.SetSeriesComicVineVolume(series.ID, volumeID); err != nil {
+	vol, _, err := s.cv.GetVolume(int(volumeID))
+	volURL := ""
+	if err != nil {
+		log.Printf("comicvine: fetch volume for series %d: %v", series.ID, err)
+	} else {
+		volURL = vol.URL
+	}
+	if err := s.store.SetSeriesComicVineVolume(series.ID, volumeID, volURL); err != nil {
 		s.serverError(w, err)
 		return
 	}
-	if vol, _, err := s.cv.GetVolume(int(volumeID)); err != nil {
-		log.Printf("comicvine: enrich series %d: %v", series.ID, err)
-	} else {
+	if vol != nil {
 		if err := s.store.EnrichSeriesFromComicVine(series.ID, vol.Name, vol.Publisher, vol.Description); err != nil {
 			log.Printf("comicvine: enrich series %d: %v", series.ID, err)
 		}
@@ -375,6 +382,7 @@ func (s *Server) handleMatchUnlink(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Header.Get("HX-Request") == "true" {
 		series.ComicVineVolumeID = sql.NullInt64{}
+		series.ComicVineURL = ""
 		s.renderPartial(w, "scrape_status.html", "scrape-status", s.scrapeDataFor(series))
 		return
 	}
@@ -415,6 +423,7 @@ func applyComicVine(issue *store.Issue, cv *comicvine.Issue) {
 	set(&issue.Writer, cv.Writers)
 	set(&issue.Artist, cv.Artists)
 	issue.ComicVineIssueID = sql.NullInt64{Int64: int64(cv.ID), Valid: true}
+	issue.ComicVineURL = cv.URL
 	issue.MetadataSource = store.SourceComicVine
 }
 

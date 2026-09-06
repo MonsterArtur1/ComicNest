@@ -29,6 +29,7 @@ func TestClearIssueComicVine(t *testing.T) {
 		t.Fatal(err)
 	}
 	issue.ComicVineIssueID = sql.NullInt64{Int64: 42, Valid: true}
+	issue.ComicVineURL = "https://comicvine.gamespot.com/saga-1/4000-42/"
 	issue.MetadataSource = SourceComicVine
 	issue.Title = "Chapter One"
 	if err := st.UpdateIssueMetadata(issue); err != nil {
@@ -44,6 +45,9 @@ func TestClearIssueComicVine(t *testing.T) {
 	}
 	if got.ComicVineIssueID.Valid {
 		t.Error("comicvine_issue_id should be cleared")
+	}
+	if got.ComicVineURL != "" {
+		t.Errorf("comicvine_url should be cleared, got %q", got.ComicVineURL)
 	}
 	if got.MetadataSource != SourceFilename {
 		t.Errorf("metadata_source = %q, want %q", got.MetadataSource, SourceFilename)
@@ -70,7 +74,7 @@ func TestClearSeriesComicVineVolume(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetSeriesComicVineVolume(seriesID, 7); err != nil {
+	if err := st.SetSeriesComicVineVolume(seriesID, 7, "https://comicvine.gamespot.com/saga/4050-7/"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -107,6 +111,9 @@ func TestClearSeriesComicVineVolume(t *testing.T) {
 	}
 	if sr.ComicVineVolumeID.Valid {
 		t.Error("series comicvine_volume_id should be cleared")
+	}
+	if sr.ComicVineURL != "" {
+		t.Errorf("series comicvine_url should be cleared, got %q", sr.ComicVineURL)
 	}
 
 	gotUnlocked, err := st.GetIssue(unlocked.ID)

@@ -651,6 +651,8 @@ details.desc .series-desc { margin: 12px 0 4px; }
     background: var(--bg);
 }
 .cv-info { flex: 1; min-width: 0; }
+.cv-candidate-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.cv-candidate-actions .btn, .cv-candidate-actions .btn-primary { text-align: center; white-space: nowrap; }
 .cv-meta { display: block; font-size: 13px; color: var(--text-dim); margin-top: 2px; }
 .cv-desc {
     font-size: 13px;

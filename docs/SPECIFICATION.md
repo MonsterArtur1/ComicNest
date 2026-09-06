@@ -295,21 +295,25 @@ Przepływ dopasowania — **zawsze z potwierdzeniem użytkownika** (największa 
 starego projektu: brał ślepo pierwszy wynik wyszukiwania):
 
 1. Na stronie serii: „Dopasuj w ComicVine" → `POST /series/{id}/match` → lista
-   kandydatów (okładka, nazwa, wydawca, rok startu, liczba zeszytów) w modalu HTMX.
-2. Użytkownik wybiera → zapis `comicvine_volume_id` na serii.
+   kandydatów (okładka, nazwa, wydawca, rok startu, liczba zeszytów) w modalu HTMX,
+   każdy z przyciskiem „Otwórz stronę ↗" (link do `site_detail_url` na comicvine.gamespot.com,
+   żeby zweryfikować kandydata przed wyborem) obok „Wybierz".
+2. Użytkownik wybiera → zapis `comicvine_volume_id` + `comicvine_url` (`site_detail_url` z API) na serii.
 3. „Pobierz metadane" przy zeszycie (lub „dla wszystkich brakujących" na serii):
    po `comicvine_volume_id` pobierz listę zeszytów wolumenu, dopasuj po
    `issue_number` (porównanie znormalizowane: trim zer wiodących), pobierz szczegóły,
-   zaktualizuj rekord (`metadata_source='comicvine'`) + pobierz okładkę z ComicVine
-   do cache (zastępuje miniaturę z archiwum, bo zwykle lepsza).
+   zaktualizuj rekord (`metadata_source='comicvine'`, `comicvine_url`) + pobierz okładkę
+   z ComicVine do cache (zastępuje miniaturę z archiwum, bo zwykle lepsza). Zapisany
+   `comicvine_url` (serii i zeszytu) pokazuje się jako link „Zobacz na ComicVine ↗" na
+   stronie serii (pasek akcji) i na stronie zeszytu.
 4. Rekordy `metadata_locked=1` pomijane z informacją w UI.
 5. Cofnięcie dopasowania: „Usuń dopasowanie" na stronie serii (`POST /series/{id}/match/unlink`)
-   czyści `series.comicvine_volume_id` i kaskadowo cofa jej niezablokowane zeszyty ze
-   źródłem `comicvine` (`comicvine_issue_id` → NULL, `metadata_source` → `comicinfo`/`filename`
-   wg `has_comicinfo`) — zablokowane zeszyty (edycja ręczna) zostają nietknięte. Osobno,
-   „Usuń dopasowanie ComicVine" przy zeszycie (`POST /issues/{id}/scrape/unlink`) cofa tylko
-   ten jeden zeszyt tym samym mechanizmem; pobrane wcześniej dane (tytuł, opis, twórcy…)
-   zostają — usuwany jest tylko sam znacznik źródła i dopasowany numer ComicVine.
+   czyści `series.comicvine_volume_id` + `comicvine_url` i kaskadowo cofa jej niezablokowane
+   zeszyty ze źródłem `comicvine` (`comicvine_issue_id`/`comicvine_url` → NULL/'', `metadata_source`
+   → `comicinfo`/`filename` wg `has_comicinfo`) — zablokowane zeszyty (edycja ręczna) zostają
+   nietknięte. Osobno, „Usuń dopasowanie ComicVine" przy zeszycie (`POST /issues/{id}/scrape/unlink`)
+   cofa tylko ten jeden zeszyt tym samym mechanizmem; pobrane wcześniej dane (tytuł, opis, twórcy…)
+   zostają — usuwany jest tylko sam znacznik źródła, link i dopasowany numer ComicVine.
 
 ## 9. Interfejs WWW — widoki i routing
 

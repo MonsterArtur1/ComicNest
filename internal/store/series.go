@@ -13,6 +13,7 @@ type Series struct {
 	Publisher         string
 	Description       string
 	ComicVineVolumeID sql.NullInt64
+	ComicVineURL      string // comicvine.gamespot.com page, set together with ComicVineVolumeID
 	MetadataLocked    bool
 	OneShot           bool // single publication, not part of any series
 	CreatedAt         string
@@ -42,12 +43,12 @@ func (s *Store) GetSeries(id int64) (*Series, error) {
 	var sr Series
 	err := s.db.QueryRow(`
 		SELECT s.id, s.name, s.folder_path, s.publisher, s.description,
-		       s.comicvine_volume_id, s.metadata_locked, s.one_shot,
+		       s.comicvine_volume_id, s.comicvine_url, s.metadata_locked, s.one_shot,
 		       s.created_at, s.updated_at,
 		       (SELECT COUNT(*) FROM issues i WHERE i.series_id = s.id)
 		FROM series s WHERE s.id = ?`, id).
 		Scan(&sr.ID, &sr.Name, &sr.FolderPath, &sr.Publisher, &sr.Description,
-			&sr.ComicVineVolumeID, &sr.MetadataLocked, &sr.OneShot,
+			&sr.ComicVineVolumeID, &sr.ComicVineURL, &sr.MetadataLocked, &sr.OneShot,
 			&sr.CreatedAt, &sr.UpdatedAt, &sr.IssueCount)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -111,10 +112,10 @@ func (s *Store) ReconcileOneShots() error {
 // SetSeriesComicVineVolume records the user's ComicVine volume match. The
 // match itself is allowed even on locked series — the lock protects metadata
 // text, not the mapping.
-func (s *Store) SetSeriesComicVineVolume(id, volumeID int64) error {
+func (s *Store) SetSeriesComicVineVolume(id, volumeID int64, url string) error {
 	_, err := s.db.Exec(`
-		UPDATE series SET comicvine_volume_id = ?, updated_at = datetime('now')
-		WHERE id = ?`, volumeID, id)
+		UPDATE series SET comicvine_volume_id = ?, comicvine_url = ?, updated_at = datetime('now')
+		WHERE id = ?`, volumeID, url, id)
 	return err
 }
 
@@ -131,7 +132,7 @@ func (s *Store) ClearSeriesComicVineVolume(id int64) error {
 	defer tx.Rollback()
 
 	if _, err := tx.Exec(`
-		UPDATE issues SET comicvine_issue_id = NULL,
+		UPDATE issues SET comicvine_issue_id = NULL, comicvine_url = '',
 			metadata_source = CASE WHEN has_comicinfo THEN ? ELSE ? END,
 			updated_at = datetime('now')
 		WHERE series_id = ? AND metadata_locked = 0 AND metadata_source = ?`,
@@ -139,7 +140,7 @@ func (s *Store) ClearSeriesComicVineVolume(id int64) error {
 		return err
 	}
 	if _, err := tx.Exec(`
-		UPDATE series SET comicvine_volume_id = NULL, updated_at = datetime('now')
+		UPDATE series SET comicvine_volume_id = NULL, comicvine_url = '', updated_at = datetime('now')
 		WHERE id = ?`, id); err != nil {
 		return err
 	}

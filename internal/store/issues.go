@@ -47,6 +47,7 @@ type Issue struct {
 	PageCount        int // from metadata (ComicInfo), may be 0 or wrong
 	FilePages        int // image entries actually inside the archive (0 = not counted yet)
 	ComicVineIssueID sql.NullInt64
+	ComicVineURL     string // comicvine.gamespot.com page, set together with ComicVineIssueID
 	MetadataSource   string
 	MetadataLocked   bool
 	HasComicInfo     bool
@@ -60,7 +61,7 @@ type Issue struct {
 
 const issueColumns = `id, series_id, path, file_size, file_missing, issue_number,
 	title, summary, release_date, writer, artist, publisher, page_count, file_pages,
-	comicvine_issue_id, metadata_source, metadata_locked, has_comicinfo,
+	comicvine_issue_id, comicvine_url, metadata_source, metadata_locked, has_comicinfo,
 	comicinfo_series, cover_cached, created_at, updated_at`
 
 // fields returns scan targets for issueColumns, in order.
@@ -68,7 +69,7 @@ func (i *Issue) fields() []any {
 	return []any{&i.ID, &i.SeriesID, &i.Path, &i.FileSize, &i.FileMissing,
 		&i.IssueNumber, &i.Title, &i.Summary, &i.ReleaseDate, &i.Writer,
 		&i.Artist, &i.Publisher, &i.PageCount, &i.FilePages, &i.ComicVineIssueID,
-		&i.MetadataSource, &i.MetadataLocked, &i.HasComicInfo, &i.ComicInfoSeries,
+		&i.ComicVineURL, &i.MetadataSource, &i.MetadataLocked, &i.HasComicInfo, &i.ComicInfoSeries,
 		&i.CoverCached, &i.CreatedAt, &i.UpdatedAt}
 }
 
@@ -145,7 +146,7 @@ type IssueWithSeries struct {
 // `issues i JOIN series s`.
 const issueWithSeriesColumns = `i.id, i.series_id, i.path, i.file_size, i.file_missing,
 	i.issue_number, i.title, i.summary, i.release_date, i.writer, i.artist, i.publisher,
-	i.page_count, i.file_pages, i.comicvine_issue_id, i.metadata_source, i.metadata_locked,
+	i.page_count, i.file_pages, i.comicvine_issue_id, i.comicvine_url, i.metadata_source, i.metadata_locked,
 	i.has_comicinfo, i.comicinfo_series, i.cover_cached, i.created_at, i.updated_at, s.name`
 
 func scanIssuesWithSeries(rows *sql.Rows) ([]IssueWithSeries, error) {
@@ -226,7 +227,7 @@ func (s *Store) IssuesNeedingComicVine() (map[int64][]Issue, error) {
 	rows, err := s.db.Query(`
 		SELECT i.id, i.series_id, i.path, i.file_size, i.file_missing, i.issue_number,
 			i.title, i.summary, i.release_date, i.writer, i.artist, i.publisher,
-			i.page_count, i.file_pages, i.comicvine_issue_id, i.metadata_source,
+			i.page_count, i.file_pages, i.comicvine_issue_id, i.comicvine_url, i.metadata_source,
 			i.metadata_locked, i.has_comicinfo, i.comicinfo_series, i.cover_cached,
 			i.created_at, i.updated_at, s.comicvine_volume_id
 		FROM issues i JOIN series s ON s.id = i.series_id
@@ -291,11 +292,11 @@ func (s *Store) UpdateIssueMetadata(i *Issue) error {
 	_, err := s.db.Exec(`
 		UPDATE issues SET issue_number = ?, title = ?, summary = ?,
 			release_date = ?, writer = ?, artist = ?, publisher = ?,
-			page_count = ?, comicvine_issue_id = ?, metadata_source = ?,
+			page_count = ?, comicvine_issue_id = ?, comicvine_url = ?, metadata_source = ?,
 			metadata_locked = ?, has_comicinfo = ?, updated_at = datetime('now')
 		WHERE id = ?`,
 		i.IssueNumber, i.Title, i.Summary, i.ReleaseDate, i.Writer, i.Artist,
-		i.Publisher, i.PageCount, i.ComicVineIssueID, i.MetadataSource,
+		i.Publisher, i.PageCount, i.ComicVineIssueID, i.ComicVineURL, i.MetadataSource,
 		i.MetadataLocked, i.HasComicInfo, i.ID)
 	return err
 }
@@ -309,7 +310,7 @@ func (s *Store) UpdateIssueMetadata(i *Issue) error {
 // while lifting the write-protection.
 func (s *Store) ClearIssueComicVine(id int64) error {
 	_, err := s.db.Exec(`
-		UPDATE issues SET comicvine_issue_id = NULL,
+		UPDATE issues SET comicvine_issue_id = NULL, comicvine_url = '',
 			metadata_source = CASE WHEN has_comicinfo THEN ? ELSE ? END,
 			updated_at = datetime('now')
 		WHERE id = ? AND metadata_source = ?`,

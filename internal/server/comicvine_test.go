@@ -20,7 +20,7 @@ func TestHandleMatchUnlink(t *testing.T) {
 		return rec
 	}
 
-	if err := srv.store.SetSeriesComicVineVolume(1, 7); err != nil {
+	if err := srv.store.SetSeriesComicVineVolume(1, 7, "https://comicvine.gamespot.com/saga/4050-7/"); err != nil {
 		t.Fatal(err)
 	}
 	issue, err := srv.store.GetIssue(1)
@@ -28,9 +28,20 @@ func TestHandleMatchUnlink(t *testing.T) {
 		t.Fatal(err)
 	}
 	issue.ComicVineIssueID = sql.NullInt64{Int64: 55, Valid: true}
+	issue.ComicVineURL = "https://comicvine.gamespot.com/saga-1/4000-55/"
 	issue.MetadataSource = store.SourceComicVine
 	if err := srv.store.UpdateIssueMetadata(issue); err != nil {
 		t.Fatal(err)
+	}
+
+	// The matched pages link out to ComicVine before unlinking (the series
+	// action strip is fetched separately via HTMX; the issue page renders
+	// its link inline).
+	if body := get(t, h, "/series/1/scrape/status", nil).Body.String(); !strings.Contains(body, `href="https://comicvine.gamespot.com/saga/4050-7/"`) {
+		t.Errorf("series action strip should link to the matched ComicVine volume:\n%s", body)
+	}
+	if body := get(t, h, "/issues/1", nil).Body.String(); !strings.Contains(body, `href="https://comicvine.gamespot.com/saga-1/4000-55/"`) {
+		t.Errorf("issue page should link to the matched ComicVine issue:\n%s", body)
 	}
 
 	rec := post("/series/1/match/unlink")
@@ -38,20 +49,29 @@ func TestHandleMatchUnlink(t *testing.T) {
 		t.Fatalf("unlink: %d -> %q", rec.Code, rec.Header().Get("Location"))
 	}
 
+	// And stop linking once the match is gone.
+	if body := get(t, h, "/series/1/scrape/status", nil).Body.String(); strings.Contains(body, "comicvine.gamespot.com") {
+		t.Errorf("series action strip should no longer link to ComicVine:\n%s", body)
+	}
+	if body := get(t, h, "/issues/1", nil).Body.String(); strings.Contains(body, "comicvine.gamespot.com") {
+		t.Errorf("issue page should no longer link to ComicVine:\n%s", body)
+	}
+
 	sr, err := srv.store.GetSeries(1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sr.ComicVineVolumeID.Valid {
-		t.Error("series should no longer be matched to a ComicVine volume")
+	if sr.ComicVineVolumeID.Valid || sr.ComicVineURL != "" {
+		t.Errorf("series should no longer be matched to a ComicVine volume, got valid=%v url=%q",
+			sr.ComicVineVolumeID.Valid, sr.ComicVineURL)
 	}
 	updated, err := srv.store.GetIssue(1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.ComicVineIssueID.Valid || updated.MetadataSource != store.SourceFilename {
-		t.Errorf("issue should be rolled back, got id valid=%v source=%q",
-			updated.ComicVineIssueID.Valid, updated.MetadataSource)
+	if updated.ComicVineIssueID.Valid || updated.ComicVineURL != "" || updated.MetadataSource != store.SourceFilename {
+		t.Errorf("issue should be rolled back, got id valid=%v url=%q source=%q",
+			updated.ComicVineIssueID.Valid, updated.ComicVineURL, updated.MetadataSource)
 	}
 }
 
@@ -70,6 +90,7 @@ func TestHandleIssueScrapeUnlink(t *testing.T) {
 		t.Fatal(err)
 	}
 	issue.ComicVineIssueID = sql.NullInt64{Int64: 55, Valid: true}
+	issue.ComicVineURL = "https://comicvine.gamespot.com/saga-1/4000-55/"
 	issue.MetadataSource = store.SourceComicVine
 	if err := srv.store.UpdateIssueMetadata(issue); err != nil {
 		t.Fatal(err)
@@ -87,8 +108,8 @@ func TestHandleIssueScrapeUnlink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.ComicVineIssueID.Valid || updated.MetadataSource != store.SourceFilename {
-		t.Errorf("issue should be rolled back, got id valid=%v source=%q",
-			updated.ComicVineIssueID.Valid, updated.MetadataSource)
+	if updated.ComicVineIssueID.Valid || updated.ComicVineURL != "" || updated.MetadataSource != store.SourceFilename {
+		t.Errorf("issue should be rolled back, got id valid=%v url=%q source=%q",
+			updated.ComicVineIssueID.Valid, updated.ComicVineURL, updated.MetadataSource)
 	}
 }

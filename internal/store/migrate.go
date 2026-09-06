@@ -93,6 +93,13 @@ var migrations = []string{
 	`
 	ALTER TABLE issues ADD COLUMN comicinfo_series TEXT;
 	`,
+
+	// 6: the ComicVine site page for a matched volume/issue, so the UI can
+	// link straight to it instead of just showing the numeric id.
+	`
+	ALTER TABLE series ADD COLUMN comicvine_url TEXT NOT NULL DEFAULT '';
+	ALTER TABLE issues ADD COLUMN comicvine_url TEXT NOT NULL DEFAULT '';
+	`,
 }
 
 func migrate(db *sql.DB) error {

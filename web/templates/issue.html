@@ -81,6 +81,9 @@
                 </button>
             </form>
             {{end}}
+            {{if .Issue.ComicVineURL}}
+            <a class="btn" href="{{.Issue.ComicVineURL}}" target="_blank" rel="noopener">Zobacz na ComicVine ↗</a>
+            {{end}}
             {{if .Issue.ComicVineIssueID.Valid}}
             <form action="/issues/{{.Issue.ID}}/scrape/unlink" method="post"
                   onsubmit="return confirm('Usunąć dopasowanie tego zeszytu do ComicVine? Pobrane dane zostają, ale przestają być oznaczone jako pochodzące z ComicVine.');">

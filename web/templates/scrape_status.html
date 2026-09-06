@@ -8,22 +8,24 @@
 </div>
 {{else}}
 <div class="scan-status">
+    {{if and .CVEnabled .Matched}}
+    <form hx-post="/series/{{.SeriesID}}/scrape" hx-target="#scrape-area" hx-swap="innerHTML"
+          action="/series/{{.SeriesID}}/scrape" method="post">
+        <button type="submit" class="btn" title="Pobierz metadane ComicVine dla zeszytów bez nich">Pobierz brakujące metadane</button>
+    </form>
+    {{end}}
     {{if .CVEnabled}}
-        {{if .Matched}}
-        <form hx-post="/series/{{.SeriesID}}/scrape" hx-target="#scrape-area" hx-swap="innerHTML"
-              action="/series/{{.SeriesID}}/scrape" method="post">
-            <button type="submit" class="btn" title="Pobierz metadane ComicVine dla zeszytów bez nich">Pobierz brakujące metadane</button>
-        </form>
-        {{end}}
-        <a class="btn" href="/series/{{.SeriesID}}/match">{{if .Matched}}Zmień dopasowanie{{else}}Dopasuj w ComicVine{{end}}</a>
-        {{if .Matched}}
-        <form hx-post="/series/{{.SeriesID}}/match/unlink" hx-target="#scrape-area" hx-swap="innerHTML"
-              action="/series/{{.SeriesID}}/match/unlink" method="post"
-              onsubmit="return confirm('Usunąć dopasowanie serii do ComicVine? Niezablokowane zeszyty pobrane z tego wolumenu wrócą do danych z pliku.');">
-            <button type="submit" class="btn btn-danger" title="Usuń dopasowanie serii do ComicVine">Usuń dopasowanie</button>
-        </form>
-        {{end}}
-    {{else}}
+    <a class="btn" href="/series/{{.SeriesID}}/match">{{if .Matched}}Zmień dopasowanie{{else}}Dopasuj w ComicVine{{end}}</a>
+    {{end}}
+    {{if .URL}}<a class="btn" href="{{.URL}}" target="_blank" rel="noopener">Zobacz na ComicVine ↗</a>{{end}}
+    {{if .Matched}}
+    <form hx-post="/series/{{.SeriesID}}/match/unlink" hx-target="#scrape-area" hx-swap="innerHTML"
+          action="/series/{{.SeriesID}}/match/unlink" method="post"
+          onsubmit="return confirm('Usunąć dopasowanie serii do ComicVine? Niezablokowane zeszyty pobrane z tego wolumenu wrócą do danych z pliku.');">
+        <button type="submit" class="btn btn-danger" title="Usuń dopasowanie serii do ComicVine">Usuń dopasowanie</button>
+    </form>
+    {{end}}
+    {{if not .CVEnabled}}
     <span class="scan-note" title="Ustaw comicvine_api_key w config.yaml">ComicVine wyłączone (brak klucza API)</span>
     {{end}}
     {{if .Err}}

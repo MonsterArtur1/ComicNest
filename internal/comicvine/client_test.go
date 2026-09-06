@@ -57,7 +57,8 @@ func TestSearchVolumes(t *testing.T) {
 				"publisher": {"name": "DC Comics"},
 				"count_of_issues": 900,
 				"description": "<p>The <b>Dark</b> Knight.</p>",
-				"image": {"small_url": "http://img/small1.jpg", "medium_url": "http://img/medium1.jpg"}
+				"image": {"small_url": "http://img/small1.jpg", "medium_url": "http://img/medium1.jpg"},
+				"site_detail_url": "https://comicvine.gamespot.com/batman/4050-1/"
 			},
 			{
 				"id": 2,
@@ -99,7 +100,8 @@ func TestSearchVolumes(t *testing.T) {
 
 	v1 := volumes[0]
 	if v1.ID != 1 || v1.Name != "Batman" || v1.StartYear != "1940" || v1.Publisher != "DC Comics" ||
-		v1.CountOfIssues != 900 || v1.ImageURL != "http://img/small1.jpg" {
+		v1.CountOfIssues != 900 || v1.ImageURL != "http://img/small1.jpg" ||
+		v1.URL != "https://comicvine.gamespot.com/batman/4050-1/" {
 		t.Errorf("volume 1 mismatch: %+v", v1)
 	}
 	if v1.Description != "The Dark Knight." {
@@ -127,6 +129,7 @@ func TestGetVolume(t *testing.T) {
 			"count_of_issues": 3,
 			"description": "Plain description",
 			"image": {"small_url": "http://img/s.jpg", "medium_url": "http://img/m.jpg"},
+			"site_detail_url": "https://comicvine.gamespot.com/fables/4050-42/",
 			"issues": [
 				{"id": 100, "issue_number": "1", "name": "Legends in Exile"},
 				{"id": 101, "issue_number": "2", "name": "Part 2"},
@@ -152,6 +155,9 @@ func TestGetVolume(t *testing.T) {
 	if vol.ID != 42 || vol.Name != "Fables" || vol.Publisher != "Vertigo" {
 		t.Errorf("volume mismatch: %+v", vol)
 	}
+	if vol.URL != "https://comicvine.gamespot.com/fables/4050-42/" {
+		t.Errorf("volume URL = %q", vol.URL)
+	}
 	if len(issues) != 3 {
 		t.Fatalf("got %d issues, want 3", len(issues))
 	}
@@ -175,6 +181,7 @@ func TestGetIssue(t *testing.T) {
 			"store_date": "2020-01-08",
 			"description": "<p>Something happens.<br>Then more.</p>",
 			"image": {"small_url": "http://img/s.jpg", "medium_url": "http://img/m.jpg"},
+			"site_detail_url": "https://comicvine.gamespot.com/fables-1/4000-7/",
 			"person_credits": [
 				{"name": "Alice Writer", "role": "writer"},
 				{"name": "Bob Artist", "role": "penciler, inker"},
@@ -206,6 +213,9 @@ func TestGetIssue(t *testing.T) {
 	}
 	if issue.ImageURL != "http://img/m.jpg" {
 		t.Errorf("ImageURL = %q, want medium url", issue.ImageURL)
+	}
+	if issue.URL != "https://comicvine.gamespot.com/fables-1/4000-7/" {
+		t.Errorf("issue URL = %q", issue.URL)
 	}
 	if issue.Writers != "Alice Writer" {
 		t.Errorf("Writers = %q, want %q (deduped)", issue.Writers, "Alice Writer")
