@@ -23,7 +23,7 @@ type Series struct {
 
 	// Reading aggregates over issues present on disk (list views only).
 	IssuesPresent int // issues whose file exists
-	IssuesStarted int // present issues with any reading progress
+	IssuesStarted int // present issues with real reading progress (page 2+, or finished)
 	IssuesRead    int // present issues read to the last page
 }
 
@@ -264,6 +264,9 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 	// An issue counts as read when its progress reached the page total
 	// (archive count, else metadata count); unknown totals never count.
 	const total = `CASE WHEN i.file_pages > 0 THEN i.file_pages ELSE i.page_count END`
+	// A lone first page (opened and closed right away) does not count as
+	// "started" — only real progress (page 2+) or an outright finish does.
+	const started = `rp.page IS NOT NULL AND (rp.page > 1 OR (` + total + ` > 0 AND rp.page >= ` + total + `))`
 
 	// The cover endpoint falls back to a placeholder on its own, so the
 	// representative issue is simply the series' first one.
@@ -279,7 +282,7 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 		           LIMIT 1
 		       ), 0),
 		       COALESCE(SUM(i.file_missing = 0), 0) AS present_cnt,
-		       COALESCE(SUM(i.file_missing = 0 AND rp.page IS NOT NULL), 0) AS started_cnt,
+		       COALESCE(SUM(i.file_missing = 0 AND ` + started + `), 0) AS started_cnt,
 		       COALESCE(SUM(i.file_missing = 0 AND rp.page IS NOT NULL
 		                    AND ` + total + ` > 0 AND rp.page >= ` + total + `), 0) AS read_cnt
 		FROM series s

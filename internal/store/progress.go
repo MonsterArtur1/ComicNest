@@ -87,16 +87,17 @@ type IssueInProgress struct {
 
 // ListIssuesInProgress returns the user's started-but-unfinished issues (last
 // read page below the page total), most recently read first. Issues whose
-// page total is unknown count as unfinished.
+// page total is unknown count as unfinished. A lone first page (opened and
+// closed right away) does not count as "started" — it takes real progress
+// (page 2+) to show up here.
 func (s *Store) ListIssuesInProgress(user string, limit int) ([]IssueInProgress, error) {
 	rows, err := s.db.Query(`
 		SELECT `+issueWithSeriesColumns+`, rp.page, rp.updated_at
 		FROM reading_progress rp
 		JOIN issues i ON i.id = rp.issue_id
 		JOIN series s ON s.id = i.series_id
-		WHERE rp.user = ? AND i.file_missing = 0
-		  AND (CASE WHEN i.file_pages > 0 THEN i.file_pages ELSE i.page_count END = 0
-		       OR rp.page < CASE WHEN i.file_pages > 0 THEN i.file_pages ELSE i.page_count END)
+		WHERE rp.user = ? AND i.file_missing = 0 AND rp.page > 1
+		  AND (`+totalPagesExpr+` = 0 OR rp.page < `+totalPagesExpr+`)
 		ORDER BY rp.updated_at DESC
 		LIMIT ?`, user, limit)
 	if err != nil {
@@ -149,26 +150,32 @@ func (s *Store) ListReadIssues(user string, limit, offset int) ([]IssueWithSerie
 	return scanIssuesWithSeries(rows)
 }
 
+// unreadCondition matches issues with no real reading progress: either no
+// row at all, or a lone first page (opened and closed right away, which
+// does not count as "started" unless that first page was also the last).
+const unreadCondition = `(rp.issue_id IS NULL
+	OR (rp.page <= 1 AND NOT (` + totalPagesExpr + ` > 0 AND rp.page >= ` + totalPagesExpr + `)))`
+
 // CountUnreadIssues returns the number of present-on-disk issues the user
-// has never opened (no reading progress at all).
+// has not meaningfully started (no progress, or only its first page seen).
 func (s *Store) CountUnreadIssues(user string) (int, error) {
 	var n int
 	err := s.db.QueryRow(`
 		SELECT COUNT(*)
 		FROM issues i LEFT JOIN reading_progress rp ON rp.issue_id = i.id AND rp.user = ?
-		WHERE i.file_missing = 0 AND rp.issue_id IS NULL`,
+		WHERE i.file_missing = 0 AND `+unreadCondition,
 		user).Scan(&n)
 	return n, err
 }
 
-// ListUnreadIssues returns present-on-disk issues the user has never
-// opened, newest first.
+// ListUnreadIssues returns present-on-disk issues the user has not
+// meaningfully started, newest first.
 func (s *Store) ListUnreadIssues(user string, limit, offset int) ([]IssueWithSeries, error) {
 	rows, err := s.db.Query(`
 		SELECT `+issueWithSeriesColumns+`
 		FROM issues i JOIN series s ON s.id = i.series_id
 		LEFT JOIN reading_progress rp ON rp.issue_id = i.id AND rp.user = ?
-		WHERE i.file_missing = 0 AND rp.issue_id IS NULL
+		WHERE i.file_missing = 0 AND `+unreadCondition+`
 		ORDER BY i.created_at DESC, i.id DESC
 		LIMIT ? OFFSET ?`, user, limit, offset)
 	if err != nil {

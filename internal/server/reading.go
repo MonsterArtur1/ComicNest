@@ -73,11 +73,20 @@ type readingView struct {
 }
 
 // newReadingView combines an issue with its progress; nil when unread.
+//
+// A lone first page (opened and immediately closed) does not count as
+// "started" — only real progress (page 2+) or an outright finish does. This
+// keeps a barely-glanced-at issue out of "w trakcie czytania".
 func newReadingView(i *store.Issue, p *store.ReadingProgress) *readingView {
 	if p == nil || p.Page <= 0 {
 		return nil
 	}
-	v := &readingView{Page: p.Page, Total: i.TotalPages()}
+	total := i.TotalPages()
+	finished := total > 0 && p.Page >= total
+	if p.Page <= 1 && !finished {
+		return nil
+	}
+	v := &readingView{Page: p.Page, Total: total}
 	if v.Total > 0 {
 		v.Page = min(v.Page, v.Total)
 		v.Percent = v.Page * 100 / v.Total
