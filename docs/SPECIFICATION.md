@@ -249,6 +249,17 @@ Algorytm:
      przed pierwszym rozdzieleniem (blokada dotyczy tekstu metadanych). Opróżniona seria folderu
      zostaje w bazie (listy ukrywają serie bez zeszytów). Przykład: `Mad Max/` z „Mad Max: Fury
      Road" i „Mad Max: Fury Road: Max" → dwie serie.
+   - **Ręczne scalanie serii** (edycja serii → „Połącz z inną serią", `POST /series/{id}/merge`,
+     `Store.MergeSeries`): wszystkie zeszyty źródłowej serii przenoszone do docelowej (docelowa
+     zachowuje własne metadane, uzupełniane tylko pustymi polami źródłowej), źródłowa kasowana.
+     Sposób, w jaki źródłowa była dotąd odnajdywana — jej `folder_path` (seria z folderu) albo,
+     dla serii wirtualnej, jej `name` — zapisywany jest jako alias na docelową
+     (`series_folder_aliases` / `series_name_aliases`, migracja 7); `FindOrCreateSeriesByFolder`/
+     `FindOrCreateSeriesByName` sprawdzają te tabele, zanim utworzą nową serię. Bez tego kolejny
+     skan nie znajdowałby już wpisu dla tego folderu/nazwy i tworzyłby go od nowa — cichym
+     skutkiem byłoby rozłączenie właśnie scalonej serii przy każdym skanie. Aliasy wskazujące
+     wcześniej na źródłową (z poprzedniego scalenia) są przy kolejnym scaleniu przepinane na nowy
+     cel, więc łańcuchy scaleń (A→B, potem B→C) też przeżywają skan.
 3. **Parsowanie nazwy pliku** (bez rozszerzenia) — kolejno próbowane wzorce:
    - `Tytuł #012` → seria "Tytuł", numer "012" (konwencja starego projektu),
    - `Tytuł 012 (2020)` → seria "Tytuł", numer "012", rok "2020",

@@ -167,6 +167,12 @@ func (s *Store) EnrichSeriesFromComicVine(id int64, name, publisher, description
 // same series (e.g. two folders scraped separately, corrected to the same
 // name). The target keeps its own metadata, filling only fields it still has
 // empty from the source, and is never itself locked or renamed by the merge.
+//
+// The source's own folder (or, for a virtual series, its own name) is
+// recorded as an alias to the target: a rescan resolves it there instead of
+// finding nothing, recreating the deleted series, and silently undoing the
+// merge. Aliases that already pointed at the source, from an earlier merge,
+// are repointed to the target too, so chained merges keep working.
 func (s *Store) MergeSeries(fromID, intoID int64) error {
 	if fromID == intoID {
 		return errors.New("cannot merge a series into itself")
@@ -176,6 +182,27 @@ func (s *Store) MergeSeries(fromID, intoID int64) error {
 		return err
 	}
 	defer tx.Rollback()
+
+	if _, err := tx.Exec(`
+		INSERT INTO series_folder_aliases (folder_path, series_id)
+		SELECT folder_path, ? FROM series WHERE id = ? AND folder_path IS NOT NULL
+		ON CONFLICT(folder_path) DO UPDATE SET series_id = excluded.series_id`,
+		intoID, fromID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO series_name_aliases (name, series_id)
+		SELECT name, ? FROM series WHERE id = ? AND folder_path IS NULL
+		ON CONFLICT(name) DO UPDATE SET series_id = excluded.series_id`,
+		intoID, fromID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE series_folder_aliases SET series_id = ? WHERE series_id = ?`, intoID, fromID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE series_name_aliases SET series_id = ? WHERE series_id = ?`, intoID, fromID); err != nil {
+		return err
+	}
 
 	if _, err := tx.Exec(`
 		UPDATE series SET
@@ -197,10 +224,20 @@ func (s *Store) MergeSeries(fromID, intoID int64) error {
 }
 
 // FindOrCreateSeriesByFolder returns the series backed by the given library
-// folder (relative path), creating it with the folder's base name when absent.
+// folder (relative path), creating it with the folder's base name when
+// absent. A folder that used to back its own series, merged away since (see
+// MergeSeries), resolves to the merge target instead of creating a fresh
+// series and silently undoing the merge.
 func (s *Store) FindOrCreateSeriesByFolder(folderPath, name string) (int64, error) {
 	var id int64
 	err := s.db.QueryRow(`SELECT id FROM series WHERE folder_path = ?`, folderPath).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if err != sql.ErrNoRows {
+		return 0, err
+	}
+	err = s.db.QueryRow(`SELECT series_id FROM series_folder_aliases WHERE folder_path = ?`, folderPath).Scan(&id)
 	if err == nil {
 		return id, nil
 	}
@@ -215,12 +252,22 @@ func (s *Store) FindOrCreateSeriesByFolder(folderPath, name string) (int64, erro
 }
 
 // FindOrCreateSeriesByName returns the "virtual" series (no backing folder)
-// with the given name, creating it when absent. Name match is case-insensitive.
+// with the given name, creating it when absent. Name match is
+// case-insensitive. A name that used to back its own virtual series, merged
+// away since (see MergeSeries), resolves to the merge target instead of
+// creating a fresh series and silently undoing the merge.
 func (s *Store) FindOrCreateSeriesByName(name string) (int64, error) {
 	var id int64
 	err := s.db.QueryRow(`
 		SELECT id FROM series
 		WHERE folder_path IS NULL AND name = ? COLLATE NOCASE`, name).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if err != sql.ErrNoRows {
+		return 0, err
+	}
+	err = s.db.QueryRow(`SELECT series_id FROM series_name_aliases WHERE name = ?`, name).Scan(&id)
 	if err == nil {
 		return id, nil
 	}
