@@ -115,6 +115,69 @@ func (s *Store) ListIssuesInProgress(user string, limit int) ([]IssueInProgress,
 	return out, rows.Err()
 }
 
+// totalPagesExpr picks the best known page total for an issue: the count
+// read from the file itself when available, falling back to the metadata
+// page count. Zero means the total is unknown.
+const totalPagesExpr = `CASE WHEN i.file_pages > 0 THEN i.file_pages ELSE i.page_count END`
+
+// CountReadIssues returns the number of present-on-disk issues the user has
+// read to the end (page total known and reached).
+func (s *Store) CountReadIssues(user string) (int, error) {
+	var n int
+	err := s.db.QueryRow(`
+		SELECT COUNT(*)
+		FROM issues i JOIN reading_progress rp ON rp.issue_id = i.id AND rp.user = ?
+		WHERE i.file_missing = 0 AND `+totalPagesExpr+` > 0 AND rp.page >= `+totalPagesExpr,
+		user).Scan(&n)
+	return n, err
+}
+
+// ListReadIssues returns present-on-disk issues the user has read to the
+// end, most recently finished first.
+func (s *Store) ListReadIssues(user string, limit, offset int) ([]IssueWithSeries, error) {
+	rows, err := s.db.Query(`
+		SELECT `+issueWithSeriesColumns+`
+		FROM issues i JOIN series s ON s.id = i.series_id
+		JOIN reading_progress rp ON rp.issue_id = i.id AND rp.user = ?
+		WHERE i.file_missing = 0 AND `+totalPagesExpr+` > 0 AND rp.page >= `+totalPagesExpr+`
+		ORDER BY rp.updated_at DESC, i.id DESC
+		LIMIT ? OFFSET ?`, user, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanIssuesWithSeries(rows)
+}
+
+// CountUnreadIssues returns the number of present-on-disk issues the user
+// has never opened (no reading progress at all).
+func (s *Store) CountUnreadIssues(user string) (int, error) {
+	var n int
+	err := s.db.QueryRow(`
+		SELECT COUNT(*)
+		FROM issues i LEFT JOIN reading_progress rp ON rp.issue_id = i.id AND rp.user = ?
+		WHERE i.file_missing = 0 AND rp.issue_id IS NULL`,
+		user).Scan(&n)
+	return n, err
+}
+
+// ListUnreadIssues returns present-on-disk issues the user has never
+// opened, newest first.
+func (s *Store) ListUnreadIssues(user string, limit, offset int) ([]IssueWithSeries, error) {
+	rows, err := s.db.Query(`
+		SELECT `+issueWithSeriesColumns+`
+		FROM issues i JOIN series s ON s.id = i.series_id
+		LEFT JOIN reading_progress rp ON rp.issue_id = i.id AND rp.user = ?
+		WHERE i.file_missing = 0 AND rp.issue_id IS NULL
+		ORDER BY i.created_at DESC, i.id DESC
+		LIMIT ? OFFSET ?`, user, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanIssuesWithSeries(rows)
+}
+
 // AdoptAnonymousProgress hands progress recorded before accounts existed
 // (empty user name) to the given user, keeping the user's own rows where
 // both exist. Returns how many rows moved.

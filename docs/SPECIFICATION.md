@@ -355,11 +355,13 @@ jest faviconem stron WWW: linki w `<head>` layoutu, loginu i czytnika oraz trasa
 
 | Ścieżka | Feed |
 |---|---|
-| `GET /opds` | nawigacyjny root: „Wszystkie serie", „Aktualnie czytane", „Ostatnio dodane" + link `search` |
+| `GET /opds` | nawigacyjny root: „Wszystkie serie", „Aktualnie czytane", „Ostatnio dodane", „Nieczytane", „Przeczytane" + link `search` |
 | `GET /opds/series?page=N` | nawigacyjny: serie alfabetycznie (50/stronę, `next`/`previous`, `opensearch:totalResults`); wpis = link `subsection` do feedu serii + okładka pierwszego zeszytu |
 | `GET /opds/series/{id}?page=N` | akwizycyjny: zeszyty serii w kolejności numerów (bez `file_missing`) |
 | `GET /opds/recent?page=N` | akwizycyjny: zeszyty wg `created_at DESC` (rel `sort/new`) |
 | `GET /opds/reading` | akwizycyjny „Aktualnie czytane": zeszyty z `reading_progress`, których ostatnia strona < liczba stron (lub liczba stron nieznana), wg ostatniego czytania (LIMIT 100) |
+| `GET /opds/read?page=N` | akwizycyjny „Przeczytane": zeszyty, których ostatnia zapisana strona osiągnęła liczbę stron, wg czasu ukończenia malejąco (50/stronę) |
+| `GET /opds/unread?page=N` | akwizycyjny „Nieczytane": zeszyty bez żadnego wpisu w `reading_progress` dla danego użytkownika, wg daty dodania malejąco (50/stronę) |
 | `GET /opds/issues/{id}/pages/{n}?width=W` | strona `n` (0-based) z archiwum CBZ/CBR (OPDS-PSE); bez `width` oryginalny plik z typem po rozszerzeniu, z `width` przeskalowanie do W px (max 4000) i JPEG; pobranie strony zapisuje postęp `n+1` (`MAX` z dotychczasowym); 404 poza zakresem, dla PDF i brakujących plików |
 | `GET /opds/search?q=` | akwizycyjny: jedna płaska lista zeszytów po nazwie serii / tytule / numerze (LIMIT 200) |
 | `GET /opds/opensearch.xml` | OpenSearch description z szablonem `…/opds/search?q={searchTerms}` i `<Image>` (ikona katalogu) |
