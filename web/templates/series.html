@@ -27,13 +27,13 @@
         {{end}}
     </div>
     <div class="series-actions">
-        <a class="btn" href="/series/{{.Series.ID}}/edit">Edytuj</a>
+        {{if isAdmin}}<a class="btn" href="/series/{{.Series.ID}}/edit">Edytuj</a>{{end}}
     </div>
 </div>
 
 <div class="scrape-area" id="scrape-area"
      hx-get="/series/{{.Series.ID}}/scrape/status" hx-trigger="load" hx-swap="innerHTML">
-    <noscript><a class="btn" href="/series/{{.Series.ID}}/match">Dopasuj w ComicVine</a></noscript>
+    <noscript>{{if isAdmin}}<a class="btn" href="/series/{{.Series.ID}}/match">Dopasuj w ComicVine</a>{{end}}</noscript>
 </div>
 
 <div class="filter-bar">
@@ -74,10 +74,12 @@
             <span class="badge badge-{{.MetadataSource}}">{{sourceLabel .MetadataSource}}</span>
         </div>
         {{if .FileMissing}}
+        {{if isAdmin}}
         <form action="/issues/{{.ID}}/delete" method="post"
               onsubmit="return confirm('Usunąć rekord tego zeszytu z katalogu?');">
             <button type="submit" class="btn btn-danger" title="Plik zniknął z biblioteki — usuń wpis z katalogu">Usuń</button>
         </form>
+        {{end}}
         {{else}}
         {{if and .Reading .Reading.Finished}}
         <form action="/issues/{{.ID}}/unread" method="post">

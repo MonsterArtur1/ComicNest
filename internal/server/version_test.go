@@ -3,8 +3,6 @@ package server
 import (
 	"strings"
 	"testing"
-
-	"comicnest/internal/config"
 )
 
 func TestVersionFooterOnlyForStampedBuilds(t *testing.T) {
@@ -25,7 +23,7 @@ func TestVersionFooterOnlyForStampedBuilds(t *testing.T) {
 		t.Errorf("stamped build should render the footer with a GitHub link:\n%s", body)
 	}
 	// Only the library page carries the footer.
-	srv.cfg.Users = []config.User{{Name: "ania", Password: "x"}}
+	mustCreateUser(t, srv.store, "ania", "x", false)
 	if body := get(t, srv.Handler(), "/login", nil).Body.String(); strings.Contains(body, "site-footer") {
 		t.Error("login page should not render the footer")
 	}

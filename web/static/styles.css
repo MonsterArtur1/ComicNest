@@ -615,6 +615,47 @@ details.desc .series-desc { margin: 12px 0 4px; }
     color: var(--text-dim);
 }
 
+.admin-section { max-width: 900px; margin-bottom: 32px; }
+.admin-section h2 { font-size: 16px; margin: 0 0 12px; }
+.admin-users-wrap { overflow-x: auto; }
+.admin-users { width: 100%; border-collapse: collapse; font-size: 14px; }
+.admin-users th, .admin-users td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+.admin-row-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.inline-form { display: inline-flex; }
+.admin-password-toggle { position: relative; }
+.admin-password-toggle summary { list-style: none; cursor: pointer; }
+.admin-password-toggle summary::-webkit-details-marker { display: none; }
+.admin-password-form {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 5;
+    margin-top: 6px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    white-space: nowrap;
+}
+.admin-password-form input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 6px 8px;
+    font-size: 13px;
+    font-family: inherit;
+}
+.admin-link { text-decoration: none; }
+
 @media (max-width: 700px) {
     .edit-layout { flex-direction: column; }
     .form-row { flex-direction: column; }

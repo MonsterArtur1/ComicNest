@@ -6,9 +6,8 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 	"path/filepath"
-	"strings"
+	"time"
 
 	"comicnest/internal/comicvine"
 	"comicnest/internal/config"
@@ -69,28 +68,22 @@ func main() {
 	} else {
 		log.Printf("comicvine: enabled")
 	}
-	if cfg.AuthEnabled() {
-		names := make([]string, len(cfg.Users))
-		for i, u := range cfg.Users {
-			names[i] = u.Name
-		}
-		log.Printf("users: %s (web login + OPDS basic auth)", strings.Join(names, ", "))
-		// Progress recorded before accounts existed belongs to the first user.
-		if moved, err := st.AdoptAnonymousProgress(cfg.Users[0].Name); err != nil {
-			log.Printf("users: adopting anonymous progress: %v", err)
-		} else if moved > 0 {
-			log.Printf("users: %d reading-progress record(s) assigned to %s", moved, cfg.Users[0].Name)
-		}
+	userCount, err := st.CountUsers()
+	if err != nil {
+		log.Fatalf("store: counting users: %v", err)
+	}
+	if userCount > 0 {
+		log.Printf("users: %d account(s) (web login + OPDS basic auth) — manage at /admin", userCount)
 	} else {
-		log.Printf("users: none configured — no login, single anonymous reader")
+		log.Printf("users: none yet — app runs open; the first visitor is an anonymous admin who can create one at /admin")
 	}
 	switch {
 	case !cfg.OPDSEnabled:
 		log.Printf("opds: disabled (set opds_enabled: true in config.yaml)")
-	case cfg.AuthEnabled():
+	case userCount > 0:
 		log.Printf("opds: enabled (basic auth with user accounts)")
 	default:
-		log.Printf("opds: enabled (no auth)")
+		log.Printf("opds: enabled (no auth yet)")
 	}
 	if cfg.OPDSEnabled && cfg.Listen == "localhost" {
 		log.Printf("opds: listening on localhost only — set listen: 0.0.0.0 to reach the catalog from other devices")

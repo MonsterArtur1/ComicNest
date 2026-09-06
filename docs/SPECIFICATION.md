@@ -79,45 +79,64 @@ data_dir: "./data"             # baza sqlite + cache okładek
 comicvine_api_key: ""          # puste = funkcje ComicVine wyłączone (UI to komunikuje)
 opds_enabled: false            # katalog OPDS pod /opds (patrz §9a)
 page_size: 60                  # kafelków serii na stronę biblioteki; 0 = bez paginacji
-users:                         # konta; puste = brak logowania (jeden anonimowy czytelnik)
-  - name: artur
-    password: sekret           # plaintext — świadomie (osobista aplikacja w LAN)
-  - name: kasia
-    password: inne
 ```
 
-Przy braku pliku aplikacja zapisuje domyślny config i loguje instrukcję uzupełnienia.
+Przy braku pliku aplikacja zapisuje domyślny config i loguje instrukcję uzupełnienia. Konta
+użytkowników **nie** są częścią tego pliku — żyją w bazie i zarządza się nimi z panelu
+administracyjnego w przeglądarce (`/admin`, patrz niżej), nie edycją YAML.
 
 **Plik `config_example.yaml`** (w korzeniu repozytorium, wersjonowany) jest wzorcem dla użytkownika
 i jedynym pełnym spisem opcji: każdy klucz ma tam komentarz mówiący, co robi i jakie wartości
 przyjmuje. **Zasada:** każda zmiana w konfiguracji (nowy klucz, zmiana nazwy lub domyślnej wartości,
 usunięcie) trafia w tym samym commicie do `config_example.yaml` razem z opisem — a także do bloku
-powyżej i do README. Prawdziwy `config.yaml` (z hasłami i kluczem API) pozostaje w `.gitignore`.
+powyżej i do README. Prawdziwy `config.yaml` (z kluczem API) pozostaje w `.gitignore`.
 Klucz API **nigdy nie trafia do kodu** (w starym projekcie był zahardkodowany — patrz §10).
 
-**Konta użytkowników (`users`).** Jedno źródło prawdy dla logowania do WWW (formularz
-`/login`, sesja w ciasteczku `comicnest_session`: HttpOnly, SameSite=Strict, 30 dni, tabela sesji
-w pamięci — restart wylogowuje) i dla OPDS (HTTP Basic z tymi samymi parami nazwa/hasło).
-Postęp czytania jest per użytkownik (§5). Walidacja: nazwa i hasło wymagane, nazwy unikalne, bez
-`:` (Basic auth). Brak `users` = stare zachowanie: wszystko otwarte, postęp anonimowego czytelnika
-(`user = ''`). Hasła do OPDS pochodzą wyłącznie z `users` — dawna sekcja `opds` (z `username`/`password`)
-została usunięta, a włącznik katalogu to klucz `opds_enabled`. Przy starcie z kontami postęp anonimowy przechodzi na
-pierwsze konto z listy (`Store.AdoptAnonymousProgress`).
+**Konta użytkowników i panel administracyjny (`/admin`).** Konta żyją w tabeli `users`
+(`internal/store/users.go`, migracja 8 w `internal/store/migrate.go`): login, hasło zahaszowane
+bcryptem (`golang.org/x/crypto/bcrypt`, nigdy plaintext — inaczej niż w starym, config-owym systemie),
+flaga `is_admin`, `last_login_at` (uzupełniane przy każdym udanym logowaniu WWW i uwierzytelnieniu
+OPDS Basic). Jedno źródło prawdy dla logowania do WWW (formularz `/login`, sesja w ciasteczku
+`comicnest_session`: HttpOnly, SameSite=Strict, 30 dni, tabela sesji w pamięci — restart wylogowuje)
+i dla OPDS (HTTP Basic z tymi samymi parami nazwa/hasło). Postęp czytania jest per użytkownik (§5).
+
+*Pierwsze uruchomienie* — zero kont w tabeli: aplikacja działa całkowicie otwarta (bez logowania),
+a anonimowy gość jest traktowany jak administrator (`Server.isAdmin`), więc widzi panel `/admin`,
+przycisk skanowania i przyciski edycji/ComicVine, i może stamtąd założyć pierwsze prawdziwe konto.
+Pierwsze utworzone konto **zawsze** zostaje administratorem, niezależnie od checkboxa w formularzu —
+inaczej, w chwili jego powstania logowanie zaczyna być wymagane i nie byłoby już jak wrócić do panelu.
+W tym momencie postęp czytania zapisany przez anonimowego gościa (`user = ''`) przechodzi na to konto
+(`Store.AdoptAnonymousProgress`, wywoływane z `handleAdminCreateUser`).
+
+*Uprawnienia admina.* Middleware `requireAdmin` (`internal/server/auth.go`) chroni: sam panel
+(`/admin/*`), skan biblioteki (`POST /scan`), edycję metadanych serii/zeszytu (formularze edycji,
+odblokowanie, scalanie serii, usuwanie rekordu zniknionego pliku) oraz wyszukiwanie/dopasowywanie/
+scrapowanie ComicVine. Nie-admin (zalogowany, ale bez flagi) dostaje 403 na te trasy; szablony
+(`isAdmin` w `funcMap`, plus pole `IsAdmin` na danych partiala `scrape_status.html`, który jest
+renderowany poza zwykłym zestawem szablonów) chowają odpowiadające im przyciski, więc nie widzi ich
+w ogóle. Czytanie, oznaczanie postępu, przeglądanie i wyszukiwanie zostają dostępne dla każdego
+zalogowanego — to nie jest funkcja administracyjna.
+
+*Zarządzanie kontami* (`/admin`, tylko admin): tabela kont (login, ✓ przy adminie, ostatnie
+logowanie — „nigdy" gdy puste, data utworzenia) z akcjami nadaj/odbierz admina, zmień hasło, usuń,
+oraz formularz dodania konta. Ostatniemu administratorowi nie można odebrać uprawnień ani go usunąć
+(`Store.CountAdmins`) — to zablokowałoby dostęp do panelu na stałe.
 
 **Paginacja biblioteki (`page_size`).** Widok główny dzieli przefiltrowaną listę serii na strony po
 `page_size` kafelków (domyślnie 60; parametr `?page=N`, sortowanie i filtr zachowane w linkach pagera).
 `0` wyłącza paginację, wartość ujemna to błąd konfiguracji. Nie dotyczy OPDS (stała 50 wpisów).
 
 Domyślnie nasłuch tylko na `localhost`. `listen: 0.0.0.0` wystawia aplikację w sieci lokalnej —
-wtedy warto zdefiniować `users`, bo bez kont UI (także edycja metadanych) jest otwarte.
+wtedy warto od razu założyć konto administratora w `/admin`, bo bez kont UI (także edycja metadanych)
+jest otwarte dla każdego w sieci.
 
 **Ścieżka configu i zmienne środowiskowe.** Plik wskazuje flaga `-config`, w drugiej kolejności
 `$COMICNEST_CONFIG`, domyślnie `./config.yaml`. Zmienne `COMICNEST_LISTEN`, `COMICNEST_PORT`,
 `COMICNEST_LIBRARY`, `COMICNEST_DATA_DIR`, `COMICNEST_COMICVINE_API_KEY`, `COMICNEST_OPDS_ENABLED`
 i `COMICNEST_PAGE_SIZE` nadpisują wartości z pliku (`Config.applyEnv`; pusta wartość = nieustawiona,
 błędny typ = błąd startu). Gdy pliku nie ma, do tworzonego domyślnego configu trafiają już wartości
-ze środowiska. `users` nie ma odpowiednika w środowisku. Mechanizm istnieje głównie dla Dockera
-(§4a), ale działa wszędzie.
+ze środowiska. Konta nie mają odpowiednika w pliku ani w środowisku — żyją wyłącznie w bazie.
+Mechanizm zmiennych środowiskowych istnieje głównie dla Dockera (§4a), ale działa wszędzie.
 
 ## 4a. Docker
 
@@ -341,23 +360,24 @@ postępu skanu, dialogu dopasowania ComicVine. Każdy widok działa też bez JS
 
 | Metoda i ścieżka | Widok / akcja |
 |---|---|
-| `GET /login` → `POST /login` (`name`, `password`, `next`) / `POST /logout` | logowanie (tylko gdy `users` zdefiniowane; bez kont → redirect na `/`). Middleware `withAuth`: bez sesji GET → 303 na `/login?next=…`, inne metody → 401; `/opds/*`, `/login`, `/logout`, `/static/*` poza bramką. Nazwa użytkownika w kontekście żądania (`userFrom(r)`), w layoucie „👤 nazwa" + „Wyloguj" (`currentUser` bindowane per żądanie na klonie szablonu) |
+| `GET /login` → `POST /login` (`name`, `password`, `next`) / `POST /logout` | logowanie (tylko gdy w tabeli `users` jest choć jedno konto; bez kont → redirect na `/`). Middleware `withAuth`: bez sesji GET → 303 na `/login?next=…`, inne metody → 401; `/opds/*`, `/login`, `/logout`, `/static/*` poza bramką. Nazwa użytkownika w kontekście żądania (`userFrom(r)`), w layoucie „👤 nazwa" + „Wyloguj" (`currentUser` bindowane per żądanie na klonie szablonu) |
+| `GET /admin` (panel) → `POST /admin/users` (dodaj) / `POST /admin/users/{id}/password` / `POST /admin/users/{id}/admin` (nadaj/odbierz) / `POST /admin/users/{id}/delete` | zarządzanie kontami — tylko admin (`requireAdmin`; przed pierwszym kontem: anonimowy gość). Pierwsze konto zawsze admin. Ostatniemu adminowi nie można odebrać uprawnień ani go usunąć |
 | `GET /?sort=&filter=` | grid serii (okładka, nazwa, liczba zeszytów, zielony znaczek ✓ gdy wszystkie dostępne zeszyty przeczytane); sort: nazwa / ostatnio dodane; filtry: wszystkie / nieczytane (żaden zeszyt nie ma realnego postępu) / w trakcie czytania (jest realny postęp, nie wszystko skończone) / przeczytane (każdy dostępny zeszyt doczytany, ≥1 zeszyt) / bez metadanych z ComicVine (jakiś zeszyt ze źródłem `filename` lub `comicinfo`) / brakujące pliki (jakiś zeszyt `file_missing`). Agregaty liczone w `ListSeries` (`LEFT JOIN reading_progress`, HAVING). Samo otwarcie i zamknięcie zeszytu (tylko strona 1) nie liczy się jako „realny postęp" — próg to strona 2+, albo od razu koniec (zeszyt jednostronicowy) |
 | `GET /series/{id}` | strona serii: metadane + lista zeszytów (okładka, numer, tytuł, data, rozmiar, badge źródła metadanych, pasek postępu czytania pod okładką + „czytane: str. X z N (P%)" / „✓ przeczytane") |
-| `GET /series/{id}/edit` → `POST /series/{id}` | formularz edycji serii (nazwa, wydawca, opis) |
-| `POST /series/{id}/match` / `POST /series/{id}/match/{volumeID}` | wyszukanie kandydatów ComicVine / zapis wyboru |
-| `POST /series/{id}/scrape` | pobranie metadanych ComicVine dla zeszytów serii bez dopasowania |
+| `GET /series/{id}/edit` → `POST /series/{id}` | formularz edycji serii (nazwa, wydawca, opis) — tylko admin |
+| `POST /series/{id}/match` / `POST /series/{id}/match/{volumeID}` | wyszukanie kandydatów ComicVine / zapis wyboru — tylko admin |
+| `POST /series/{id}/scrape` | pobranie metadanych ComicVine dla zeszytów serii bez dopasowania — tylko admin |
 | `GET /issues/{id}` | szczegóły zeszytu (pełne metadane, duża okładka; przycisk „Czytaj" / „Czytaj dalej (str. X)" / „Czytaj od nowa" dla CBZ/CBR; przy postępie czytania ramka „W trakcie czytania / Przeczytane — przeczytano X z N stron (P%) · ostatnio data" z paskiem, wiersz „Przeczytano" w tabeli; „Strony" pokazuje `file_pages` z fallbackiem na `page_count`) |
-| `GET /issues/{id}/edit` → `POST /issues/{id}` | formularz edycji zeszytu (numer, tytuł, opis, data, twórcy, wydawca); zapis ustawia `manual` + `locked` |
-| `POST /issues/{id}/unlock` | zdjęcie blokady metadanych |
+| `GET /issues/{id}/edit` → `POST /issues/{id}` | formularz edycji zeszytu (numer, tytuł, opis, data, twórcy, wydawca); zapis ustawia `manual` + `locked` — tylko admin |
+| `POST /issues/{id}/unlock` | zdjęcie blokady metadanych — tylko admin |
 | `GET /issues/{id}/read?page=N` | czytnik w przeglądarce (osobny szablon `reader.html` bez layoutu + `static/reader.js`): jedna strona na ekran, zoom (dopasuj wysokość / szerokość / skala 20–400% z przewijaniem, zapamiętana w `localStorage`), przewracanie (strzałki, Space/PageUp/PageDown, Home/End, klik w lewą/prawą 30% ekranu, swipe, kółko gdy strona mieści się w całości, suwak), pełny ekran, auto-ukrywane paski, preload sąsiednich stron, na dolnym pasku linki ◂◂/▸▸ do poprzedniego/następnego czytelnego zeszytu serii (bez popupu na końcu — użytkownik sam wychodzi; wcześniejsza nakładka „Koniec zeszytu" usunięta na życzenie). Start: `?page=` → postęp (gdy < liczba stron) → 1. Tylko CBZ/CBR obecne na dysku (404 dla PDF/brakujących); brak `file_pages` → liczy i zapisuje |
 | `GET /issues/{id}/pages/{n}?track=0` | ten sam handler co w OPDS; `track=0` (używane przez czytnik, który preloaduje) nie zapisuje postępu |
 | `POST /issues/{id}/progress` (`page=`, 1-based) | jawny zapis postępu z czytnika (fetch po zmianie strony z debounce 400 ms, `sendBeacon` przy opuszczaniu strony); `MAX` z dotychczasowym jak w OPDS; 400 poza zakresem; 204 |
 | `POST /issues/{id}/read` / `POST /issues/{id}/unread` | oznaczenie zeszytu jako przeczytany (postęp = liczba stron; dla archiwum bez policzonych stron liczy je teraz; przy nieznanej liczbie stron błąd flash) / nieprzeczytany (usunięcie postępu). Pole `next` (tylko ścieżki lokalne) wraca na stronę listy; bez niego redirect na stronę zeszytu z `?msg=` |
-| `POST /issues/{id}/scrape` | ComicVine dla pojedynczego zeszytu |
+| `POST /issues/{id}/scrape` | ComicVine dla pojedynczego zeszytu — tylko admin |
 | `GET /issues/{id}/cover` | miniatura z cache (Cache-Control; placeholder gdy brak) |
 | `GET /issues/{id}/download` | plik komiksu (`Content-Disposition: attachment`, oryginalna nazwa, `Content-Type` wg rozszerzenia: `application/vnd.comicbook+zip` / `-rar` / `application/pdf`) |
-| `POST /scan` / `GET /scan/status` | start skanu / partial HTMX z postępem |
+| `POST /scan` — tylko admin / `GET /scan/status` | start skanu / partial HTMX z postępem |
 | `GET /search?q=` | wyniki po nazwach serii, tytułach i numerach zeszytów (LIKE) |
 | `GET /static/...` | statyki z `embed.FS` |
 | `GET /healthz` | sonda stanu (`ok`, bez logowania) — Docker/orkiestratory |
@@ -369,7 +389,7 @@ Filtry na stronie serii i w gridzie: wszystkie / bez metadanych (`metadata_sourc
 
 OPDS 1.2 (Atom) — format obsługiwany przez czytniki komiksów (Panels, Chunky, Moon+ Reader,
 Librera, KOReader, Mihon przez rozszerzenie). Cały katalog — feedy, okładki i pliki — żyje pod
-prefiksem `/opds`, żeby HTTP Basic auth (konta z `users`, §4) obejmowało wszystko, czego dotyka
+prefiksem `/opds`, żeby HTTP Basic auth (konta z tabeli `users`, §4) obejmowało wszystko, czego dotyka
 czytnik; zalogowany użytkownik trafia do kontekstu żądania, więc `pse:lastRead`, „Aktualnie
 czytane" i postęp ze strumieniowania są jego. Bez kont katalog jest otwarty (czytelnik anonimowy).
 Gdy OPDS jest wyłączony, trasy nie są rejestrowane (404 z catch-alla).

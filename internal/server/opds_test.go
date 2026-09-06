@@ -20,7 +20,28 @@ import (
 	"comicnest/internal/covers"
 	"comicnest/internal/library"
 	"comicnest/internal/store"
+	"golang.org/x/crypto/bcrypt"
 )
+
+// mustCreateUser creates an account directly in the store (bypassing the
+// admin panel HTTP handlers, which is fine for tests that only need the
+// account to exist to exercise login/OPDS/admin-gating behavior).
+func mustCreateUser(t *testing.T, st *store.Store, name, password string, isAdmin bool) *store.User {
+	t.Helper()
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := st.CreateUser(name, string(hash), isAdmin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := st.GetUser(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u
+}
 
 // newTestServer builds a Server over a fresh SQLite database in a temp dir,
 // seeded with one series holding two issues (one of them missing on disk).
@@ -559,7 +580,7 @@ func TestOPDSNoStreamingForPDF(t *testing.T) {
 
 func TestOPDSBasicAuth(t *testing.T) {
 	srv, _ := newTestServer(t, true)
-	srv.cfg.Users = []config.User{{Name: "artur", Password: "sekret"}}
+	mustCreateUser(t, srv.store, "artur", "sekret", false)
 	h := srv.Handler()
 
 	for _, path := range []string{"/opds", "/opds/series/1", "/opds/issues/1/file", "/opds/issues/1/cover"} {

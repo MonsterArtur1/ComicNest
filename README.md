@@ -31,8 +31,10 @@ file, no cloud account.
 - **Serves an OPDS catalog** for comic reader apps on phones and tablets (Panels, Chunky,
   Moon+ Reader, Librera, KOReader, Thorium…). Readers can browse, search, download, or stream
   pages straight from the server without downloading the file.
-- **Supports several users** — optional accounts with separate reading progress, used by both
-  the web interface and the OPDS catalog.
+- **Supports several users** — accounts (with separate reading progress) created from an
+  in-browser admin panel, used by both the web interface and the OPDS catalog. Editing
+  metadata, scanning the library and ComicVine search are admin-only; everyone else can
+  browse, read and track their own progress.
 - Dark theme, works without JavaScript.
 
 ## Screenshots
@@ -96,28 +98,29 @@ data_dir: ./data              # runtime data: SQLite database and cover cache
 comicvine_api_key: ""         # key from https://comicvine.gamespot.com/api/ — leave empty to disable ComicVine features
 opds_enabled: false           # OPDS catalog at http://<host>:8080/opds for reader apps
 page_size: 60                 # series tiles per page in the library grid; 0 = everything on one page
-users:                        # accounts (optional); no section = no login, one anonymous reader
-  - name: alice               # login name for the web UI and OPDS — must not contain ":"
-    password: secret          # stored in plain text on purpose (personal app on a home network)
-  - name: bob                 # every account has its own reading progress
-    password: other
 ```
 
-A few things worth knowing:
+User accounts are **not** in this file — you create them from the browser, in the admin panel
+at `/admin`. A few things worth knowing:
 
 - **Opening the server to your network.** By default ComicNest listens on `localhost` only.
   Set `listen: 0.0.0.0` to reach it from phones, tablets and other computers. If you do that,
-  add `users`, otherwise anyone on the network can edit your library.
-- **User accounts.** With `users` defined, the web interface asks for a login and reader apps
-  ask for the same name and password. Each user has their own progress: progress bars,
-  "read" marks, filters and the "currently reading" list are personal. Progress recorded before
-  accounts existed is assigned to the first user in the list.
+  create an admin account first, otherwise anyone on the network can edit your library.
+- **User accounts and the admin panel.** Until you create the first account, ComicNest runs
+  wide open and treats you as an anonymous admin, so you can visit `/admin` and create one —
+  it becomes an admin automatically. From then on the web UI asks for a login, and OPDS reader
+  apps ask for the same name and password. Each account has its own reading progress: progress
+  bars, "read" marks, filters and the "currently reading" list are personal. Only admin accounts
+  can scan the library, edit series/issue metadata, or search/match ComicVine; other accounts
+  can browse, read and track their own progress. The admin panel also shows each account's last
+  login time and lets you promote, demote, reset the password of, or delete an account (the
+  last remaining admin is protected from demotion/deletion).
 - **ComicVine.** Without a key everything works, but matching and metadata download are
   disabled and the interface says so. Get a free key at comicvine.gamespot.com/api.
-- **Environment variables.** Every key except `users` can be overridden with
-  `COMICNEST_<KEY>` (for example `COMICNEST_LISTEN=0.0.0.0` or
-  `COMICNEST_COMICVINE_API_KEY=…`). `COMICNEST_CONFIG` sets the config file path. Values from
-  the environment win over the file. This is what the Docker image uses, but it works anywhere.
+- **Environment variables.** Every key can be overridden with `COMICNEST_<KEY>` (for example
+  `COMICNEST_LISTEN=0.0.0.0` or `COMICNEST_COMICVINE_API_KEY=…`). `COMICNEST_CONFIG` sets the
+  config file path. Values from the environment win over the file. This is what the Docker
+  image uses, but it works anywhere.
 
 ### 4. Organising your comics
 
@@ -201,9 +204,10 @@ SSH) and GID `100` (the `users` group). On Unraid use `99` / `100`. If you leave
 the container keeps running as root.
 
 **First start.** The container creates `config/config.yaml` with the right paths already
-filled in (`listen: 0.0.0.0`, `library: /comics`, `data_dir: /data`). Add your accounts
-and ComicVine key to that file, run `docker compose restart`, then open
-`http://<your-host>:8080/` and click **Skanuj bibliotekę**.
+filled in (`listen: 0.0.0.0`, `library: /comics`, `data_dir: /data`). Add your ComicVine key
+to that file if you want ComicVine features, run `docker compose restart`, then open
+`http://<your-host>:8080/` — you'll be an anonymous admin until you create your first account
+at `/admin` — and click **Skanuj bibliotekę**.
 
 **Updating.** `docker compose pull` followed by `docker compose up -d`. Database migrations
 run automatically on start.
@@ -222,6 +226,7 @@ The catalog offers **all series** with covers, **currently reading**, **recently
 CBZ/CBR issues directly from the server without downloading the file, resume at the last page,
 and their progress shows up in the web interface as well. PDFs are download-only.
 
-If you defined `users`, the reader will ask for a login and see that user's progress. On the
+If you created accounts in the admin panel, the reader will ask for a login and see that
+user's progress. On the
 same computer (for example Thorium Reader on a PC) use `http://127.0.0.1:8080/opds` — Thorium
 refuses `localhost`. The server prints all working addresses when it starts.

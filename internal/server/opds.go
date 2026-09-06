@@ -43,12 +43,12 @@ func (s *Server) opdsRoutes() {
 	handle("GET /opds/issues/{id}/pages/{page}", s.handleIssuePage)
 }
 
-// opdsAuth enforces HTTP Basic auth against the configured user accounts and
-// binds the authenticated user to the request, so progress recorded through
-// the catalog lands on that user's record.
+// opdsAuth enforces HTTP Basic auth against the accounts table and binds the
+// authenticated user to the request, so progress recorded through the
+// catalog lands on that user's record.
 func (s *Server) opdsAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !s.cfg.AuthEnabled() {
+		if !s.authEnabled() {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -57,6 +57,9 @@ func (s *Server) opdsAuth(next http.Handler) http.Handler {
 			w.Header().Set("WWW-Authenticate", `Basic realm="ComicNest OPDS", charset="UTF-8"`)
 			http.Error(w, "Wymagane logowanie do katalogu OPDS.", http.StatusUnauthorized)
 			return
+		}
+		if err := s.store.TouchUserLogin(u); err != nil {
+			log.Printf("opds auth: recording last login for %q: %v", u, err)
 		}
 		next.ServeHTTP(w, withUser(r, u))
 	})

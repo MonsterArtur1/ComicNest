@@ -4,34 +4,26 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
-// User is an account defined in config.yaml. The same credentials log into
-// the web UI and authenticate OPDS readers; reading progress is per user.
-type User struct {
-	Name     string `yaml:"name"`
-	Password string `yaml:"password"` // plain text, by design (personal LAN app)
-}
-
-// Config holds all application settings, loaded from config.yaml.
+// Config holds all application settings, loaded from config.yaml. User
+// accounts are not part of it — they live in the database (see
+// internal/store/users.go) and are managed from the admin panel (/admin) at
+// runtime, not by editing this file.
 type Config struct {
 	Port int `yaml:"port"`
 	// Listen is the interface to bind to. "localhost" keeps the app private to
 	// this machine; "0.0.0.0" exposes it on the LAN (needed for OPDS readers on
-	// phones/tablets — define users then, so the UI is behind a login).
+	// phones/tablets — create an admin account then, so the UI is behind a login).
 	Listen          string `yaml:"listen"`
 	Library         string `yaml:"library"`
 	DataDir         string `yaml:"data_dir"`
 	ComicVineAPIKey string `yaml:"comicvine_api_key"`
 	// OPDSEnabled turns on the OPDS catalog for external comic readers. The
-	// catalog is protected with HTTP Basic auth using the `users` accounts.
+	// catalog is protected with HTTP Basic auth using the accounts table.
 	OPDSEnabled bool `yaml:"opds_enabled"`
-	// Users enables login. Empty = no accounts: the UI and OPDS are open and
-	// everything is tracked for one anonymous reader.
-	Users []User `yaml:"users"`
 	// PageSize is the number of series tiles per page of the library grid.
 	// 0 disables pagination (everything on one page).
 	PageSize int `yaml:"page_size"`
@@ -48,29 +40,15 @@ func defaults() Config {
 		DataDir:         "./data",
 		ComicVineAPIKey: "",
 		OPDSEnabled:     false,
-		Users:           nil,
 		PageSize:        DefaultPageSize,
 	}
-}
-
-// AuthEnabled reports whether any user accounts are configured.
-func (c Config) AuthEnabled() bool { return len(c.Users) > 0 }
-
-// FindUser returns the user with the given name, or nil.
-func (c Config) FindUser(name string) *User {
-	for i := range c.Users {
-		if c.Users[i].Name == name {
-			return &c.Users[i]
-		}
-	}
-	return nil
 }
 
 // EnvPrefix is the prefix of environment variables that override config.yaml
 // (COMICNEST_LISTEN, COMICNEST_PORT, COMICNEST_LIBRARY, COMICNEST_DATA_DIR,
 // COMICNEST_COMICVINE_API_KEY, COMICNEST_OPDS_ENABLED, COMICNEST_PAGE_SIZE).
 // The Docker image uses them to point at its volumes; they also let the API
-// key live outside the file. Accounts (`users`) are file-only.
+// key live outside the file.
 const EnvPrefix = "COMICNEST_"
 
 // Load reads the config file at path and applies environment overrides. If
@@ -112,9 +90,6 @@ func Load(path string) (Config, error) {
 	if cfg.PageSize < 0 {
 		return cfg, fmt.Errorf("invalid page_size %d in %s (0 = no pagination)", cfg.PageSize, path)
 	}
-	if err := cfg.normalizeUsers(path); err != nil {
-		return cfg, err
-	}
 	return cfg, nil
 }
 
@@ -151,28 +126,6 @@ func (c *Config) applyEnv() error {
 			return fmt.Errorf("%sOPDS_ENABLED: %q is not a boolean", EnvPrefix, v)
 		}
 		c.OPDSEnabled = b
-	}
-	return nil
-}
-
-// normalizeUsers validates accounts: names required and unique, passwords
-// required.
-func (c *Config) normalizeUsers(path string) error {
-	seen := make(map[string]bool)
-	for i, u := range c.Users {
-		u.Name = strings.TrimSpace(u.Name)
-		c.Users[i].Name = u.Name
-		switch {
-		case u.Name == "":
-			return fmt.Errorf("users[%d]: name is required in %s", i, path)
-		case strings.ContainsAny(u.Name, ":\n\r"):
-			return fmt.Errorf("users[%d]: name %q must not contain ':' (HTTP Basic auth)", i, u.Name)
-		case u.Password == "":
-			return fmt.Errorf("users[%d] (%s): password is required in %s", i, u.Name, path)
-		case seen[u.Name]:
-			return fmt.Errorf("users: duplicate name %q in %s", u.Name, path)
-		}
-		seen[u.Name] = true
 	}
 	return nil
 }
