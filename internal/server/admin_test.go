@@ -133,7 +133,7 @@ func TestAdminDeleteMissing(t *testing.T) {
 	c := login(t, h, "admin", "adminpass")
 
 	body := get(t, h, "/admin", asUser(c)).Body.String()
-	if !strings.Contains(body, `action="/admin/missing/delete"`) || !strings.Contains(body, "Delete all missing files (1)") {
+	if !strings.Contains(body, `action="/admin/missing/delete"`) || !strings.Contains(body, "Delete all missing entries (1)") {
 		t.Errorf("admin panel should offer to delete the one missing record:\n%s", body)
 	}
 
@@ -156,6 +156,33 @@ func TestAdminDeleteMissing(t *testing.T) {
 	body = get(t, h, "/admin", asUser(c)).Body.String()
 	if strings.Contains(body, `action="/admin/missing/delete"`) {
 		t.Errorf("the delete-missing button should disappear once nothing is missing:\n%s", body)
+	}
+}
+
+// TestAdminStatistics checks the Statistics section against the known seed
+// data from newTestServer: one series ("Saga") with one present issue (10
+// bytes, filename-sourced) and one missing issue.
+func TestAdminStatistics(t *testing.T) {
+	srv, _ := newTestServer(t, false)
+	h := srv.Handler()
+	mustCreateUser(t, srv.store, "admin", "adminpass", true)
+	c := login(t, h, "admin", "adminpass")
+
+	body := get(t, h, "/admin", asUser(c)).Body.String()
+	for _, want := range []string{
+		"<dt>Series</dt><dd>1</dd>",
+		"<dt>One-shots</dt><dd>0</dd>",
+		"<dt>Locked series</dt><dd>0</dd>",
+		"<dt>Issues</dt><dd>1</dd>",
+		"<dt>Missing files</dt><dd>1</dd>",
+		"<dt>Library size</dt><dd>10 B</dd>",
+		"<dt>From ComicVine</dt><dd>0</dd>",
+		"<dt>No ComicVine metadata</dt><dd>1</dd>",
+		"<dt>Locked issues</dt><dd>0</dd>",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("admin panel stats missing %q:\n%s", want, body)
+		}
 	}
 }
 

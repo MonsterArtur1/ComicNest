@@ -123,6 +123,10 @@ user — those aren't admin functions.
 plus an add-account form. The last remaining administrator cannot have their privileges revoked or
 be deleted (`Store.CountAdmins`) — that would lock everyone out of the panel permanently.
 
+The panel also shows a Statistics section (`Store.LibraryStats`): series/one-shot/locked-series
+counts, present and missing issue counts, total library size on disk, and ComicVine coverage
+(from ComicVine / no ComicVine metadata / locked issues).
+
 **Library pagination (`page_size`).** The home view splits the filtered series list into pages of
 `page_size` tiles (default 60; `?page=N` parameter, sort and filter preserved in pager links). `0`
 disables pagination; a negative value is a config error. Does not apply to OPDS (a fixed 50
