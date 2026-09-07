@@ -6,6 +6,21 @@
 {{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
 
 <section class="admin-section">
+    <h2>Library</h2>
+    <div class="scan-area admin-scan-area" id="scan-area" hx-get="/scan/status" hx-trigger="load" hx-swap="innerHTML">
+        <noscript>
+            <form action="/scan" method="post"><button type="submit">Scan Library</button></form>
+        </noscript>
+    </div>
+    {{if .MissingCount}}
+    <form action="/admin/missing/delete" method="post" class="inline-form admin-missing-form"
+          onsubmit="return confirm('Delete all {{.MissingCount}} missing file record(s) from the catalog? This cannot be undone.');">
+        <button type="submit" class="btn btn-danger">Delete all missing entries ({{.MissingCount}})</button>
+    </form>
+    {{end}}
+</section>
+
+<section class="admin-section">
     <h2>Users</h2>
     {{if .Users}}
     <div class="admin-users-wrap">

@@ -195,6 +195,8 @@ code {
 
 /* --- scan widget --- */
 .scan-area { margin-left: auto; }
+.admin-scan-area { margin-left: 0; margin-bottom: 12px; }
+.admin-missing-form { margin-top: 4px; }
 
 .scan-status {
     display: flex;

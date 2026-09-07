@@ -223,6 +223,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /admin/users/{id}/password", s.requireAdmin(s.handleAdminSetPassword))
 	s.mux.HandleFunc("POST /admin/users/{id}/admin", s.requireAdmin(s.handleAdminSetAdmin))
 	s.mux.HandleFunc("POST /admin/users/{id}/delete", s.requireAdmin(s.handleAdminDeleteUser))
+	s.mux.HandleFunc("POST /admin/missing/delete", s.requireAdmin(s.handleAdminDeleteMissing))
 	if s.cfg.OPDSEnabled {
 		s.opdsRoutes()
 	}

@@ -1,7 +1,7 @@
 # ComicNest in Docker. Copy this file, adjust the comics path, then:
 #   docker compose up -d
 # First start creates ./config/config.yaml — add users / ComicVine key there,
-# then `docker compose restart`. Open http://<host>:8080/ and click "Scan Library".
+# then `docker compose restart`. Open http://<host>:8080/, go to the admin panel and click "Scan Library".
 services:
   comicnest:
     image: jaggred/comicnest:latest
