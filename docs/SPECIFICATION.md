@@ -125,7 +125,9 @@ be deleted (`Store.CountAdmins`) — that would lock everyone out of the panel p
 
 The panel also shows a Statistics section (`Store.LibraryStats`): series/one-shot/locked-series
 counts, present and missing issue counts, total library size on disk, and ComicVine coverage
-(from ComicVine / no ComicVine metadata / locked issues).
+(from ComicVine / no ComicVine metadata / locked issues). Below it, a Scan History section lists
+the most recent completed scans (`scan_history` table, migration 9; see §6) — when they ran, how
+long they took, files found/processed/missing, ComicVine updates, and any error.
 
 **Library pagination (`page_size`).** The home view splits the filtered series list into pages of
 `page_size` tiles (default 60; `?page=N` parameter, sort and filter preserved in pager links). `0`
@@ -307,6 +309,12 @@ Algorithm:
 6. After walking the tree: records whose files weren't found get `file_missing=1` (never deleted —
    the user sees them and decides). Series with no issues left are hidden.
 7. PDF: catalogued with metadata from the file name, a placeholder cover, `page_count=0`.
+
+Once the goroutine finishes (`Scanner.run`, after the optional ComicVine follow-up phase — see §8),
+it records the outcome as one row in `scan_history` (migration 9: started/finished time, found/
+processed/missing counts, ComicVine updated/failed counts, the error if any) — best-effort, a
+write failure is logged but never fails the scan. This is what backs the admin panel's Scan History
+section (§4); the in-memory `Status` struct alone would lose everything on restart.
 
 ## 7. ComicInfo.xml
 

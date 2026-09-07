@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"comicnest/internal/store"
 )
 
 func TestAdminCreateUserFirstAccountIsAdmin(t *testing.T) {
@@ -182,6 +184,48 @@ func TestAdminStatistics(t *testing.T) {
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("admin panel stats missing %q:\n%s", want, body)
+		}
+	}
+}
+
+// TestAdminScanHistory checks the Scan History table renders seeded rows
+// (bypassing a real scan, same directness as TestAdminStatistics).
+func TestAdminScanHistory(t *testing.T) {
+	srv, _ := newTestServer(t, false)
+	h := srv.Handler()
+	mustCreateUser(t, srv.store, "admin", "adminpass", true)
+	c := login(t, h, "admin", "adminpass")
+
+	// Empty state first.
+	body := get(t, h, "/admin", asUser(c)).Body.String()
+	if !strings.Contains(body, "No scans yet.") {
+		t.Errorf("admin panel should show the empty scan history hint:\n%s", body)
+	}
+
+	if err := srv.store.RecordScanHistory(store.ScanHistoryEntry{
+		StartedAt: "2024-01-01 10:00:00", FinishedAt: "2024-01-01 10:00:05",
+		Found: 5, Processed: 5, Missing: 1, CVUpdated: 2, CVFailed: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.store.RecordScanHistory(store.ScanHistoryEntry{
+		StartedAt: "2024-01-02 10:00:00", FinishedAt: "2024-01-02 10:00:03",
+		Found: 2, Processed: 2, Missing: 0, Err: "walk failed",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	body = get(t, h, "/admin", asUser(c)).Body.String()
+	for _, want := range []string{
+		"walk failed",
+		"2 / 2",
+		"5 / 5",
+		"2 updated, 1 failed",
+		"<td>5s</td>",
+		"<td>3s</td>",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("admin panel scan history missing %q:\n%s", want, body)
 		}
 	}
 }

@@ -36,6 +36,33 @@
 </section>
 
 <section class="admin-section">
+    <h2>Scan History</h2>
+    {{if .ScanHistory}}
+    <div class="admin-users-wrap">
+    <table class="admin-users">
+        <thead>
+            <tr><th>Started</th><th>Duration</th><th>Files</th><th>Missing</th><th>ComicVine</th><th>Result</th></tr>
+        </thead>
+        <tbody>
+        {{range .ScanHistory}}
+            <tr>
+                <td>{{.Started}}</td>
+                <td>{{.Duration}}</td>
+                <td>{{.Processed}} / {{.Found}}</td>
+                <td>{{.Missing}}</td>
+                <td>{{if or .CVUpdated .CVFailed}}{{.CVUpdated}} updated{{if .CVFailed}}, {{.CVFailed}} failed{{end}}{{else}}—{{end}}</td>
+                <td>{{if .Err}}<span class="scan-error">{{.Err}}</span>{{else}}OK{{end}}</td>
+            </tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+    {{else}}
+    <p class="hint">No scans yet.</p>
+    {{end}}
+</section>
+
+<section class="admin-section">
     <h2>Users</h2>
     {{if .Users}}
     <div class="admin-users-wrap">

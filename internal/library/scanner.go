@@ -124,6 +124,21 @@ func (sc *Scanner) run() {
 			st.Err = err.Error()
 		}
 	})
+
+	final := sc.Status()
+	entry := store.ScanHistoryEntry{
+		StartedAt:  final.StartedAt.UTC().Format("2006-01-02 15:04:05"),
+		FinishedAt: final.FinishedAt.UTC().Format("2006-01-02 15:04:05"),
+		Found:      final.Found,
+		Processed:  final.Processed,
+		Missing:    final.Missing,
+		CVUpdated:  final.CVUpdated,
+		CVFailed:   final.CVFailed,
+		Err:        final.Err,
+	}
+	if err := sc.store.RecordScanHistory(entry); err != nil {
+		log.Printf("scan: recording history: %v", err)
+	}
 }
 
 func (sc *Scanner) scan() error {
