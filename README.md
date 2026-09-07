@@ -148,7 +148,7 @@ edit locks the record (🔒) until you unlock it.
 
 ## Running with Docker
 
-The image `ghcr.io/monsterartur1/comicnest` is about 15 MB and is built for `linux/amd64`
+The image `jaggred/comicnest` (on [Docker Hub](https://hub.docker.com/r/jaggred/comicnest)) is about 15 MB and is built for `linux/amd64`
 and `linux/arm64`, so it runs on x86 servers, Raspberry Pi and ARM-based NAS units. Tags:
 `latest` is the newest build, `1.2.0` / `1.2` / `1` are stable releases.
 
@@ -172,7 +172,7 @@ docker compose up -d
 ```yaml
 services:
   comicnest:
-    image: ghcr.io/monsterartur1/comicnest:latest
+    image: jaggred/comicnest:latest
     container_name: comicnest
     ports:
       - "8080:8080"

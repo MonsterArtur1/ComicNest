@@ -59,7 +59,7 @@ ComicNextClaude/
 │   ├── templates/               # layout.html + widoki + partiale HTMX
 │   └── static/                  # htmx.min.js, styles.css, placeholder.svg, favicon.png, favicon-32.png, favicon.ico, apple-touch-icon.png
 ├── docs/                        # ta dokumentacja
-├── .github/workflows/go.yml     # CI: testy + binaria (Win/Linux/macOS) + obraz Docker (GHCR) po każdym pushu na main, wydania z tagów v*
+├── .github/workflows/go.yml     # CI: testy + binaria (Win/Linux/macOS) + obraz Docker (Docker Hub) po każdym pushu na main, wydania z tagów v*
 ├── Dockerfile                   # obraz: static binary w distroless, wolumeny /comics /config /data (§4a)
 ├── docker-compose.yml           # przykład uruchomienia dla użytkowników
 ├── .dockerignore
@@ -155,7 +155,7 @@ odczytu, `/config`, `/data`) wystarczają, a pierwszy start tworzy poprawny `con
 `GET /healthz` (poza logowaniem i logiem żądań) zwraca `ok`; `comicnest -healthcheck` odpytuje go
 po `127.0.0.1:port` i kończy się kodem 0/1 — to `HEALTHCHECK` w `docker-compose.yml`, bo obraz nie
 ma `curl`. Publikacja: job `docker` w `.github/workflows/go.yml` buduje `linux/amd64` + `linux/arm64`
-(buildx + QEMU) i wypycha do `ghcr.io/monsterartur1/comicnest` — `latest` i `main-<sha>` z `main`,
+(buildx + QEMU) i wypycha do Docker Hub (`jaggred/comicnest`) — `latest` i `main-<sha>` z `main`,
 `X.Y.Z`/`X.Y`/`X` z tagów. Wersja trafia do obrazu przez `--build-arg VERSION`. Przykład użycia
 w `docker-compose.yml`; `/data` na lokalnym dysku (SQLite na SMB/NFS grozi uszkodzeniem bazy).
 

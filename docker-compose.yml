@@ -4,7 +4,7 @@
 # then `docker compose restart`. Open http://<host>:8080/ and click "Skanuj bibliotekę".
 services:
   comicnest:
-    image: ghcr.io/monsterartur1/comicnest:latest
+    image: jaggred/comicnest:latest
     container_name: comicnest
     ports:
       - "8080:8080"
