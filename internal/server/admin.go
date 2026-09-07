@@ -21,6 +21,19 @@ type adminUserRow struct {
 	CreatedAt string
 }
 
+// scanHistoryRow is one past scan shaped for the admin panel's Scan History
+// table.
+type scanHistoryRow struct {
+	Started   string // "2006-01-02 15:04" local time
+	Duration  string // e.g. "12s", or "-" when the timestamps don't parse
+	Found     int
+	Processed int
+	Missing   int
+	CVUpdated int
+	CVFailed  int
+	Err       string
+}
+
 type adminData struct {
 	Users []adminUserRow
 	// IsFirstRun is true when no account exists yet: the add-user form force
@@ -32,7 +45,9 @@ type adminData struct {
 	// Stats is the library-wide health snapshot shown in the Statistics
 	// section.
 	Stats store.LibraryStats
-	Error string
+	// ScanHistory is the most recent completed scans, newest first.
+	ScanHistory []scanHistoryRow
+	Error       string
 }
 
 // adminPageData loads the current account list and library status for the
@@ -64,7 +79,45 @@ func (s *Server) adminPageData() (adminData, error) {
 	if err != nil {
 		return adminData{}, err
 	}
-	return adminData{Users: rows, IsFirstRun: len(rows) == 0, MissingCount: missing, Stats: stats}, nil
+	history, err := s.store.ListScanHistory(20)
+	if err != nil {
+		return adminData{}, err
+	}
+	return adminData{
+		Users:        rows,
+		IsFirstRun:   len(rows) == 0,
+		MissingCount: missing,
+		Stats:        stats,
+		ScanHistory:  scanHistoryRows(history),
+	}, nil
+}
+
+// scanHistoryRows formats store.ScanHistoryEntry rows for the Scan History
+// table.
+func scanHistoryRows(history []store.ScanHistoryEntry) []scanHistoryRow {
+	rows := make([]scanHistoryRow, len(history))
+	for i, h := range history {
+		started := opds.ParseDBTime(h.StartedAt, time.Time{})
+		finished := opds.ParseDBTime(h.FinishedAt, time.Time{})
+		startedStr, duration := "-", "-"
+		if !started.IsZero() {
+			startedStr = started.Local().Format("2006-01-02 15:04")
+		}
+		if !started.IsZero() && !finished.IsZero() {
+			duration = finished.Sub(started).Round(time.Second).String()
+		}
+		rows[i] = scanHistoryRow{
+			Started:   startedStr,
+			Duration:  duration,
+			Found:     h.Found,
+			Processed: h.Processed,
+			Missing:   h.Missing,
+			CVUpdated: h.CVUpdated,
+			CVFailed:  h.CVFailed,
+			Err:       h.Err,
+		}
+	}
+	return rows
 }
 
 func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {

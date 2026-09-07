@@ -132,6 +132,23 @@ var migrations = []string{
 		updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 	);
 	`,
+
+	// 9: one row per completed scan, so the admin panel can show a history
+	// instead of just the current/last status (which the in-memory Status
+	// struct forgets on restart).
+	`
+	CREATE TABLE scan_history (
+		id          INTEGER PRIMARY KEY,
+		started_at  TEXT NOT NULL,
+		finished_at TEXT NOT NULL,
+		found       INTEGER NOT NULL DEFAULT 0,
+		processed   INTEGER NOT NULL DEFAULT 0,
+		missing     INTEGER NOT NULL DEFAULT 0,
+		cv_updated  INTEGER NOT NULL DEFAULT 0,
+		cv_failed   INTEGER NOT NULL DEFAULT 0,
+		error       TEXT NOT NULL DEFAULT ''
+	);
+	`,
 }
 
 func migrate(db *sql.DB) error {
