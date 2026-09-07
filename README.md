@@ -106,6 +106,13 @@ at `/admin`. A few things worth knowing:
 - **Opening the server to your network.** By default ComicNest listens on `localhost` only.
   Set `listen: 0.0.0.0` to reach it from phones, tablets and other computers. If you do that,
   create an admin account first, otherwise anyone on the network can edit your library.
+- **Editing the ComicVine key, OPDS toggle and page size from the browser.** The admin panel's
+  Configuration section edits these three `config.yaml` keys directly (with a "Test Connection"
+  button for the ComicVine key, so a bad key is caught before it's saved). The page size applies
+  right away; the ComicVine key and OPDS toggle need an app restart, since the ComicVine client
+  and OPDS routes are only built at startup. `port`, `listen`, `library` and `data_dir` still
+  need editing the file (and a restart) — a `COMICNEST_*` environment variable, when set, always
+  wins over an edit made here.
 - **User accounts and the admin panel.** Until you create the first account, ComicNest runs
   wide open and treats you as an anonymous admin, so you can visit `/admin` and create one —
   it becomes an admin automatically. From then on the web UI asks for a login, and OPDS reader

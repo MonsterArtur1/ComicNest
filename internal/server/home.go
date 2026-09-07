@@ -54,7 +54,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := homeData{Sort: string(sort), Filter: string(filter), Total: len(series), Page: 1, Pages: 1}
-	if size := s.cfg.PageSize; size > 0 {
+	if size := s.config().PageSize; size > 0 {
 		data.Pages = max(1, (len(series)+size-1)/size)
 		data.Page = min(pageParam(r), data.Pages)
 		from, to, _ := pageWindow(data.Page, size, len(series))

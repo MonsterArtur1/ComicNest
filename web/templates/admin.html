@@ -21,6 +21,47 @@
 </section>
 
 <section class="admin-section">
+    <h2>Configuration</h2>
+    <form action="/admin/config" method="post" class="edit-form">
+        <label>ComicVine API key
+            <input type="text" name="comicvine_api_key" value="{{.Config.ComicVineAPIKey}}"
+                   placeholder="get one at comicvine.gamespot.com/api" autocomplete="off">
+        </label>
+        {{if .Config.ComicVineEnvPinned}}
+        <p class="hint">Overridden by the COMICNEST_COMICVINE_API_KEY environment variable — edit it there instead.</p>
+        {{end}}
+        <div id="cv-test-result">
+        {{if .CVTest}}
+        <p class="{{if .CVTest.OK}}form-ok{{else}}form-error{{end}}">{{if .CVTest.OK}}✓{{else}}✗{{end}} {{.CVTest.Message}}</p>
+        {{end}}
+        </div>
+
+        <label class="check-label">
+            <input type="checkbox" name="opds_enabled" value="1" {{if .Config.OPDSEnabled}}checked{{end}}>
+            Enable OPDS catalog
+        </label>
+        {{if .Config.OPDSEnvPinned}}
+        <p class="hint">Overridden by the COMICNEST_OPDS_ENABLED environment variable — edit it there instead.</p>
+        {{end}}
+
+        <label>Series per page
+            <input type="number" name="page_size" min="0" value="{{.Config.PageSize}}">
+        </label>
+        {{if .Config.PageSizeEnvPinned}}
+        <p class="hint">Overridden by the COMICNEST_PAGE_SIZE environment variable — edit it there instead.</p>
+        {{end}}
+        <p class="hint">The ComicVine key and OPDS toggle need an app restart to take effect; the page size applies right away. Other settings (port, listen address, library path) still live only in config.yaml.</p>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">Save</button>
+            <button type="submit" formaction="/admin/config/test-comicvine" formnovalidate class="btn"
+                    hx-post="/admin/config/test-comicvine" hx-include="closest form"
+                    hx-target="#cv-test-result" hx-swap="innerHTML">Test Connection</button>
+        </div>
+    </form>
+</section>
+
+<section class="admin-section">
     <h2>Library</h2>
     <div class="scan-area admin-scan-area" id="scan-area" hx-get="/scan/status" hx-trigger="load" hx-swap="innerHTML">
         <noscript>

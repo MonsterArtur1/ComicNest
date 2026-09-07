@@ -92,7 +92,7 @@ func main() {
 	coverCache := covers.New(coversDir)
 	scanner := library.NewScanner(st, coverCache, cfg.Library)
 
-	srv, err := server.New(cfg, st, coverCache, scanner, comicvine.New(cfg.ComicVineAPIKey))
+	srv, err := server.New(cfg, *configPath, st, coverCache, scanner, comicvine.New(cfg.ComicVineAPIKey))
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}

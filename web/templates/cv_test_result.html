@@ -1,0 +1,3 @@
+{{define "cv-test-result"}}
+<p class="{{if .OK}}form-ok{{else}}form-error{{end}}">{{if .OK}}✓{{else}}✗{{end}} {{.Message}}</p>
+{{end}}

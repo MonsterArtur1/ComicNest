@@ -268,6 +268,17 @@ func (c *Client) doRequest(path string, params url.Values) (json.RawMessage, err
 	return envelope.Results, nil
 }
 
+// TestKey performs a minimal authenticated request (the "types" resource,
+// which needs no query) to check that the API key is valid — used by the
+// admin panel's "Test Connection" button, before the key is saved.
+func (c *Client) TestKey() error {
+	if !c.Enabled() {
+		return ErrNoKey
+	}
+	_, err := c.doRequest("/types/", nil)
+	return err
+}
+
 // SearchVolumes queries volumes by name (max ~20 results).
 func (c *Client) SearchVolumes(query string) ([]Volume, error) {
 	if !c.Enabled() {
