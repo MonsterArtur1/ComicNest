@@ -29,7 +29,10 @@ type adminData struct {
 	// MissingCount is the number of catalog records whose file has
 	// disappeared from disk (drives the "delete all missing" button).
 	MissingCount int
-	Error        string
+	// Stats is the library-wide health snapshot shown in the Statistics
+	// section.
+	Stats store.LibraryStats
+	Error string
 }
 
 // adminPageData loads the current account list and library status for the
@@ -57,7 +60,11 @@ func (s *Server) adminPageData() (adminData, error) {
 	if err != nil {
 		return adminData{}, err
 	}
-	return adminData{Users: rows, IsFirstRun: len(rows) == 0, MissingCount: missing}, nil
+	stats, err := s.store.LibraryStats()
+	if err != nil {
+		return adminData{}, err
+	}
+	return adminData{Users: rows, IsFirstRun: len(rows) == 0, MissingCount: missing, Stats: stats}, nil
 }
 
 func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
