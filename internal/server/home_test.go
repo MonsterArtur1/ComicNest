@@ -54,7 +54,7 @@ func TestHomePagination(t *testing.T) {
 	if got := titles(body); !slices.Equal(got, []string{"S01", "S02", "S03", "S04"}) {
 		t.Errorf("page 1 = %v", got)
 	}
-	for _, want := range []string{`href="/?page=2" rel="next"`, `href="/?page=3"`, "strona 1 z 3", "11 serii"} {
+	for _, want := range []string{`href="/?page=2" rel="next"`, `href="/?page=3"`, "page 1 of 3", "11 series"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page 1 missing %q", want)
 		}

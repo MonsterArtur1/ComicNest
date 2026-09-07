@@ -1,87 +1,87 @@
-# ComicNest — Plan implementacji v1
+# ComicNest — v1 implementation plan
 
-Kolejność etapów dobrana tak, żeby po każdym etapie aplikacja była uruchamialna
-i coś pokazywała. Szczegóły projektowe: [SPECIFICATION.md](SPECIFICATION.md).
+Stages are ordered so the app stays runnable and shows something after each one.
+Design details: [SPECIFICATION.md](SPECIFICATION.md).
 
-## Etap 1 — Szkielet aplikacji ✅
-- [x] `go mod init`, struktura katalogów z §3 specyfikacji
-- [x] `internal/config`: wczytanie/utworzenie `config.yaml`
-- [x] `internal/store`: otwarcie SQLite (modernc), migracja schematu z §5 (tabela `schema_version`)
-- [x] `internal/server`: serwer HTTP, layout.html, statyki przez `embed`, strona główna (pusty grid)
-- [x] Uruchomienie: `go run ./cmd/comicnest` → działa strona na porcie z configu
+## Stage 1 — Application skeleton ✅
+- [x] `go mod init`, the directory layout from spec §3
+- [x] `internal/config`: loading/creating `config.yaml`
+- [x] `internal/store`: opening SQLite (modernc), schema migration from §5 (`schema_version` table)
+- [x] `internal/server`: HTTP server, layout.html, static assets via `embed`, home page (empty grid)
+- [x] Run it: `go run ./cmd/comicnest` → the page works on the configured port
 
-## Etap 2 — Skaner biblioteki ✅
-- [x] `internal/library/scanner.go`: walk, filtr rozszerzeń, hybrydowe przypisanie do serii (folder / fallback nazwa pliku), wzorce parsowania nazw z §6
-- [x] `internal/library/archive.go`: otwieranie CBZ (zip) i CBR (rardecode), listowanie obrazków w porządku naturalnym (+ fallback formatu dla źle nazwanych .cbz/.cbr)
-- [x] `internal/library/comicinfo.go`: parser ComicInfo.xml + mapowanie pól z §7
-- [x] `internal/covers`: ekstrakcja pierwszej strony → miniatura JPEG 400px → `data/covers/` (+ `GET /issues/{id}/cover` z fallbackiem do placeholdera)
-- [x] Reguły nadpisywania (`metadata_source`, `metadata_locked`), oznaczanie `file_missing`
-- [x] `POST /scan` w goroutine + `GET /scan/status` (postęp w pamięci, polling HTMX co 2 s)
-- [x] Testy jednostkowe: parsowanie nazw plików, mapowanie ComicInfo, archiwa, miniatury
+## Stage 2 — Library scanner ✅
+- [x] `internal/library/scanner.go`: walk, extension filter, hybrid series assignment (folder / file-name fallback), name-parsing patterns from §6
+- [x] `internal/library/archive.go`: opening CBZ (zip) and CBR (rardecode), listing images in natural order (+ a format fallback for misnamed .cbz/.cbr)
+- [x] `internal/library/comicinfo.go`: ComicInfo.xml parser + field mapping from §7
+- [x] `internal/covers`: first-page extraction → 400px JPEG thumbnail → `data/covers/` (+ `GET /issues/{id}/cover` falling back to a placeholder)
+- [x] Overwrite rules (`metadata_source`, `metadata_locked`), flagging `file_missing`
+- [x] `POST /scan` in a goroutine + `GET /scan/status` (in-memory progress, HTMX polling every 2s)
+- [x] Unit tests: file-name parsing, ComicInfo mapping, archives, thumbnails
 
-## Etap 3 — Przeglądanie katalogu ✅
-- [x] Grid serii na `/` (okładki, licznik zeszytów, sortowanie; filtr tekstowy przez wyszukiwarkę)
-- [x] Strona serii `/series/{id}` z listą zeszytów i filtrami metadanych (wszystkie / bez metadanych / ComicVine / brakujące)
-- [x] Szczegóły zeszytu `/issues/{id}` (okładka, pełne metadane, badge źródła, breadcrumbs)
-- [x] `GET /issues/{id}/cover` (cache + placeholder) i `GET /issues/{id}/download` (Content-Disposition z oryginalną nazwą)
-- [x] Wyszukiwarka `/search` (serie po nazwie, zeszyty po tytule/numerze)
-- [x] CSS: dark theme, responsywny grid okładek, lista zeszytów, widok szczegółów
+## Stage 3 — Browsing the catalog ✅
+- [x] Series grid on `/` (covers, issue count, sorting; a text filter via search)
+- [x] Series page `/series/{id}` with the issue list and metadata filters (all / no metadata / ComicVine / missing)
+- [x] Issue details `/issues/{id}` (cover, full metadata, source badge, breadcrumbs)
+- [x] `GET /issues/{id}/cover` (cache + placeholder) and `GET /issues/{id}/download` (Content-Disposition with the original name)
+- [x] Search `/search` (series by name, issues by title/number)
+- [x] CSS: dark theme, a responsive cover grid, issue list, detail view
 
-## Etap 4 — Edycja metadanych ✅
-- [x] Formularze edycji serii i zeszytu (pełne strony `/…/{id}/edit`, zwykłe formularze POST — działają bez JS)
-- [x] Zapis → `metadata_source='manual'`, `metadata_locked=1`; przycisk odblokowania (dane zostają, scrape może nadpisać)
-- [x] Badge źródła metadanych i kłódki na listach (z Etapu 3) + kłódka przy nazwie serii
-- [x] Walidacja: nazwa serii wymagana (błąd renderowany w formularzu)
+## Stage 4 — Metadata editing ✅
+- [x] Series and issue edit forms (full `/…/{id}/edit` pages, plain POST forms — work without JS)
+- [x] Saving → `metadata_source='manual'`, `metadata_locked=1`; an unlock button (the data stays, scraping may overwrite)
+- [x] Metadata-source badges and lock icons in lists (from Stage 3) + a lock next to the series name
+- [x] Validation: series name required (the error is rendered in the form)
 
-## Etap 5 — ComicVine ✅
-- [x] `internal/comicvine`: klient (search/volume/issue, `field_list`, rate limiter 1 req/s, timeout 20 s, User-Agent, StripHTML dla opisów) + testy na mocku httptest
-- [x] Strona dopasowania serii `/series/{id}/match` z listą kandydatów (okładka, rok, wydawca, liczba zeszytów) i wyborem użytkownika; zapis wzbogaca pusty opis/wydawcę serii
-- [x] Scrape pojedynczego zeszytu (synchronicznie + komunikaty flash) i „wszystkich brakujących" w serii (w tle, jeden job naraz, postęp HTMX; z poszanowaniem blokad); normalizacja numerów ("055" ↔ "55")
-- [x] Pobieranie okładek ComicVine do cache (zastępują miniatury z archiwum)
-- [x] UI przy braku klucza API: funkcje wyłączone z podpowiedzią konfiguracji
+## Stage 5 — ComicVine ✅
+- [x] `internal/comicvine`: the client (search/volume/issue, `field_list`, a 1 req/s rate limiter, 20s timeout, User-Agent, StripHTML for descriptions) + tests against an httptest mock
+- [x] Series match page `/series/{id}/match` with a candidate list (cover, year, publisher, issue count) and a user pick; saving enriches an empty series description/publisher
+- [x] Scraping a single issue (synchronously, with flash messages) and "all missing" in a series (in the background, one job at a time, HTMX progress; respecting locks); number normalization ("055" ↔ "55")
+- [x] Fetching ComicVine covers into the cache (replacing archive thumbnails)
+- [x] UI when there's no API key: features disabled with a configuration hint
 
-## Etap 6 — Wykończenie ✅
-- [x] Obsługa `file_missing` w UI: oznaczenie (badge + wyszarzenie) + „Usuń rekord" na liście serii i stronie zeszytu (z potwierdzeniem; rekordy istniejących plików chronione — 409)
-- [x] Stylowana strona błędu (404/500, catch-all dla nieznanych tras), renderowanie stron przez bufor (czyste 500 zamiast urwanej strony), logowanie żądań (bez statyk i polling​u) i konfiguracji przy starcie
-- [x] README (uruchomienie, konfiguracja, konwencje nazewnictwa plików, priorytety metadanych)
-- [x] `go vet`, testy, build binarium na Windows (`comicnest.exe`)
+## Stage 6 — Polish ✅
+- [x] `file_missing` handling in the UI: a marker (badge + greyed out) + "Delete record" on the series list and issue page (with confirmation; records of existing files are protected — 409)
+- [x] A styled error page (404/500, a catch-all for unknown routes), buffered page rendering (a clean 500 instead of a cut-off page), request logging (excluding static assets and polling) and config logging at startup
+- [x] README (running it, configuration, file-naming conventions, metadata priorities)
+- [x] `go vet`, tests, a Windows binary build (`comicnest.exe`)
 
-**v1 ukończona.** 🎉
+**v1 complete.** 🎉
 
-## Zmiany po v1
-- [x] Dopasowanie/scrape serii ustawia też jej nazwę z ComicVine (chyba że seria zablokowana)
-- [x] Długi opis serii zwijany do ~300 znaków z przełącznikiem (natywny `<details>`, bez JS)
-- [x] Obsługa one-shotów: flaga `one_shot` (sygnały: wolumen CV z 1 zeszytem, ComicInfo `Format`/`Count`, 1 zeszyt bez numeru), etykieta „wydanie jednorazowe", kafelek → zeszyt, scrape dopasowuje jedyny zeszyt wolumenu; fallback parsera nazw obcina grupy `(...)` i łapie rok
-- [x] Checkbox „wydanie jednorazowe" w edycji serii; ręczny wybór (jak każda edycja) blokuje serię — automatyczne sygnały one-shot (skan, ComicVine) szanują blokadę
-- [x] Druga faza skanu: automatyczny scrape ComicVine dla zeszytów z dopasowaną serią, ale bez danych CV (bez blokad i brakujących plików); postęp „Aktualizacja ComicVine… X/Y" i licznik w podsumowaniu skanu („ComicVine: N zaktualizowano")
-- [x] Fix pomieszanych okładek po rekreacji bazy: okładki serwowane z `Cache-Control: no-cache` (rewalidacja przez Last-Modified/304 zamiast max-age 24h — ID zeszytów są reużywane), a skan na starcie usuwa osierocone miniatury z `data/covers/`
-- [x] Serwer OPDS 1.2 (`opds_enabled` w configu, opcjonalne Basic auth, `listen` do wystawienia w LAN): root → serie (nawigacja, paginacja) → zeszyty serii (akwizycja), „Ostatnio dodane", wyszukiwanie + OpenSearch, pliki i okładki pod `/opds/…`; pakiet `internal/opds` + testy httptest (SPECIFICATION §9a)
-- [x] OPDS pod Thorium Reader: komunikat startowy z adresami IP (Thorium odrzuca `localhost`). Widok „półki" serii (grupy `rel="collection"`, pojedyncze wydania jako zeszyt) był wdrożony i wycofany — w Thorium robił większy bałagan niż lista
-- [x] Strumieniowanie stron OPDS-PSE 1.2 (`/opds/issues/{id}/pages/{n}?width=`), postęp czytania zapisywany z żądań stron (`reading_progress`, migracja 3 z `issues.file_pages`), `pse:lastRead` w feedach, sekcja „Aktualnie czytane" (`/opds/reading`); `library.ExtractPage`, `covers.Resize`
-- [x] Postęp czytania w UI WWW: pasek pod okładką i „czytane: str. X z N" na liście zeszytów serii, ramka z postępem i wiersz „Przeczytano" na stronie zeszytu (`readingView`, `issueRow`)
-- [x] Konta użytkowników w `config.yaml` (`users`, hasła plaintext): logowanie WWW (sesja w ciasteczku, `/login`, `/logout`), to samo hasło w OPDS (Basic), postęp per użytkownik (migracja 4: `reading_progress(user, issue_id)`), przejęcie anonimowego postępu przez pierwsze konto
-- [x] Usunięcie sekcji `opds` (`username`/`password`) z configu — hasła wyłącznie z `users`; `opds.enabled` zastąpione płaskim kluczem `opds_enabled`
-- [x] Czytnik stron w przeglądarce (`/issues/{id}/read`, `reader.html` + `reader.js`): zoom, przewracanie klawiaturą/klikiem/gestem/suwakiem, pełny ekran, wznawianie od ostatniej strony, postęp wspólny z OPDS (`POST /issues/{id}/progress`, strony z `?track=0`), linki do poprzedniego/następnego zeszytu na dolnym pasku (popup „Koniec zeszytu" usunięty na życzenie użytkownika)
-- [x] Ręczne oznaczanie zeszytu jako przeczytany / nieprzeczytany (przyciski na stronie zeszytu i na liście serii, `POST /issues/{id}/read|unread`, powrót przez `next`)
-- [x] Grid biblioteki: zielony znaczek ✓ na przeczytanych seriach i filtry (nieczytane / w trakcie / przeczytane / bez ComicVine / brakujące pliki) obok sortowania; agregaty czytania w `ListSeries` (`SeriesFilter`)
-- [x] Paginacja gridu biblioteki (`?page=N`, pager z oknem stron, sortowanie/filtr zachowane) — liczba kafelków na stronę w `config.yaml` (`page_size`, domyślnie 60, 0 = bez paginacji)
-- [x] Docker: `Dockerfile` (static binary w `distroless/static:nonroot`, ok. 15 MB), `docker-compose.yml`, `.dockerignore`; wolumeny `/comics` (ro) `/config` `/data`; obraz na Docker Hub (`jaggred/comicnest`, amd64+arm64) z joba `docker` w workflow. W aplikacji: flaga `-config` / `$COMICNEST_CONFIG`, nadpisania `COMICNEST_*` (`Config.applyEnv`), `GET /healthz` i tryb `-healthcheck` do `HEALTHCHECK`; obsługa `PUID`/`PGID` (start jako root, chown `/config` + `/data`, `setuid` przed otwarciem bazy) po tym, jak `nonroot` z distroless nie miał praw do wolumenów na Synology
-- [x] GitHub Actions (`.github/workflows/go.yml`): `go vet` + `go test` na każdym pushu i PR, binaria bez cgo dla windows/amd64, linux/amd64, linux/arm64, darwin/arm64 jako artefakty; push na `main` odświeża pre-release `latest`, tag `v*` tworzy wydanie z notatkami; wersja z `git describe` wstrzykiwana do `main.version`, logowana przy starcie i pokazywana w stopce strony głównej jako link do repozytorium GitHub (`server.Version`, `appVersion` w szablonach; lokalny build `dev` nie pokazuje stopki)
-- [x] Ikona aplikacji z `logo.png` (pisklę czytające komiks w gnieździe; źródło 1254 px w `imgs/`, warianty generowane przez skalowanie po przycięciu do obrysu): `favicon.png` 192 px + `favicon-32.png` + `favicon.ico` + `apple-touch-icon.png` w `<head>` każdej strony i pod `/favicon.ico` (bez logowania), logo także obok nazwy w górnym pasku i na stronie logowania (`.brand-logo`); w OPDS jako `<icon>` każdego feedu i `<Image>` w OpenSearch (`/static/favicon.png`)
-- [x] Fix: folder z kilkoma seriami wg ComicInfo (np. `Mad Max/` z „Mad Max: Fury Road" i „Mad Max: Fury Road: Max") był jedną serią. Skan zapamiętuje `<Series>` z ComicInfo (`issues.comicinfo_series`, migracja 5; backfill przy pierwszym skanie, NULL przy nieczytelnym archiwum = ponowna próba) i w przebiegu 3 (`splitMixedFolders`) rozdziela folder z ≥2 różnymi wartościami: przenosi tylko zeszyty siedzące jeszcze w serii folderu, do serii, w której już są inne pliki folderu z tą samą wartością, a dopiero w braku takiej do serii wirtualnej o tej nazwie — więc ręczna zmiana nazwy lub dopasowanie ComicVine rozdzielonej serii przeżywa kolejne skany; wartość równa nazwie folderu zostaje w serii folderu; folder ze spójną wartością lub bez ComicInfo bez zmian (SPECIFICATION §5, §6 pkt 2; testy `scanner_test.go`)
+## Changes after v1
+- [x] Matching/scraping a series also sets its name from ComicVine (unless the series is locked)
+- [x] A long series description collapses to ~300 characters with a toggle (native `<details>`, no JS)
+- [x] One-shot handling: the `one_shot` flag (signals: a CV volume with 1 issue, ComicInfo `Format`/`Count`, 1 issue with no number), a "one-shot" label, the tile links to the issue, scraping matches the volume's single issue; the name-parser fallback strips `(...)` groups and catches the year
+- [x] A "one-shot" checkbox in series editing; a manual choice (like any edit) locks the series — automatic one-shot signals (scan, ComicVine) respect the lock
+- [x] A second scan phase: automatic ComicVine scraping for issues of a matched series that still lack CV data (skipping locks and missing files); progress "Updating ComicVine… X/Y" and a counter in the scan summary ("ComicVine: N updated")
+- [x] Fixed mixed-up covers after recreating the database: covers are served with `Cache-Control: no-cache` (revalidation via Last-Modified/304 instead of a 24h max-age — issue IDs get reused), and a scan removes orphaned thumbnails from `data/covers/` at startup
+- [x] An OPDS 1.2 server (`opds_enabled` in the config, optional Basic auth, `listen` to expose it on the LAN): root → series (navigation, pagination) → series issues (acquisition), "Recently added", search + OpenSearch, files and covers under `/opds/…`; the `internal/opds` package + httptest tests (SPECIFICATION §9a)
+- [x] OPDS under Thorium Reader: a startup message with IP addresses (Thorium rejects `localhost`). A series "shelf" view (`rel="collection"` groups, single releases as an issue) was implemented and rolled back — it made a bigger mess than a plain list in Thorium
+- [x] OPDS-PSE 1.2 page streaming (`/opds/issues/{id}/pages/{n}?width=`), reading progress recorded from page requests (`reading_progress`, migration 3 for `issues.file_pages`), `pse:lastRead` in feeds, a "Currently reading" section (`/opds/reading`); `library.ExtractPage`, `covers.Resize`
+- [x] Reading progress in the web UI: a bar under the cover and "read: p. X of N" on the series issue list, a progress box and a "Read" row on the issue page (`readingView`, `issueRow`)
+- [x] User accounts in `config.yaml` (`users`, plaintext passwords): web login (a session cookie, `/login`, `/logout`), the same password in OPDS (Basic), per-user progress (migration 4: `reading_progress(user, issue_id)`), the first account adopting anonymous progress
+- [x] Removed the `opds` section (`username`/`password`) from the config — passwords come only from `users`; `opds.enabled` replaced by the flat `opds_enabled` key
+- [x] An in-browser page reader (`/issues/{id}/read`, `reader.html` + `reader.js`): zoom, paging by keyboard/click/gesture/slider, fullscreen, resuming from the last page, progress shared with OPDS (`POST /issues/{id}/progress`, pages via `?track=0`), links to the previous/next issue on the bottom bar (the "End of issue" popup was removed at the user's request)
+- [x] Manually marking an issue read / unread (buttons on the issue page and the series list, `POST /issues/{id}/read|unread`, returning via `next`)
+- [x] Library grid: a green ✓ badge on fully-read series and filters (unread / reading / read / no ComicVine / missing files) next to sorting; reading aggregates in `ListSeries` (`SeriesFilter`)
+- [x] Library grid pagination (`?page=N`, a pager with a page window, sort/filter preserved) — tiles per page set in `config.yaml` (`page_size`, default 60, 0 = no pagination)
+- [x] Docker: `Dockerfile` (a static binary in `distroless/static:nonroot`, ~15 MB), `docker-compose.yml`, `.dockerignore`; `/comics` (ro) `/config` `/data` volumes; the image on Docker Hub (`jaggred/comicnest`, amd64+arm64) from a `docker` job in the workflow. In the app: the `-config` flag / `$COMICNEST_CONFIG`, `COMICNEST_*` overrides (`Config.applyEnv`), `GET /healthz` and a `-healthcheck` mode for `HEALTHCHECK`; `PUID`/`PGID` handling (start as root, chown `/config` + `/data`, `setuid` before opening the database) after distroless's `nonroot` turned out to have no permissions on Synology volumes
+- [x] GitHub Actions (`.github/workflows/go.yml`): `go vet` + `go test` on every push and PR, cgo-free binaries for windows/amd64, linux/amd64, linux/arm64, darwin/arm64 as artifacts; a push to `main` refreshes the `latest` pre-release, a `v*` tag creates a release with notes; the version from `git describe` is injected into `main.version`, logged at startup and shown in the home page footer as a link to the GitHub repository (`server.Version`, `appVersion` in templates; a local `dev` build shows no footer)
+- [x] An app icon from `logo.png` (a chick reading a comic in a nest; a 1254px source in `imgs/`, variants generated by scaling after cropping to the silhouette): `favicon.png` 192px + `favicon-32.png` + `favicon.ico` + `apple-touch-icon.png` in every page's `<head>` and under `/favicon.ico` (no login needed), the logo also next to the name in the top bar and on the login page (`.brand-logo`); in OPDS as every feed's `<icon>` and as the `<Image>` in OpenSearch (`/static/favicon.png`)
+- [x] Fix: a folder with several series per ComicInfo (e.g. `Mad Max/` with "Mad Max: Fury Road" and "Mad Max: Fury Road: Max") used to be treated as one series. A scan now remembers ComicInfo's `<Series>` (`issues.comicinfo_series`, migration 5; backfilled on the first scan, NULL for an unreadable archive = retried later), and pass 3 (`splitMixedFolders`) splits a folder with ≥2 distinct values: it moves only issues still sitting in the folder's series, into the series that already holds other files of the folder with the same value, or, failing that, into a virtual series named after that value — so a manual rename or a ComicVine match of the split-out series survives further scans; a value equal to the folder's name stays in the folder's series; a folder with a consistent value, or with no ComicInfo, is unchanged (SPECIFICATION §5, §6 point 2; tests in `scanner_test.go`)
 
-## Pomysły na v2 (nie robić teraz)
-- Panel admina, z mozliwoscia dodawania uzytkownikow w runtime. I uprawnien do uzywania ComicVine/skanowania library
-- Co jeszcze  mozna dodac do panelu admina/settingsow?
-- Czytnik: tryb dwóch stron obok siebie, kierunek czytania manga (prawo→lewo)
-- Zapis metadanych do ComicInfo.xml w archiwum
-- Konwertowanie PDF do CBR/CBZ
-- Nowe sekcje w OPDS: Przeczytane, nieczytane
-- pliki z rokiem w nazwie sa zle parsowane jako numery (The Boys 48 - Proper Preparation and Planning 1 (2010) (Digital-1920) (Kingpin-Empire).cbz rozpoznany jako #1 The Boys 52 - Barbary Coast 1 (2011) (HD) (digital-Empire).cbz)
-- Opcja łączenia 2 pozycji, jesli sa tą samą serią (przypadek Dantes)
-- Opcja usuniecia danych ComicVine z pozycji. (odpiecia z dopasowania)
-- Jesli jest zlinkowane z comicVine, link zeby otworzyc strone ComicVine danej pozycji
-- Obserwowanie zmian w bibliotece (fsnotify)
-- Jesli postep czytania to 0% nie oznaczaj jako rozpoczety czytanie
-- Deadpool polska - na comicvine nie ma nic poza okladka, wiec jest ignorowany. niech nie bedzie
-- Kolekcje / listy czytelnicze
+## Ideas for v2 (not doing now)
+- Admin panel, with the ability to add users at runtime, and permissions for using ComicVine/scanning the library
+- What else could be added to the admin panel/settings?
+- Reader: a two-page side-by-side mode, manga reading direction (right→left)
+- Writing metadata back into ComicInfo.xml inside the archive
+- Converting PDF to CBR/CBZ
+- New OPDS sections: Read, Unread
+- Files with a year in the name get misparsed as numbers (`The Boys 48 - Proper Preparation and Planning 1 (2010) (Digital-1920) (Kingpin-Empire).cbz` recognized as #1 `The Boys 52 - Barbary Coast 1 (2011) (HD) (digital-Empire).cbz`)
+- An option to merge 2 entries if they're the same series (the Dante's case)
+- An option to remove ComicVine data from an entry (unlinking a match)
+- If linked to ComicVine, a link to open that entry's ComicVine page
+- Watching the library for changes (fsnotify)
+- If reading progress is 0%, don't mark it as started
+- Deadpool Polska — ComicVine has nothing but a cover for it, so it gets ignored; it shouldn't be
+- Collections / reading lists

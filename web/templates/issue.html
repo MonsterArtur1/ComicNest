@@ -3,14 +3,14 @@
 {{define "content"}}
 {{if .Msg}}<p class="flash {{if .MsgError}}flash-error{{end}}">{{.Msg}}</p>{{end}}
 <nav class="breadcrumbs">
-    <a href="/">Biblioteka</a> <span>/</span>
+    <a href="/">Library</a> <span>/</span>
     <a href="/series/{{.Series.ID}}">{{.Series.Name}}</a> <span>/</span>
     {{if .Issue.IssueNumber}}#{{.Issue.IssueNumber}}{{else}}{{.Filename}}{{end}}
 </nav>
 
 <div class="issue-detail">
     <div class="issue-detail-cover">
-        <img src="/issues/{{.Issue.ID}}/cover" alt="okładka">
+        <img src="/issues/{{.Issue.ID}}/cover" alt="cover">
     </div>
     <div class="issue-detail-body">
         <h1>
@@ -20,8 +20,8 @@
         {{if .Issue.Title}}<h2 class="issue-detail-title">{{.Issue.Title}}</h2>{{end}}
 
         <div class="issue-badges detail-badges">
-            {{if .Issue.FileMissing}}<span class="badge badge-missing">brak pliku na dysku</span>{{end}}
-            {{if .Issue.MetadataLocked}}<span class="badge badge-lock">🔒 metadane zablokowane</span>{{end}}
+            {{if .Issue.FileMissing}}<span class="badge badge-missing">missing file on disk</span>{{end}}
+            {{if .Issue.MetadataLocked}}<span class="badge badge-lock">🔒 metadata locked</span>{{end}}
             <span class="badge badge-{{.Issue.MetadataSource}}">{{sourceLabel .Issue.MetadataSource}}</span>
         </div>
 
@@ -30,9 +30,9 @@
         {{with .Reading}}
         <div class="reading-box">
             <div class="reading-text">
-                {{if .Finished}}<strong>Przeczytane</strong>{{else}}<strong>W trakcie czytania</strong>{{end}}
-                — przeczytano {{.Page}}{{if .Total}} z {{.Total}}{{end}} stron{{if .Total}} ({{.Percent}}%){{end}}
-                {{if .ReadAt}}<span class="reading-date">· ostatnio {{.ReadAt}}</span>{{end}}
+                {{if .Finished}}<strong>Read</strong>{{else}}<strong>Reading</strong>{{end}}
+                — read {{.Page}}{{if .Total}} of {{.Total}}{{end}} pages{{if .Total}} ({{.Percent}}%){{end}}
+                {{if .ReadAt}}<span class="reading-date">· last {{.ReadAt}}</span>{{end}}
             </div>
             <span class="progress progress-lg {{if .Finished}}done{{end}}">
                 <span style="width: {{if .Total}}{{.Percent}}{{else}}100{{end}}%"></span>
@@ -41,64 +41,64 @@
         {{end}}
 
         <dl class="meta-table">
-            {{if .Issue.ReleaseDate}}<dt>Data wydania</dt><dd>{{.Issue.ReleaseDate}}</dd>{{end}}
-            {{if .Issue.Writer}}<dt>Scenariusz</dt><dd>{{.Issue.Writer}}</dd>{{end}}
-            {{if .Issue.Artist}}<dt>Rysunki</dt><dd>{{.Issue.Artist}}</dd>{{end}}
-            {{if .Issue.Publisher}}<dt>Wydawca</dt><dd>{{.Issue.Publisher}}</dd>{{end}}
-            {{if .Issue.TotalPages}}<dt>Strony</dt><dd>{{.Issue.TotalPages}}{{if and .Issue.FilePages .Issue.PageCount (ne .Issue.FilePages .Issue.PageCount)}} <span class="dim">(metadane: {{.Issue.PageCount}})</span>{{end}}</dd>{{end}}
-            {{with .Reading}}<dt>Przeczytano</dt><dd>{{.Page}}{{if .Total}} z {{.Total}} stron ({{.Percent}}%){{else}} stron{{end}}</dd>{{end}}
-            <dt>Plik</dt><dd><code title="{{.Issue.Path}}">{{.Filename}}</code> ({{prettySize .Issue.FileSize}})</dd>
+            {{if .Issue.ReleaseDate}}<dt>Release date</dt><dd>{{.Issue.ReleaseDate}}</dd>{{end}}
+            {{if .Issue.Writer}}<dt>Writer</dt><dd>{{.Issue.Writer}}</dd>{{end}}
+            {{if .Issue.Artist}}<dt>Art</dt><dd>{{.Issue.Artist}}</dd>{{end}}
+            {{if .Issue.Publisher}}<dt>Publisher</dt><dd>{{.Issue.Publisher}}</dd>{{end}}
+            {{if .Issue.TotalPages}}<dt>Pages</dt><dd>{{.Issue.TotalPages}}{{if and .Issue.FilePages .Issue.PageCount (ne .Issue.FilePages .Issue.PageCount)}} <span class="dim">(metadata: {{.Issue.PageCount}})</span>{{end}}</dd>{{end}}
+            {{with .Reading}}<dt>Read</dt><dd>{{.Page}}{{if .Total}} of {{.Total}} pages ({{.Percent}}%){{else}} pages{{end}}</dd>{{end}}
+            <dt>File</dt><dd><code title="{{.Issue.Path}}">{{.Filename}}</code> ({{prettySize .Issue.FileSize}})</dd>
         </dl>
 
         <div class="detail-actions">
             {{if and (not .Issue.FileMissing) (canRead .Issue.Path)}}
             <a class="btn btn-primary" href="/issues/{{.Issue.ID}}/read">
-                {{if and .Reading (not .Reading.Finished)}}Czytaj dalej (str. {{.Reading.Page}}){{else if .Reading}}Czytaj od nowa{{else}}Czytaj{{end}}
+                {{if and .Reading (not .Reading.Finished)}}Continue (p. {{.Reading.Page}}){{else if .Reading}}Read again{{else}}Read{{end}}
             </a>
             {{end}}
             {{if not .Issue.FileMissing}}
-            <a class="btn {{if not (canRead .Issue.Path)}}btn-primary{{end}}" href="/issues/{{.Issue.ID}}/download">Pobierz plik</a>
+            <a class="btn {{if not (canRead .Issue.Path)}}btn-primary{{end}}" href="/issues/{{.Issue.ID}}/download">Download file</a>
             {{end}}
-            {{if isAdmin}}<a class="btn" href="/issues/{{.Issue.ID}}/edit">Edytuj metadane</a>{{end}}
+            {{if isAdmin}}<a class="btn" href="/issues/{{.Issue.ID}}/edit">Edit metadata</a>{{end}}
             {{if and .Reading .Reading.Finished}}
             <form action="/issues/{{.Issue.ID}}/unread" method="post">
-                <button type="submit" class="btn" title="Wyzeruj postęp czytania">Oznacz jako nieprzeczytany</button>
+                <button type="submit" class="btn" title="Reset reading progress">Mark as unread</button>
             </form>
             {{else}}
             <form action="/issues/{{.Issue.ID}}/read" method="post">
-                <button type="submit" class="btn" title="Ustaw postęp na ostatnią stronę">Oznacz jako przeczytany</button>
+                <button type="submit" class="btn" title="Set progress to the last page">Mark as read</button>
             </form>
             {{if .Reading}}
             <form action="/issues/{{.Issue.ID}}/unread" method="post">
-                <button type="submit" class="btn" title="Wyzeruj postęp czytania">Oznacz jako nieprzeczytany</button>
+                <button type="submit" class="btn" title="Reset reading progress">Mark as unread</button>
             </form>
             {{end}}
             {{end}}
             {{if and isAdmin .CVEnabled}}
             <form action="/issues/{{.Issue.ID}}/scrape" method="post">
-                <button type="submit" class="btn" {{if not .CVMatched}}disabled title="Najpierw dopasuj serię w ComicVine"{{else}}title="Pobierz metadane tego zeszytu z ComicVine"{{end}}>
-                    Pobierz z ComicVine
+                <button type="submit" class="btn" {{if not .CVMatched}}disabled title="Match the series in ComicVine first"{{else}}title="Fetch metadata for this issue from ComicVine"{{end}}>
+                    Fetch from ComicVine
                 </button>
             </form>
             {{end}}
             {{if .Issue.ComicVineURL}}
-            <a class="btn" href="{{.Issue.ComicVineURL}}" target="_blank" rel="noopener">Zobacz na ComicVine ↗</a>
+            <a class="btn" href="{{.Issue.ComicVineURL}}" target="_blank" rel="noopener">View on ComicVine ↗</a>
             {{end}}
             {{if and isAdmin .Issue.ComicVineIssueID.Valid}}
             <form action="/issues/{{.Issue.ID}}/scrape/unlink" method="post"
-                  onsubmit="return confirm('Usunąć dopasowanie tego zeszytu do ComicVine? Pobrane dane zostają, ale przestają być oznaczone jako pochodzące z ComicVine.');">
-                <button type="submit" class="btn btn-danger" title="Usuń dopasowanie tego zeszytu do ComicVine">Usuń dopasowanie ComicVine</button>
+                  onsubmit="return confirm('Remove this issue\'s ComicVine match? The fetched data stays, but is no longer marked as coming from ComicVine.');">
+                <button type="submit" class="btn btn-danger" title="Remove this issue's ComicVine match">Remove ComicVine match</button>
             </form>
             {{end}}
             {{if and isAdmin .Issue.MetadataLocked}}
             <form action="/issues/{{.Issue.ID}}/unlock" method="post">
-                <button type="submit" class="btn" title="Pozwól aktualizacjom nadpisać metadane">Zdejmij blokadę 🔒</button>
+                <button type="submit" class="btn" title="Let updates overwrite the metadata">Remove lock 🔒</button>
             </form>
             {{end}}
             {{if and isAdmin .Issue.FileMissing}}
             <form action="/issues/{{.Issue.ID}}/delete" method="post"
-                  onsubmit="return confirm('Usunąć rekord tego zeszytu z katalogu?');">
-                <button type="submit" class="btn btn-danger" title="Plik zniknął z biblioteki — usuń wpis z katalogu">Usuń rekord</button>
+                  onsubmit="return confirm('Delete this issue\'s record from the catalog?');">
+                <button type="submit" class="btn btn-danger" title="The file disappeared from the library — delete the catalog entry">Delete record</button>
             </form>
             {{end}}
         </div>

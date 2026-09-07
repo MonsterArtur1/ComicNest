@@ -4,7 +4,7 @@
      hx-get="/series/{{.SeriesID}}/scrape/status" hx-trigger="every 2s"
      hx-target="#scrape-area" hx-swap="innerHTML">
     <span class="spinner"></span>
-    <span>Pobieranie z ComicVine… {{.Done}}/{{.Total}}</span>
+    <span>Fetching from ComicVine… {{.Done}}/{{.Total}}</span>
 </div>
 {{else}}
 <div class="scan-status">
@@ -12,28 +12,28 @@
     {{if and .CVEnabled .Matched}}
     <form hx-post="/series/{{.SeriesID}}/scrape" hx-target="#scrape-area" hx-swap="innerHTML"
           action="/series/{{.SeriesID}}/scrape" method="post">
-        <button type="submit" class="btn" title="Pobierz metadane ComicVine dla zeszytów bez nich">Pobierz brakujące metadane</button>
+        <button type="submit" class="btn" title="Fetch ComicVine metadata for issues that lack it">Fetch missing metadata</button>
     </form>
     {{end}}
     {{if .CVEnabled}}
-    <a class="btn" href="/series/{{.SeriesID}}/match">{{if .Matched}}Zmień dopasowanie{{else}}Dopasuj w ComicVine{{end}}</a>
+    <a class="btn" href="/series/{{.SeriesID}}/match">{{if .Matched}}Change match{{else}}Match in ComicVine{{end}}</a>
     {{end}}
     {{end}}
-    {{if .URL}}<a class="btn" href="{{.URL}}" target="_blank" rel="noopener">Zobacz na ComicVine ↗</a>{{end}}
+    {{if .URL}}<a class="btn" href="{{.URL}}" target="_blank" rel="noopener">View on ComicVine ↗</a>{{end}}
     {{if and .IsAdmin .Matched}}
     <form hx-post="/series/{{.SeriesID}}/match/unlink" hx-target="#scrape-area" hx-swap="innerHTML"
           action="/series/{{.SeriesID}}/match/unlink" method="post"
-          onsubmit="return confirm('Usunąć dopasowanie serii do ComicVine? Niezablokowane zeszyty pobrane z tego wolumenu wrócą do danych z pliku.');">
-        <button type="submit" class="btn btn-danger" title="Usuń dopasowanie serii do ComicVine">Usuń dopasowanie</button>
+          onsubmit="return confirm('Remove the series\' ComicVine match? Unlocked issues fetched from this volume will revert to file data.');">
+        <button type="submit" class="btn btn-danger" title="Remove the series' ComicVine match">Remove match</button>
     </form>
     {{end}}
     {{if and .IsAdmin (not .CVEnabled)}}
-    <span class="scan-note" title="Ustaw comicvine_api_key w config.yaml">ComicVine wyłączone (brak klucza API)</span>
+    <span class="scan-note" title="Set comicvine_api_key in config.yaml">ComicVine disabled (no API key)</span>
     {{end}}
     {{if .Err}}
-    <span class="scan-note scan-error" title="{{.Err}}">błąd aktualizacji</span>
+    <span class="scan-note scan-error" title="{{.Err}}">update error</span>
     {{else if .Finished}}
-    <span class="scan-note">zaktualizowano: {{.Updated}}, pominięto: {{.Skipped}}{{if .Failed}}, błędy: {{.Failed}}{{end}}</span>
+    <span class="scan-note">updated: {{.Updated}}, skipped: {{.Skipped}}{{if .Failed}}, failed: {{.Failed}}{{end}}</span>
     {{end}}
 </div>
 {{end}}

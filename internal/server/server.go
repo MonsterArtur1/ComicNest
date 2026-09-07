@@ -116,17 +116,17 @@ func prettySize(b int64) string {
 	return ""
 }
 
-// sourceLabel maps a metadata_source value to its Polish UI label.
+// sourceLabel maps a metadata_source value to its UI label.
 func sourceLabel(source string) string {
 	switch source {
 	case "filename":
-		return "z nazwy pliku"
+		return "from file name"
 	case "comicinfo":
 		return "ComicInfo"
 	case "comicvine":
 		return "ComicVine"
 	case "manual":
-		return "ręczne"
+		return "manual"
 	}
 	return source
 }
@@ -397,7 +397,7 @@ func (s *Server) errorPage(w http.ResponseWriter, r *http.Request, status int, m
 }
 
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
-	s.errorPage(w, r, http.StatusNotFound, "Nie znaleziono takiej strony ani zasobu.")
+	s.errorPage(w, r, http.StatusNotFound, "This page or resource was not found.")
 }
 
 func (s *Server) handleNotFound(w http.ResponseWriter, r *http.Request) {
@@ -415,5 +415,5 @@ func (s *Server) renderPartial(w http.ResponseWriter, file, name string, data an
 func (s *Server) serverError(w http.ResponseWriter, err error) {
 	log.Printf("server error: %v", err)
 	s.errorPage(w, nil, http.StatusInternalServerError,
-		"Wystąpił błąd serwera — szczegóły w logu aplikacji.")
+		"A server error occurred — see the application log for details.")
 }

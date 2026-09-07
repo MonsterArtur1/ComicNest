@@ -178,7 +178,7 @@ func WriteOpenSearch(w io.Writer, searchURL, iconURL string) error {
 	d := OpenSearchDescription{
 		Xmlns:       "http://a9.com/-/spec/opensearch/1.1/",
 		ShortName:   "ComicNest",
-		Description: "Wyszukiwanie serii i zeszytów w bibliotece ComicNest",
+		Description: "Search series and issues in the ComicNest library",
 		InputEnc:    "UTF-8",
 		OutputEnc:   "UTF-8",
 	}

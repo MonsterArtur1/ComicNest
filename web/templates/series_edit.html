@@ -1,57 +1,57 @@
-{{define "title"}}Edycja: {{.Series.Name}} — ComicNest{{end}}
+{{define "title"}}Edit: {{.Series.Name}} — ComicNest{{end}}
 
 {{define "content"}}
 <nav class="breadcrumbs">
-    <a href="/">Biblioteka</a> <span>/</span>
-    <a href="/series/{{.Series.ID}}">{{.Series.Name}}</a> <span>/</span> edycja
+    <a href="/">Library</a> <span>/</span>
+    <a href="/series/{{.Series.ID}}">{{.Series.Name}}</a> <span>/</span> edit
 </nav>
 
-<div class="page-head"><h1>Edycja serii</h1></div>
+<div class="page-head"><h1>Edit series</h1></div>
 
 {{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
 
 <form class="edit-form" action="/series/{{.Series.ID}}" method="post">
-    <label>Nazwa
+    <label>Name
         <input type="text" name="name" value="{{.Series.Name}}" required>
     </label>
-    <label>Wydawca
+    <label>Publisher
         <input type="text" name="publisher" value="{{.Series.Publisher}}">
     </label>
-    <label>Opis
+    <label>Description
         <textarea name="description" rows="5">{{.Series.Description}}</textarea>
     </label>
     <label class="check-label">
         <input type="checkbox" name="one_shot" value="1" {{if .Series.OneShot}}checked{{end}}>
-        Wydanie jednorazowe (one-shot) — pojedyncza pozycja, nie seria
+        One-shot — a single item, not a series
     </label>
-    <p class="hint">Zapis blokuje metadane serii przed nadpisaniem przez skan i ComicVine.</p>
+    <p class="hint">Saving locks the series' metadata against being overwritten by a scan or ComicVine.</p>
     <div class="form-actions">
-        <button type="submit" class="btn-primary">Zapisz</button>
-        <a class="btn" href="/series/{{.Series.ID}}">Anuluj</a>
+        <button type="submit" class="btn-primary">Save</button>
+        <a class="btn" href="/series/{{.Series.ID}}">Cancel</a>
     </div>
 </form>
 
 {{if .Series.MetadataLocked}}
 <form class="unlock-form" action="/series/{{.Series.ID}}/unlock" method="post">
-    <p class="hint">Metadane są zablokowane 🔒 — automatyczne aktualizacje ich nie nadpiszą.</p>
-    <button type="submit" class="btn">Zdejmij blokadę</button>
+    <p class="hint">Metadata is locked 🔒 — automatic updates will not overwrite it.</p>
+    <button type="submit" class="btn">Remove lock</button>
 </form>
 {{end}}
 
 {{if .Options}}
 <form class="merge-form" action="/series/{{.Series.ID}}/merge" method="post"
-      onsubmit="return confirm('Połączyć tę serię z wybraną? Wszystkie jej zeszyty trafią do docelowej serii, a ta pozycja zniknie.');">
-    <label>Połącz z inną serią
+      onsubmit="return confirm('Merge this series into the selected one? All its issues will move to the target series, and this entry will disappear.');">
+    <label>Merge into another series
         <select name="into_id" required>
-            <option value="">— wybierz serię docelową —</option>
+            <option value="">— choose a target series —</option>
             {{range .Options}}
-            <option value="{{.ID}}">{{.Name}}{{if .FolderPath.Valid}} · {{.FolderPath.String}}{{else}} · wirtualna{{end}} · {{.IssueCount}} {{if eq .IssueCount 1}}zeszyt{{else}}zeszytów{{end}}</option>
+            <option value="{{.ID}}">{{.Name}}{{if .FolderPath.Valid}} · {{.FolderPath.String}}{{else}} · virtual{{end}} · {{.IssueCount}} {{if eq .IssueCount 1}}issue{{else}}issues{{end}}</option>
             {{end}}
         </select>
     </label>
-    <p class="hint">Użyj tego, gdy ten sam tytuł został skatalogowany dwukrotnie jako osobne pozycje (np. z dwóch folderów). Wszystkie zeszyty przejdą do wybranej serii, a ta zostanie usunięta.</p>
+    <p class="hint">Use this when the same title was catalogued twice as separate entries (e.g. from two folders). All issues will move to the selected series, and this one will be deleted.</p>
     <div class="form-actions">
-        <button type="submit" class="btn btn-danger">Połącz serie</button>
+        <button type="submit" class="btn btn-danger">Merge series</button>
     </div>
 </form>
 {{end}}

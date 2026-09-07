@@ -80,7 +80,7 @@ func (s *Server) handleSeriesEditSave(w http.ResponseWriter, r *http.Request) {
 			s.serverError(w, err)
 			return
 		}
-		s.render(w, r, "series_edit.html", seriesEditData{Series: series, Options: options, Error: "Nazwa serii nie może być pusta."})
+		s.render(w, r, "series_edit.html", seriesEditData{Series: series, Options: options, Error: "Series name cannot be empty."})
 		return
 	}
 
@@ -116,7 +116,7 @@ func (s *Server) handleSeriesMerge(w http.ResponseWriter, r *http.Request) {
 
 	targetID, err := strconv.ParseInt(strings.TrimSpace(r.FormValue("into_id")), 10, 64)
 	if err != nil || targetID == series.ID {
-		renderError("Wybierz inną serię, z którą chcesz połączyć tę pozycję.")
+		renderError("Choose a different series to merge this one into.")
 		return
 	}
 	target, err := s.store.GetSeries(targetID)
@@ -125,7 +125,7 @@ func (s *Server) handleSeriesMerge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if target == nil {
-		renderError("Nie znaleziono wybranej serii docelowej.")
+		renderError("The selected target series was not found.")
 		return
 	}
 

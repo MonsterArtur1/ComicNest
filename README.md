@@ -79,8 +79,8 @@ Put the file in a folder of its own and start it (double-click on Windows, or ru
 terminal). The first start creates `config.yaml` next to it and stops with a hint. Open that
 file, set `library` to your comics folder, and start the program again.
 
-Now open **http://localhost:8080/** in your browser and click **Skanuj bibliotekę** (scan
-library) in the top bar. The first scan of a large collection takes a while, because covers are
+Now open **http://localhost:8080/** in your browser and click **Scan Library**
+in the top bar. The first scan of a large collection takes a while, because covers are
 extracted and pages counted; a progress bar shows where it is. Later scans are much faster.
 
 To start with a different config file location, run `comicnest -config /path/to/config.yaml`.
@@ -207,7 +207,7 @@ the container keeps running as root.
 filled in (`listen: 0.0.0.0`, `library: /comics`, `data_dir: /data`). Add your ComicVine key
 to that file if you want ComicVine features, run `docker compose restart`, then open
 `http://<your-host>:8080/` — you'll be an anonymous admin until you create your first account
-at `/admin` — and click **Skanuj bibliotekę**.
+at `/admin` — and click **Scan Library**.
 
 **Updating.** `docker compose pull` followed by `docker compose up -d`. Database migrations
 run automatically on start.

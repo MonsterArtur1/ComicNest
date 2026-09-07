@@ -1,19 +1,19 @@
-# Przykładowa konfiguracja ComicNest. Skopiuj do config.yaml obok binarium
-# i dostosuj. Każdy klucz obsługiwany przez aplikację ma tu wpis z opisem —
-# przy dodawaniu nowej opcji uzupełnij ten plik (patrz SPECIFICATION §4).
-# Każdy klucz można nadpisać zmienną środowiskową COMICNEST_<KLUCZ>
-# (np. COMICNEST_LISTEN=0.0.0.0, COMICNEST_COMICVINE_API_KEY=...); ścieżkę
-# tego pliku wskazuje flaga -config albo COMICNEST_CONFIG.
+# Example ComicNest configuration. Copy to config.yaml next to the binary
+# and adjust. Every key the app supports has an entry here with a
+# description — when adding a new option, update this file too (see SPECIFICATION §4).
+# Every key can be overridden with the COMICNEST_<KEY> environment variable
+# (e.g. COMICNEST_LISTEN=0.0.0.0, COMICNEST_COMICVINE_API_KEY=...); the path
+# to this file comes from the -config flag or COMICNEST_CONFIG.
 #
-# Konta użytkowników NIE są w tym pliku — zakładasz je z przeglądarki, w
-# panelu administracyjnym pod /admin. Dopóki nie ma żadnego konta, aplikacja
-# działa całkiem otwarta i traktuje Cię jak anonimowego administratora, żebyś
-# mógł tam założyć pierwsze konto (zostanie adminem automatycznie).
+# User accounts are NOT in this file — you create them from the browser, in
+# the admin panel at /admin. Until an account exists, the app runs
+# completely open and treats you as an anonymous administrator, so you can
+# create the first account there (it becomes an admin automatically).
 
-port: 8080                    # port HTTP serwera
-listen: 0.0.0.0               # interfejs nasłuchu: "localhost" = tylko ten komputer, "0.0.0.0" = cała sieć lokalna (potrzebne czytnikom OPDS)
-library: "D:/Library"         # korzeń biblioteki komiksów (skanowany rekursywnie: cbz/cbr/pdf)
-data_dir: ./data              # dane runtime: baza SQLite (database.sqlite, w tym konta użytkowników) i cache okładek (covers/)
-comicvine_api_key: ""         # klucz z https://comicvine.gamespot.com/api/; puste = dopasowanie/scrape ComicVine wyłączone (UI to komunikuje)
-opds_enabled: true            # katalog OPDS pod /opds (patrz §9a); logowanie tymi samymi kontami co WWW
-page_size: 60                 # kafelków serii na stronę biblioteki; 0 = bez paginacji
+port: 8080                    # HTTP server port
+listen: 0.0.0.0               # listen interface: "localhost" = this computer only, "0.0.0.0" = the whole local network (needed by OPDS readers)
+library: "D:/Library"         # comic library root (scanned recursively: cbz/cbr/pdf)
+data_dir: ./data              # runtime data: the SQLite database (database.sqlite, including user accounts) and cover cache (covers/)
+comicvine_api_key: ""         # key from https://comicvine.gamespot.com/api/; empty = ComicVine matching/scraping disabled (the UI says so)
+opds_enabled: true            # OPDS catalog under /opds (see §9a); logs in with the same accounts as the web UI
+page_size: 60                 # series tiles per library page; 0 = no pagination

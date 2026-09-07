@@ -1,175 +1,180 @@
-# ComicNest — Specyfikacja techniczna (v1)
+# ComicNest — Technical specification (v1)
 
-Osobisty katalog komiksów w formie aplikacji webowej, pisany w Go. Inspirowany Komgą,
-ale własny i prostszy. Następca konceptu **ComicsNest** (kod w `Old/ComicsNest` — służy
-tylko jako referencja pomysłu, nie kopiujemy z niego kodu).
+A personal comic catalog as a web application, written in Go. Inspired by Komga,
+but its own, simpler thing. Successor to the **ComicsNest** concept (code in `Old/ComicsNest` —
+kept only as a reference for the idea, no code is copied from it).
 
-## 1. Cele wersji 1
+## 1. Goals of version 1
 
-- Jedno binarium Go + plik konfiguracyjny; uruchomienie tworzy lokalny serwer WWW.
-- Skanowanie folderu biblioteki (`.cbz`, `.cbr`, `.pdf`) i budowanie katalogu: **serie → zeszyty (issues)**.
-- Odczyt metadanych osadzonych w plikach (**ComicInfo.xml**).
-- **Ręczna edycja metadanych** serii i zeszytów w przeglądarce.
-- **Aktualizacja metadanych z ComicVine API** (na żądanie użytkownika, z wyborem dopasowania).
-- Wyświetlanie okładek (wyciąganych z archiwów, cache na dysku).
-- Pobranie pliku komiksu po kliknięciu (bez wbudowanego czytnika w v1).
+- One Go binary + a config file; running it starts a local web server.
+- Scan the library folder (`.cbz`, `.cbr`, `.pdf`) and build a catalog: **series → issues**.
+- Read metadata embedded in files (**ComicInfo.xml**).
+- **Manual metadata editing** for series and issues in the browser.
+- **Metadata updates from the ComicVine API** (on user request, with a match picker).
+- Display covers (extracted from archives, cached on disk).
+- Download the comic file on click (no built-in reader in v1).
 
-### Poza zakresem v1 (świadomie)
+### Out of scope for v1 (deliberately)
 
-- Czytnik stron w przeglądarce (planowany na v2 — architektura ma tego nie blokować).
-- Wielu użytkowników, logowanie, uprawnienia.
-- Zapis metadanych z powrotem do ComicInfo.xml w archiwum.
-- Renderowanie okładek z PDF (PDF dostaje placeholder; plik nadal jest katalogowany i pobieralny).
-- Automatyczne obserwowanie zmian w systemie plików (skan uruchamiany ręcznie przyciskiem).
+- An in-browser page reader (planned for v2 — the architecture shouldn't block it).
+- Multiple users, login, permissions.
+- Writing metadata back into ComicInfo.xml inside the archive.
+- Rendering covers from PDF (PDF gets a placeholder; the file is still catalogued and downloadable).
+- Automatic filesystem watching (scans are triggered manually by a button).
 
-## 2. Stack technologiczny
+## 2. Technology stack
 
-| Warstwa | Wybór | Uzasadnienie |
+| Layer | Choice | Rationale |
 |---|---|---|
-| Język | Go 1.23+ | wymóg projektu |
-| HTTP | `net/http` + router stdlib (wzorce `GET /series/{id}` z Go 1.22) | zero zależności |
-| Baza | SQLite przez `modernc.org/sqlite` | czysty Go, bez cgo — bezproblemowa kompilacja na Windows |
-| Dostęp do bazy | `database/sql` + ręczne zapytania | schemat jest mały; bez ORM |
-| Szablony | `html/template` | **uwaga:** stary projekt używał `text/template` — to podatność XSS, w nowym zawsze `html/template` |
-| Interaktywność | HTMX (plik statyczny w `web/static/`, vendorowany) | edycja, filtry i status skanu bez SPA i bez build stepu |
-| CSS | własny, prosty arkusz (dark theme, grid okładek) | bez frameworków |
-| Konfiguracja | YAML (`gopkg.in/yaml.v3`) | jak w starym projekcie |
+| Language | Go 1.23+ | project requirement |
+| HTTP | `net/http` + the stdlib router (`GET /series/{id}` patterns from Go 1.22) | zero dependencies |
+| Database | SQLite via `modernc.org/sqlite` | pure Go, no cgo — trouble-free build on Windows |
+| DB access | `database/sql` + hand-written queries | the schema is small; no ORM |
+| Templates | `html/template` | **note:** the old project used `text/template` — an XSS hole; the new one always uses `html/template` |
+| Interactivity | HTMX (a static file in `web/static/`, vendored) | editing, filters and scan status without an SPA or a build step |
+| CSS | a small custom stylesheet (dark theme, cover grid) | no frameworks |
+| Configuration | YAML (`gopkg.in/yaml.v3`) | as in the old project |
 | CBZ | `archive/zip` (stdlib) | |
-| CBR | `github.com/nwaples/rardecode/v2` | odczyt RAR bez cgo |
-| Miniatury | `image` + `golang.org/x/image/draw` | skalowanie okładek do cache |
-| Embedding | `embed` — szablony i statyki wkompilowane w binarium | jedno binarium do uruchomienia |
+| CBR | `github.com/nwaples/rardecode/v2` | RAR reading without cgo |
+| Thumbnails | `image` + `golang.org/x/image/draw` | scaling covers for the cache |
+| Embedding | `embed` — templates and static assets compiled into the binary | a single binary to run |
 
-## 3. Struktura projektu
+## 3. Project structure
 
 ```
 ComicNextClaude/
 ├── cmd/comicnest/main.go        # wiring: config → db → scanner → server
 ├── internal/
-│   ├── config/                  # wczytanie/zapis config.yaml, wartości domyślne
-│   ├── store/                   # schemat SQLite, migracje, zapytania (SeriesStore, IssueStore)
-│   ├── library/                 # scanner: walk, rozpoznawanie serii/numerów, rozmiary
+│   ├── config/                  # loading/saving config.yaml, defaults
+│   ├── store/                   # SQLite schema, migrations, queries (SeriesStore, IssueStore)
+│   ├── library/                 # scanner: walk, series/number recognition, sizes
 │   │   ├── scanner.go
-│   │   ├── archive.go           # otwieranie CBZ/CBR, listowanie stron, wyciąganie plików
-│   │   └── comicinfo.go         # parser ComicInfo.xml
-│   ├── covers/                  # ekstrakcja pierwszej strony → miniatura JPEG → cache
-│   ├── comicvine/               # klient API: search volume, get volume, get issue; rate limiter
-│   ├── opds/                    # typy Atom/OPDS 1.2 + serializacja feedów i OpenSearch (bez HTTP/DB)
-│   └── server/                  # handlery HTTP, routing, renderowanie szablonów (+ opds.go: katalog OPDS)
+│   │   ├── archive.go           # opening CBZ/CBR, listing pages, extracting files
+│   │   └── comicinfo.go         # ComicInfo.xml parser
+│   ├── covers/                  # first-page extraction → JPEG thumbnail → cache
+│   ├── comicvine/                # API client: search volume, get volume, get issue; rate limiter
+│   ├── opds/                    # Atom/OPDS 1.2 types + feed and OpenSearch serialization (no HTTP/DB)
+│   └── server/                  # HTTP handlers, routing, template rendering (+ opds.go: the OPDS catalog)
 ├── web/
-│   ├── templates/               # layout.html + widoki + partiale HTMX
+│   ├── templates/               # layout.html + views + HTMX partials
 │   └── static/                  # htmx.min.js, styles.css, placeholder.svg, favicon.png, favicon-32.png, favicon.ico, apple-touch-icon.png
-├── docs/                        # ta dokumentacja
-├── .github/workflows/go.yml     # CI: testy + binaria (Win/Linux/macOS) + obraz Docker (Docker Hub) po każdym pushu na main, wydania z tagów v*
-├── Dockerfile                   # obraz: static binary w distroless, wolumeny /comics /config /data (§4a)
-├── docker-compose.yml           # przykład uruchomienia dla użytkowników
+├── docs/                        # this documentation
+├── .github/workflows/go.yml     # CI: tests + binaries (Win/Linux/macOS) + Docker image (Docker Hub) on every push to main, releases from v* tags
+├── Dockerfile                   # image: static binary in distroless, /comics /config /data volumes (§4a)
+├── docker-compose.yml           # a run example for users
 ├── .dockerignore
-├── imgs/                        # logo.png (źródło ikony, 1254 px; favicony w web/static są z niego skalowane) i screeny do README
-├── config_example.yaml          # wzorzec konfiguracji z opisem każdej opcji (wersjonowany, §4)
-├── config.yaml                  # tworzony przy pierwszym starcie (gitignore)
-└── data/                        # runtime: database.sqlite, covers/ (gitignore)
+├── imgs/                        # logo.png (the icon source, 1254 px; the favicons under web/static are scaled from it) and README screenshots
+├── config_example.yaml          # an annotated config template (versioned, §4)
+├── config.yaml                  # created on first start (gitignored)
+└── data/                        # runtime: database.sqlite, covers/ (gitignored)
 ```
 
-## 4. Konfiguracja (`config.yaml`)
+## 4. Configuration (`config.yaml`)
 
 ```yaml
 port: 8080
-listen: localhost              # "0.0.0.0" = dostęp z sieci lokalnej (potrzebne czytnikom OPDS)
-library: "D:/Library"          # korzeń biblioteki komiksów
-data_dir: "./data"             # baza sqlite + cache okładek
-comicvine_api_key: ""          # puste = funkcje ComicVine wyłączone (UI to komunikuje)
-opds_enabled: false            # katalog OPDS pod /opds (patrz §9a)
-page_size: 60                  # kafelków serii na stronę biblioteki; 0 = bez paginacji
+listen: localhost              # "0.0.0.0" = reachable from the local network (needed by OPDS readers)
+library: "D:/Library"          # comic library root
+data_dir: "./data"             # sqlite database + cover cache
+comicvine_api_key: ""          # empty = ComicVine features disabled (the UI says so)
+opds_enabled: false            # OPDS catalog under /opds (see §9a)
+page_size: 60                  # series tiles per library page; 0 = no pagination
 ```
 
-Przy braku pliku aplikacja zapisuje domyślny config i loguje instrukcję uzupełnienia. Konta
-użytkowników **nie** są częścią tego pliku — żyją w bazie i zarządza się nimi z panelu
-administracyjnego w przeglądarce (`/admin`, patrz niżej), nie edycją YAML.
+When the file is missing, the app writes a default config and logs instructions to fill it in.
+User accounts are **not** part of this file — they live in the database and are managed from the
+admin panel in the browser (`/admin`, see below), not by editing YAML.
 
-**Plik `config_example.yaml`** (w korzeniu repozytorium, wersjonowany) jest wzorcem dla użytkownika
-i jedynym pełnym spisem opcji: każdy klucz ma tam komentarz mówiący, co robi i jakie wartości
-przyjmuje. **Zasada:** każda zmiana w konfiguracji (nowy klucz, zmiana nazwy lub domyślnej wartości,
-usunięcie) trafia w tym samym commicie do `config_example.yaml` razem z opisem — a także do bloku
-powyżej i do README. Prawdziwy `config.yaml` (z kluczem API) pozostaje w `.gitignore`.
-Klucz API **nigdy nie trafia do kodu** (w starym projekcie był zahardkodowany — patrz §10).
+**The `config_example.yaml` file** (at the repo root, versioned) is the template shown to users
+and the single full list of options: every key there has a comment saying what it does and what
+values it accepts. **Rule:** every config change (a new key, a rename or a default-value change,
+a removal) goes into `config_example.yaml` with a description in the same commit — and into the
+block above and into the README. The real `config.yaml` (with the API key) stays in `.gitignore`.
+The API key **never goes into the code** (the old project hardcoded it — see §10).
 
-**Konta użytkowników i panel administracyjny (`/admin`).** Konta żyją w tabeli `users`
-(`internal/store/users.go`, migracja 8 w `internal/store/migrate.go`): login, hasło zahaszowane
-bcryptem (`golang.org/x/crypto/bcrypt`, nigdy plaintext — inaczej niż w starym, config-owym systemie),
-flaga `is_admin`, `last_login_at` (uzupełniane przy każdym udanym logowaniu WWW i uwierzytelnieniu
-OPDS Basic). Jedno źródło prawdy dla logowania do WWW (formularz `/login`, sesja w ciasteczku
-`comicnest_session`: HttpOnly, SameSite=Strict, 30 dni, tabela sesji w pamięci — restart wylogowuje)
-i dla OPDS (HTTP Basic z tymi samymi parami nazwa/hasło). Postęp czytania jest per użytkownik (§5).
+**User accounts and the admin panel (`/admin`).** Accounts live in the `users` table
+(`internal/store/users.go`, migration 8 in `internal/store/migrate.go`): login, password hashed
+with bcrypt (`golang.org/x/crypto/bcrypt`, never plaintext — unlike the old, config-based system),
+an `is_admin` flag, `last_login_at` (updated on every successful web login and OPDS Basic auth).
+One source of truth for both the web login (`/login` form, a session in the `comicnest_session`
+cookie: HttpOnly, SameSite=Strict, 30 days, an in-memory session table — a restart logs everyone
+out) and OPDS (HTTP Basic with the same name/password pairs). Reading progress is per user (§5).
 
-*Pierwsze uruchomienie* — zero kont w tabeli: aplikacja działa całkowicie otwarta (bez logowania),
-a anonimowy gość jest traktowany jak administrator (`Server.isAdmin`), więc widzi panel `/admin`,
-przycisk skanowania i przyciski edycji/ComicVine, i może stamtąd założyć pierwsze prawdziwe konto.
-Pierwsze utworzone konto **zawsze** zostaje administratorem, niezależnie od checkboxa w formularzu —
-inaczej, w chwili jego powstania logowanie zaczyna być wymagane i nie byłoby już jak wrócić do panelu.
-W tym momencie postęp czytania zapisany przez anonimowego gościa (`user = ''`) przechodzi na to konto
-(`Store.AdoptAnonymousProgress`, wywoływane z `handleAdminCreateUser`).
+*First run* — zero accounts in the table: the app runs completely open (no login), and the
+anonymous visitor is treated as an administrator (`Server.isAdmin`), so they see the `/admin`
+panel, the scan button and the edit/ComicVine buttons, and can create the first real account from
+there. The first account created **always** becomes an administrator, regardless of the checkbox
+in the form — otherwise, the moment it exists, login becomes required and there would be no way
+back into the panel. At that point, reading progress recorded by the anonymous visitor
+(`user = ''`) is transferred to that account (`Store.AdoptAnonymousProgress`, called from
+`handleAdminCreateUser`).
 
-*Uprawnienia admina.* Middleware `requireAdmin` (`internal/server/auth.go`) chroni: sam panel
-(`/admin/*`), skan biblioteki (`POST /scan`), edycję metadanych serii/zeszytu (formularze edycji,
-odblokowanie, scalanie serii, usuwanie rekordu zniknionego pliku) oraz wyszukiwanie/dopasowywanie/
-scrapowanie ComicVine. Nie-admin (zalogowany, ale bez flagi) dostaje 403 na te trasy; szablony
-(`isAdmin` w `funcMap`, plus pole `IsAdmin` na danych partiala `scrape_status.html`, który jest
-renderowany poza zwykłym zestawem szablonów) chowają odpowiadające im przyciski, więc nie widzi ich
-w ogóle. Czytanie, oznaczanie postępu, przeglądanie i wyszukiwanie zostają dostępne dla każdego
-zalogowanego — to nie jest funkcja administracyjna.
+*Admin privileges.* The `requireAdmin` middleware (`internal/server/auth.go`) protects: the panel
+itself (`/admin/*`), library scanning (`POST /scan`), series/issue metadata editing (edit forms,
+unlocking, merging series, deleting a vanished file's record), and ComicVine search/matching/
+scraping. A non-admin (logged in, but without the flag) gets a 403 on these routes; the templates
+(`isAdmin` in `funcMap`, plus the `IsAdmin` field on the `scrape_status.html` partial's data, which
+is rendered outside the normal template set) hide the corresponding buttons, so they don't see
+them at all. Reading, marking progress, browsing and searching stay available to any logged-in
+user — those aren't admin functions.
 
-*Zarządzanie kontami* (`/admin`, tylko admin): tabela kont (login, ✓ przy adminie, ostatnie
-logowanie — „nigdy" gdy puste, data utworzenia) z akcjami nadaj/odbierz admina, zmień hasło, usuń,
-oraz formularz dodania konta. Ostatniemu administratorowi nie można odebrać uprawnień ani go usunąć
-(`Store.CountAdmins`) — to zablokowałoby dostęp do panelu na stałe.
+*Account management* (`/admin`, admin only): an account table (login, ✓ for admins, last login —
+"never" when empty, creation date) with grant/revoke admin, change password and delete actions,
+plus an add-account form. The last remaining administrator cannot have their privileges revoked or
+be deleted (`Store.CountAdmins`) — that would lock everyone out of the panel permanently.
 
-**Paginacja biblioteki (`page_size`).** Widok główny dzieli przefiltrowaną listę serii na strony po
-`page_size` kafelków (domyślnie 60; parametr `?page=N`, sortowanie i filtr zachowane w linkach pagera).
-`0` wyłącza paginację, wartość ujemna to błąd konfiguracji. Nie dotyczy OPDS (stała 50 wpisów).
+**Library pagination (`page_size`).** The home view splits the filtered series list into pages of
+`page_size` tiles (default 60; `?page=N` parameter, sort and filter preserved in pager links). `0`
+disables pagination; a negative value is a config error. Does not apply to OPDS (a fixed 50
+entries).
 
-Domyślnie nasłuch tylko na `localhost`. `listen: 0.0.0.0` wystawia aplikację w sieci lokalnej —
-wtedy warto od razu założyć konto administratora w `/admin`, bo bez kont UI (także edycja metadanych)
-jest otwarte dla każdego w sieci.
+The server listens on `localhost` only by default. `listen: 0.0.0.0` exposes the app on the local
+network — at that point it's worth creating an administrator account in `/admin` right away,
+since without any accounts the UI (including metadata editing) is open to anyone on the network.
 
-**Ścieżka configu i zmienne środowiskowe.** Plik wskazuje flaga `-config`, w drugiej kolejności
-`$COMICNEST_CONFIG`, domyślnie `./config.yaml`. Zmienne `COMICNEST_LISTEN`, `COMICNEST_PORT`,
-`COMICNEST_LIBRARY`, `COMICNEST_DATA_DIR`, `COMICNEST_COMICVINE_API_KEY`, `COMICNEST_OPDS_ENABLED`
-i `COMICNEST_PAGE_SIZE` nadpisują wartości z pliku (`Config.applyEnv`; pusta wartość = nieustawiona,
-błędny typ = błąd startu). Gdy pliku nie ma, do tworzonego domyślnego configu trafiają już wartości
-ze środowiska. Konta nie mają odpowiednika w pliku ani w środowisku — żyją wyłącznie w bazie.
-Mechanizm zmiennych środowiskowych istnieje głównie dla Dockera (§4a), ale działa wszędzie.
+**Config path and environment variables.** The file location comes from the `-config` flag, then
+`$COMICNEST_CONFIG`, defaulting to `./config.yaml`. The variables `COMICNEST_LISTEN`,
+`COMICNEST_PORT`, `COMICNEST_LIBRARY`, `COMICNEST_DATA_DIR`, `COMICNEST_COMICVINE_API_KEY`,
+`COMICNEST_OPDS_ENABLED` and `COMICNEST_PAGE_SIZE` override values from the file
+(`Config.applyEnv`; an empty value means "not set", a wrong type is a startup error). When the file
+doesn't exist, the default config that gets created already carries values from the environment.
+Accounts have no equivalent in the file or the environment — they live only in the database. The
+environment-variable mechanism exists mainly for Docker (§4a), but works everywhere.
 
 ## 4a. Docker
 
-Obraz (`Dockerfile`, wieloetapowy): binarium bez cgo kompilowane w `golang:alpine`, kopiowane do
-`gcr.io/distroless/static` (certyfikaty CA dla ComicVine, brak shella). Kontener startuje jako root:
-przy ustawionych `PUID`/`PGID` (konwencja NAS — Synology, Unraid, linuxserver.io) aplikacja przepisuje
-własność katalogu configu i `data_dir` na tego użytkownika (pomijając wpisy już poprawne, więc restart
-z dużym cache okładek jest tani) i wywołuje `setgroups`/`setgid`/`setuid`, zanim otworzy bazę
-(`cmd/comicnest/privs_linux.go`; poza Linuksem no-op). Biblioteka nigdy nie jest chownowana. Bez
-`PUID`/`PGID` proces zostaje rootem — wariant `--user` z własnymi uprawnieniami katalogów też działa.
-Powód: wolumeny na NAS-ach należą do konta użytkownika (Synology: UID 1026, GID 100), a stały
-użytkownik `nonroot` z obrazu nie miał do nich zapisu.
-Obraz ustawia `COMICNEST_CONFIG=/config/config.yaml`, `COMICNEST_LISTEN=0.0.0.0`,
-`COMICNEST_LIBRARY=/comics`, `COMICNEST_DATA_DIR=/data`, więc trzy wolumeny (`/comics` tylko do
-odczytu, `/config`, `/data`) wystarczają, a pierwszy start tworzy poprawny `config.yaml`.
-`GET /healthz` (poza logowaniem i logiem żądań) zwraca `ok`; `comicnest -healthcheck` odpytuje go
-po `127.0.0.1:port` i kończy się kodem 0/1 — to `HEALTHCHECK` w `docker-compose.yml`, bo obraz nie
-ma `curl`. Publikacja: job `docker` w `.github/workflows/go.yml` buduje `linux/amd64` + `linux/arm64`
-(buildx + QEMU) i wypycha do Docker Hub (`jaggred/comicnest`) — `latest` i `main-<sha>` z `main`,
-`X.Y.Z`/`X.Y`/`X` z tagów. Wersja trafia do obrazu przez `--build-arg VERSION`. Przykład użycia
-w `docker-compose.yml`; `/data` na lokalnym dysku (SQLite na SMB/NFS grozi uszkodzeniem bazy).
+The image (`Dockerfile`, multi-stage): a cgo-free binary built in `golang:alpine`, copied into
+`gcr.io/distroless/static` (CA certificates for ComicVine, no shell). The container starts as
+root: when `PUID`/`PGID` are set (the NAS convention — Synology, Unraid, linuxserver.io) the app
+takes ownership of the config directory and `data_dir` for that user (skipping entries that are
+already correct, so a restart with a large cover cache is cheap) and calls
+`setgroups`/`setgid`/`setuid` before opening the database (`cmd/comicnest/privs_linux.go`; a no-op
+off Linux). The library is never chowned. Without `PUID`/`PGID` the process stays root — the
+`--user` variant with its own directory permissions also works. Reason: volumes on NAS boxes
+belong to a user account (Synology: UID 1026, GID 100), and the fixed `nonroot` user from the
+image had no write access to them.
+The image sets `COMICNEST_CONFIG=/config/config.yaml`, `COMICNEST_LISTEN=0.0.0.0`,
+`COMICNEST_LIBRARY=/comics`, `COMICNEST_DATA_DIR=/data`, so the three volumes (`/comics`
+read-only, `/config`, `/data`) are enough, and the first start creates a working `config.yaml`.
+`GET /healthz` (outside login and the request log) returns `ok`; `comicnest -healthcheck` polls it
+over `127.0.0.1:port` and exits 0/1 — that's the `HEALTHCHECK` in `docker-compose.yml`, since the
+image has no `curl`. Publishing: the `docker` job in `.github/workflows/go.yml` builds
+`linux/amd64` + `linux/arm64` (buildx + QEMU) and pushes to Docker Hub (`jaggred/comicnest`) —
+`latest` and `main-<sha>` from `main`, `X.Y.Z`/`X.Y`/`X` from tags. The version reaches the image
+via `--build-arg VERSION`. Usage example in `docker-compose.yml`; keep `/data` on local disk
+(SQLite on SMB/NFS risks corrupting the database).
 
-## 5. Model danych (SQLite)
+## 5. Data model (SQLite)
 
 ```sql
 CREATE TABLE series (
     id                  INTEGER PRIMARY KEY,
-    name                TEXT NOT NULL,            -- wyświetlana nazwa (edytowalna)
-    folder_path         TEXT UNIQUE,              -- NULL dla serii "wirtualnych" z nazw plików
+    name                TEXT NOT NULL,            -- display name (editable)
+    folder_path         TEXT UNIQUE,              -- NULL for "virtual" series from file names
     publisher           TEXT DEFAULT '',
     description         TEXT DEFAULT '',
-    comicvine_volume_id INTEGER,                  -- zapamiętane dopasowanie ComicVine
-    metadata_locked     INTEGER NOT NULL DEFAULT 0, -- 1 = skan/scrape nie nadpisuje
+    comicvine_volume_id INTEGER,                  -- remembered ComicVine match
+    metadata_locked     INTEGER NOT NULL DEFAULT 0, -- 1 = scan/scrape won't overwrite
     created_at          TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -177,22 +182,22 @@ CREATE TABLE series (
 CREATE TABLE issues (
     id                 INTEGER PRIMARY KEY,
     series_id          INTEGER NOT NULL REFERENCES series(id) ON DELETE CASCADE,
-    path               TEXT NOT NULL UNIQUE,      -- absolutna ścieżka pliku
-    file_size          INTEGER NOT NULL,          -- bajty; formatowanie w warstwie widoku
-    file_missing       INTEGER NOT NULL DEFAULT 0,-- plik zniknął przy ostatnim skanie
-    issue_number       TEXT DEFAULT '',           -- TEXT: bywają numery "12.1", "Annual 1"
+    path               TEXT NOT NULL UNIQUE,      -- absolute file path
+    file_size          INTEGER NOT NULL,          -- bytes; formatted in the view layer
+    file_missing       INTEGER NOT NULL DEFAULT 0,-- the file disappeared during the last scan
+    issue_number       TEXT DEFAULT '',           -- TEXT: numbers like "12.1", "Annual 1" happen
     title              TEXT DEFAULT '',
     summary            TEXT DEFAULT '',
-    release_date       TEXT DEFAULT '',           -- ISO yyyy-mm-dd (lub sam rok)
+    release_date       TEXT DEFAULT '',           -- ISO yyyy-mm-dd (or just the year)
     writer             TEXT DEFAULT '',
     artist             TEXT DEFAULT '',
     publisher          TEXT DEFAULT '',
     page_count         INTEGER DEFAULT 0,
     comicvine_issue_id INTEGER,
     metadata_source    TEXT NOT NULL DEFAULT 'filename', -- filename | comicinfo | comicvine | manual
-    metadata_locked    INTEGER NOT NULL DEFAULT 0,       -- 1 = ręcznie edytowane, nie nadpisuj
+    metadata_locked    INTEGER NOT NULL DEFAULT 0,       -- 1 = manually edited, don't overwrite
     has_comicinfo      INTEGER NOT NULL DEFAULT 0,
-    comicinfo_series   TEXT,                      -- <Series> z ComicInfo.xml (migracja 5): NULL = nie sprawdzono, '' = brak
+    comicinfo_series   TEXT,                      -- <Series> from ComicInfo.xml (migration 5): NULL = not checked yet, '' = none
     cover_cached       INTEGER NOT NULL DEFAULT 0,
     created_at         TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
@@ -201,112 +206,112 @@ CREATE TABLE issues (
 CREATE INDEX idx_issues_series ON issues(series_id);
 ```
 
-Zasada nadpisywania metadanych (priorytet rosnąco):
+Metadata-overwrite rule (increasing priority):
 `filename` → `comicinfo` → `comicvine` → `manual`.
-Skan może nadpisać dane o niższym lub równym priorytecie; `metadata_locked=1`
-(ustawiane automatycznie po ręcznej edycji) blokuje wszystko poza kolejną ręczną edycją.
+A scan may overwrite data of equal or lower priority; `metadata_locked=1`
+(set automatically after a manual edit) blocks everything except another manual edit.
 
-Okładki nie siedzą w bazie: cache `data/covers/{issue_id}.jpg` (miniatura ~400px szer.)
-+ flaga `cover_cached`. Okładka serii = okładka pierwszego zeszytu (najniższy numer).
+Covers don't live in the database: a cache at `data/covers/{issue_id}.jpg` (a thumbnail ~400px
+wide) plus the `cover_cached` flag. A series' cover is its first issue's cover (lowest number).
 
-**Wydania jednorazowe (one-shoty)** — kolumna `series.one_shot` (migracja 2). Sygnały
-(dowolny wystarczy): (1) dopasowany wolumen ComicVine ma `count_of_issues == 1`,
-(2) ComicInfo.xml ma `Format` zawierający "One-Shot" lub `Count=1`, (3) po skanie
-seria ma dokładnie 1 zeszyt bez numeru. Skan zdejmuje flagę, gdy seria zyska drugi
-zeszyt. UI: etykieta „wydanie jednorazowe" zamiast licznika, kafelek na gridzie
-prowadzi wprost do zeszytu. Scrape: zeszyt bez numeru + wolumen z jednym zeszytem
-→ dopasowany zostaje ten jedyny zeszyt.
+**One-shots** — the `series.one_shot` column (migration 2). Signals (any one is enough): (1) the
+matched ComicVine volume has `count_of_issues == 1`, (2) ComicInfo.xml has a `Format` containing
+"One-Shot" or `Count=1`, (3) after a scan the series has exactly one issue with no number. A scan
+clears the flag once the series gets a second issue. UI: a "one-shot" label instead of a counter,
+and the grid tile links straight to the issue. Scrape: a numberless issue plus a volume with a
+single issue → that one issue gets matched.
 
-**Strumieniowanie i postęp czytania** (migracja 3): kolumna `issues.file_pages` — rzeczywista
-liczba wpisów graficznych w archiwum (0 = jeszcze nieliczona; `page_count` pozostaje
-metadaną z ComicInfo, edytowalną i potencjalnie błędną) — oraz tabela
+**Streaming and reading progress** (migration 3): the `issues.file_pages` column — the actual
+number of image entries in the archive (0 = not counted yet; `page_count` remains ComicInfo
+metadata, editable and potentially wrong) — plus the table
 `reading_progress(user, issue_id → issues ON DELETE CASCADE, page, updated_at; PK (user, issue_id))`
-(migracja 4 — wcześniej PK po samym `issue_id`; stare wiersze dostały `user = ''`), gdzie `user` to
-nazwa konta z `config.yaml` (`''` = anonimowy czytelnik bez kont), a `page` to ostatnia
-przeczytana strona 1-based (konwencja OPDS-PSE). Zapis przez `UPSERT` z `MAX(page, nowa)`.
-Skan uzupełnia `file_pages` dla nowych plików i dla starych z wartością 0. Wszystkie zapytania o
-postęp (`ListSeries` agregaty, `ListIssuesInProgress`, `ReadingProgressFor`, …) przyjmują `user`.
+(migration 4 — the PK used to be just `issue_id`; old rows got `user = ''`), where `user` is the
+account name from `config.yaml` (`''` = the anonymous reader with no accounts), and `page` is the
+last read page, 1-based (the OPDS-PSE convention). Written via `UPSERT` with `MAX(page, new)`. A
+scan fills in `file_pages` for new files and for old ones still at 0. Every progress-related query
+(`ListSeries` aggregates, `ListIssuesInProgress`, `ReadingProgressFor`, …) takes `user`.
 
-**Seria z ComicInfo** (migracja 5): kolumna `issues.comicinfo_series` przechowuje surową wartość
-`<Series>` z pliku, niezależnie od (edytowalnego) wiersza serii. `NULL` = wiersz z bazy sprzed
-migracji, jeszcze nie sprawdzony, **albo** archiwum, którego nie dało się odczytać (błąd zip/rar) —
-w obu przypadkach kolejny skan czyta ComicInfo ponownie (dla starych wierszy tylko po to; zablokowanych
-metadanych nie rusza) i wypełnia kolumnę; `''` = archiwum odczytane poprawnie, ale bez ComicInfo lub z
-pustym `<Series>`, oraz każdy PDF. Kolumna służy wyłącznie regule rozdzielania folderów (§6 pkt 2).
+**Series from ComicInfo** (migration 5): the `issues.comicinfo_series` column stores the raw
+`<Series>` value from the file, independent of the (editable) series row. `NULL` = a row from
+before the migration, not checked yet, **or** an archive that couldn't be read (a zip/rar error) —
+in both cases the next scan reads ComicInfo again (for old rows only for this reason; it doesn't
+touch locked metadata) and fills the column; `''` = the archive was read fine but has no ComicInfo
+or an empty `<Series>`, and every PDF. The column exists solely for the folder-splitting rule
+(§6 point 2).
 
-## 6. Skanowanie biblioteki
+## 6. Library scanning
 
-Uruchamiane przyciskiem w UI (`POST /scan`), działa w goroutine; UI odpytuje status
-(HTMX polling `GET /scan/status` co 2 s — pasek postępu i licznik plików).
-Tylko jeden skan naraz (mutex + flaga w pamięci).
+Started by a UI button (`POST /scan`), runs in a goroutine; the UI polls status (HTMX polling
+`GET /scan/status` every 2s — a progress bar and file counter). Only one scan at a time (a mutex
+plus an in-memory flag).
 
-Algorytm:
+Algorithm:
 
-1. `filepath.WalkDir` po `config.library`, filtr rozszerzeń: `.cbz`, `.cbr`, `.pdf`.
-2. **Przypisanie do serii** (tryb hybrydowy — folder z fallbackiem na nazwę pliku):
-   - plik w podfolderze → seria = **nazwa najbliższego folderu-rodzica** (folder_path
-     = ścieżka względna od korzenia biblioteki); zagnieżdżone foldery dozwolone,
-     liczy się bezpośredni rodzic;
-   - plik bezpośrednio w korzeniu → seria z **nazwy pliku** (folder_path = NULL),
-     seria tworzona/odnajdowana po nazwie.
-   - **Folder z kilkoma seriami** (przebieg 3, `Scanner.splitMixedFolders`, po synchronizacji
-     plików, przed `ReconcileOneShots`): gdy obecne na dysku pliki *jednego* podfolderu mają
-     co najmniej dwie różne niepuste wartości `<Series>` w ComicInfo.xml (porównanie po
-     `TrimSpace`, bez rozróżniania wielkości liter), folder jest „mieszany". Przenoszone są
-     **tylko zeszyty siedzące jeszcze w serii folderu** (`series.folder_path` = katalog pliku);
-     zeszyt, który już leży w serii wirtualnej, nie jest nigdy ruszany — dzięki temu zmiana nazwy
-     (ręczna, z blokadą) lub dopasowanie ComicVine rozdzielonej serii przeżywa kolejne skany.
-     Cel przeniesienia: najpierw seria, w której już leży inny plik tego folderu z tą samą
-     (znormalizowaną) wartością `Series` (pliki dodane później dołączają do przemianowanej
-     serii), w braku takiej — seria wirtualna o tej nazwie (`FindOrCreateSeriesByName`,
-     `folder_path NULL`). Zeszyty bez ComicInfo oraz te, których `Series` równa się nazwie
-     folderu (bez rozróżniania wielkości liter), zostają w serii folderu (druga „Mad Max" byłaby
-     duplikatem; wartość nadal liczy się przy ocenie, czy folder jest mieszany). Reguła patrzy na
-     pliki fizycznie w folderze, więc jest idempotentna. Folder ze spójną wartością `Series`
-     (nawet inną niż nazwa folderu) albo z ComicInfo tylko w części plików **nie** jest dzielony —
-     folder = seria pozostaje regułą. Blokada metadanych ani dopasowanie ComicVine nie chronią
-     przed pierwszym rozdzieleniem (blokada dotyczy tekstu metadanych). Opróżniona seria folderu
-     zostaje w bazie (listy ukrywają serie bez zeszytów). Przykład: `Mad Max/` z „Mad Max: Fury
-     Road" i „Mad Max: Fury Road: Max" → dwie serie.
-   - **Ręczne scalanie serii** (edycja serii → „Połącz z inną serią", `POST /series/{id}/merge`,
-     `Store.MergeSeries`): wszystkie zeszyty źródłowej serii przenoszone do docelowej (docelowa
-     zachowuje własne metadane, uzupełniane tylko pustymi polami źródłowej), źródłowa kasowana.
-     Sposób, w jaki źródłowa była dotąd odnajdywana — jej `folder_path` (seria z folderu) albo,
-     dla serii wirtualnej, jej `name` — zapisywany jest jako alias na docelową
-     (`series_folder_aliases` / `series_name_aliases`, migracja 7); `FindOrCreateSeriesByFolder`/
-     `FindOrCreateSeriesByName` sprawdzają te tabele, zanim utworzą nową serię. Bez tego kolejny
-     skan nie znajdowałby już wpisu dla tego folderu/nazwy i tworzyłby go od nowa — cichym
-     skutkiem byłoby rozłączenie właśnie scalonej serii przy każdym skanie. Aliasy wskazujące
-     wcześniej na źródłową (z poprzedniego scalenia) są przy kolejnym scaleniu przepinane na nowy
-     cel, więc łańcuchy scaleń (A→B, potem B→C) też przeżywają skan.
-3. **Parsowanie nazwy pliku** (bez rozszerzenia) — kolejno próbowane wzorce:
-   - `Tytuł #012` → seria "Tytuł", numer "012" (konwencja starego projektu),
-   - `Tytuł 012 (2020)` → seria "Tytuł", numer "012", rok "2020",
-   - `Tytuł v2 015` → seria "Tytuł v2", numer "015",
-   - `Tytuł 052 - Podtytuł 1` → seria "Tytuł", numer "052", tytuł zeszytu "Podtytuł 1" —
-     numerem jest **pierwsza** napotkana liczba (nie ostatnia), żeby cyfra kończąca
-     podtytuł (np. "Barbary Coast 1") nie została wzięta za numer zeszytu zamiast
-     prawdziwego numeru stojącego zaraz po nazwie serii. Liczba wyglądająca jak rok
-     (1900–2099) jest pomijana na rzecz kolejnej liczby w nazwie, o ile taka istnieje
-     (np. `2000 AD 1957` → seria "2000 AD", numer "1957", nie "2000"),
-   - brak dopasowania → cała nazwa jako tytuł zeszytu, numer pusty.
-4. Dla **nowego pliku**: wstaw rekord; jeśli CBZ/CBR — spróbuj wczytać `ComicInfo.xml`
-   (nadpisuje dane z nazwy pliku, `metadata_source='comicinfo'`); wyciągnij okładkę
-   (pierwszy plik obrazkowy w porządku naturalnego sortowania nazw) i zapisz miniaturę.
-5. Dla **istniejącego pliku** (po `path`): odśwież rozmiar; ComicInfo tylko gdy
-   rekord nie jest `manual`/`locked`.
-6. Po przejściu drzewa: rekordy, których plików nie znaleziono → `file_missing=1`
-   (nie kasujemy — użytkownik widzi i decyduje). Serie bez żadnych zeszytów ukrywane.
-7. PDF: katalogowany z metadanymi z nazwy pliku, okładka = placeholder, `page_count=0`.
+1. `filepath.WalkDir` over `config.library`, filtering by extension: `.cbz`, `.cbr`, `.pdf`.
+2. **Assigning a series** (hybrid mode — folder, falling back to the file name):
+   - a file in a subfolder → series = **the name of the nearest parent folder** (folder_path =
+     the path relative to the library root); nested folders are allowed, only the immediate
+     parent matters;
+   - a file directly in the root → series from the **file name** (folder_path = NULL), the
+     series created/found by name.
+   - **A folder with several series** (pass 3, `Scanner.splitMixedFolders`, after file
+     synchronization, before `ReconcileOneShots`): when the files currently on disk in *one*
+     subfolder carry at least two distinct non-empty `<Series>` values in ComicInfo.xml (compared
+     `TrimSpace`d, case-insensitively), the folder is "mixed". Only **issues still sitting in the
+     folder's own series** are moved (`series.folder_path` = the file's directory); an issue that
+     already lives in a virtual series is never touched again — that's what lets a manual rename
+     (with a lock) or a ComicVine match of a split-out series survive further scans. Move target:
+     first, the series another file of the same folder with the same (normalized) `Series` value
+     already lives in (files added later join the renamed/matched series); failing that, a virtual
+     series named after the value (`FindOrCreateSeriesByName`, `folder_path NULL`). Issues without
+     ComicInfo, and ones whose `Series` equals the folder's name (case-insensitively), stay in the
+     folder's series (a second "Mad Max" would just duplicate it; the value still counts when
+     deciding whether the folder is mixed). The rule looks at the files physically present in the
+     folder, so it's idempotent. A folder with a consistent `Series` value (even one different
+     from the folder name), or with ComicInfo in only some files, is **not** split — folder =
+     series remains the rule. Neither a metadata lock nor a ComicVine match protects against the
+     first split (the lock covers metadata text). An emptied folder series stays in the database
+     (lists hide series with no issues). Example: `Mad Max/` with "Mad Max: Fury Road" and
+     "Mad Max: Fury Road: Max" → two series.
+   - **Manual series merging** (series edit → "Merge into another series",
+     `POST /series/{id}/merge`, `Store.MergeSeries`): every issue of the source series moves to
+     the target (the target keeps its own metadata, only filling empty fields from the source),
+     and the source is deleted. However the source used to be found — its `folder_path` (a
+     folder series) or, for a virtual series, its `name` — is recorded as an alias pointing at the
+     target (`series_folder_aliases` / `series_name_aliases`, migration 7); `FindOrCreateSeriesByFolder`/
+     `FindOrCreateSeriesByName` check these tables before creating a new series. Without this, the
+     next scan would no longer find an entry for that folder/name and would recreate it — silently
+     un-merging the series that was just merged, on every scan. Aliases that used to point at the
+     source (from an earlier merge) are repointed at the new target on a later merge, so merge
+     chains (A→B, then B→C) also survive a scan.
+3. **File name parsing** (extension stripped) — patterns tried in order:
+   - `Title #012` → series "Title", number "012" (the old project's convention),
+   - `Title 012 (2020)` → series "Title", number "012", year "2020",
+   - `Title v2 015` → series "Title v2", number "015",
+   - `Title 052 - Subtitle 1` → series "Title", number "052", issue title "Subtitle 1" — the
+     number is the **first** number encountered (not the last), so a digit ending a subtitle
+     (e.g. "Barbary Coast 1") isn't taken as the issue number instead of the real one right after
+     the series name. A number that looks like a year (1900–2099) is skipped in favor of the next
+     number in the name, if one exists (e.g. `2000 AD 1957` → series "2000 AD", number "1957", not
+     "2000"),
+   - no match → the whole name becomes the issue title, the number stays empty.
+4. For a **new file**: insert a record; if it's CBZ/CBR, try reading `ComicInfo.xml` (overrides
+   data from the file name, `metadata_source='comicinfo'`); extract the cover (the first image
+   file in natural name-sort order) and save the thumbnail.
+5. For an **existing file** (matched by `path`): refresh the size; re-read ComicInfo only when the
+   record isn't `manual`/`locked`.
+6. After walking the tree: records whose files weren't found get `file_missing=1` (never deleted —
+   the user sees them and decides). Series with no issues left are hidden.
+7. PDF: catalogued with metadata from the file name, a placeholder cover, `page_count=0`.
 
 ## 7. ComicInfo.xml
 
-Czytany z archiwum (dowolna lokalizacja w CBZ/CBR, standardowo w korzeniu).
-Mapowanie pól (parser toleruje brakujące pola):
+Read from the archive (any location inside the CBZ/CBR, typically at the root). Field mapping (the
+parser tolerates missing fields):
 
 | ComicInfo.xml | issues / series |
 |---|---|
-| `Series` | series.name (tylko przy tworzeniu serii "wirtualnej") |
+| `Series` | series.name (only when creating a "virtual" series) |
 | `Number` | issue_number |
 | `Title` | title |
 | `Summary` | summary |
@@ -314,150 +319,151 @@ Mapowanie pól (parser toleruje brakujące pola):
 | `Writer` | writer |
 | `Penciller` (fallback `Inker`) | artist |
 | `Publisher` | publisher |
-| `PageCount` | page_count (fallback: liczba obrazków w archiwum) |
+| `PageCount` | page_count (fallback: number of images in the archive) |
 
-## 8. Integracja ComicVine
+## 8. ComicVine integration
 
-Klient w `internal/comicvine/`:
+The client, in `internal/comicvine/`:
 
-- Klucz z configu; brak klucza → przyciski scrape ukryte/wyłączone z podpowiedzią.
-- **Rate limiter**: min. 1 s odstępu między żądaniami (limit ComicVine to 200/h —
-  masowego scrape'u w v1 nie robimy, tylko akcje per-seria/per-zeszyt).
-- Timeout 15 s, `User-Agent` własny, obsługa `status_code != 1` jako błąd z komunikatem.
-- Endpointy: `search` (resources=volume), `volume/4050-{id}`, `issue/4000-{id}`.
-  Pobierane pola zawężane parametrem `field_list` (mniejsze odpowiedzi).
+- The key comes from the config; no key → scrape buttons hidden/disabled with a tooltip.
+- **Rate limiter**: at least 1s between requests (ComicVine's limit is 200/h — v1 doesn't do bulk
+  scraping, only per-series/per-issue actions).
+- 15s timeout, a custom `User-Agent`, treats `status_code != 1` as an error with a message.
+- Endpoints: `search` (resources=volume), `volume/4050-{id}`, `issue/4000-{id}`. Fields fetched are
+  narrowed with `field_list` (smaller responses).
 
-Przepływ dopasowania — **zawsze z potwierdzeniem użytkownika** (największa słabość
-starego projektu: brał ślepo pierwszy wynik wyszukiwania):
+The matching flow — **always with user confirmation** (the old project's biggest weakness: it
+blindly took the first search result):
 
-1. Na stronie serii: „Dopasuj w ComicVine" → `POST /series/{id}/match` → lista
-   kandydatów (okładka, nazwa, wydawca, rok startu, liczba zeszytów) w modalu HTMX,
-   każdy z przyciskiem „Otwórz stronę ↗" (link do `site_detail_url` na comicvine.gamespot.com,
-   żeby zweryfikować kandydata przed wyborem) obok „Wybierz".
-2. Użytkownik wybiera → zapis `comicvine_volume_id` + `comicvine_url` (`site_detail_url` z API) na serii.
-3. „Pobierz metadane" przy zeszycie (lub „dla wszystkich brakujących" na serii):
-   po `comicvine_volume_id` pobierz listę zeszytów wolumenu, dopasuj po
-   `issue_number` (porównanie znormalizowane: trim zer wiodących), pobierz szczegóły,
-   zaktualizuj rekord (`metadata_source='comicvine'`, `comicvine_url`) + pobierz okładkę
-   z ComicVine do cache (zastępuje miniaturę z archiwum, bo zwykle lepsza). Zapisany
-   `comicvine_url` (serii i zeszytu) pokazuje się jako link „Zobacz na ComicVine ↗" na
-   stronie serii (pasek akcji) i na stronie zeszytu.
-4. Rekordy `metadata_locked=1` pomijane z informacją w UI.
-5. Cofnięcie dopasowania: „Usuń dopasowanie" na stronie serii (`POST /series/{id}/match/unlink`)
-   czyści `series.comicvine_volume_id` + `comicvine_url` i kaskadowo cofa jej niezablokowane
-   zeszyty ze źródłem `comicvine` (`comicvine_issue_id`/`comicvine_url` → NULL/'', `metadata_source`
-   → `comicinfo`/`filename` wg `has_comicinfo`) — zablokowane zeszyty (edycja ręczna) zostają
-   nietknięte. Osobno, „Usuń dopasowanie ComicVine" przy zeszycie (`POST /issues/{id}/scrape/unlink`)
-   cofa tylko ten jeden zeszyt tym samym mechanizmem; pobrane wcześniej dane (tytuł, opis, twórcy…)
-   zostają — usuwany jest tylko sam znacznik źródła, link i dopasowany numer ComicVine.
+1. On the series page: "Match in ComicVine" → `POST /series/{id}/match` → a list of candidates
+   (cover, name, publisher, start year, issue count) in an HTMX modal, each with an "Open page ↗"
+   button (a link to `site_detail_url` on comicvine.gamespot.com, to verify the candidate before
+   picking it) next to "Select".
+2. The user picks one → `comicvine_volume_id` + `comicvine_url` (`site_detail_url` from the API)
+   are saved on the series.
+3. "Fetch metadata" on an issue (or "for all missing" on the series): given `comicvine_volume_id`,
+   fetch the volume's issue list, match by `issue_number` (compared normalized: leading zeros
+   trimmed), fetch the details, update the record (`metadata_source='comicvine'`,
+   `comicvine_url`) and fetch the cover from ComicVine into the cache (replacing the archive
+   thumbnail, since it's usually better). The saved `comicvine_url` (on series and issue) shows up
+   as a "View on ComicVine ↗" link on the series page (action bar) and on the issue page.
+4. Records with `metadata_locked=1` are skipped, with a note in the UI.
+5. Undoing a match: "Remove match" on the series page (`POST /series/{id}/match/unlink`) clears
+   `series.comicvine_volume_id` + `comicvine_url` and cascades to roll back its unlocked issues
+   sourced from `comicvine` (`comicvine_issue_id`/`comicvine_url` → NULL/'', `metadata_source` →
+   `comicinfo`/`filename` depending on `has_comicinfo`) — locked issues (manually edited) are left
+   untouched. Separately, "Remove ComicVine match" on an issue (`POST /issues/{id}/scrape/unlink`)
+   rolls back just that one issue with the same mechanism; previously fetched data (title,
+   description, credits…) stays — only the source marker, the link and the matched ComicVine
+   number are cleared.
 
-## 9. Interfejs WWW — widoki i routing
+## 9. Web interface — views and routing
 
-Layout wspólny: nagłówek z nazwą, wyszukiwarką i przyciskiem „Skanuj bibliotekę"
-(+ dyskretny status skanu). HTMX do: formularzy edycji (modal/inline), filtrów,
-postępu skanu, dialogu dopasowania ComicVine. Każdy widok działa też bez JS
-(zwykłe formularze POST) — HTMX tylko poprawia UX.
+Shared layout: a header with the name, the search box, and a "Scan Library" button (plus a
+discreet scan status). HTMX for: edit forms (modal/inline), filters, scan progress, the ComicVine
+match dialog. Every view also works without JS (plain POST forms) — HTMX only improves the UX.
 
-| Metoda i ścieżka | Widok / akcja |
+| Method and path | View / action |
 |---|---|
-| `GET /login` → `POST /login` (`name`, `password`, `next`) / `POST /logout` | logowanie (tylko gdy w tabeli `users` jest choć jedno konto; bez kont → redirect na `/`). Middleware `withAuth`: bez sesji GET → 303 na `/login?next=…`, inne metody → 401; `/opds/*`, `/login`, `/logout`, `/static/*` poza bramką. Nazwa użytkownika w kontekście żądania (`userFrom(r)`), w layoucie „👤 nazwa" + „Wyloguj" (`currentUser` bindowane per żądanie na klonie szablonu) |
-| `GET /admin` (panel) → `POST /admin/users` (dodaj) / `POST /admin/users/{id}/password` / `POST /admin/users/{id}/admin` (nadaj/odbierz) / `POST /admin/users/{id}/delete` | zarządzanie kontami — tylko admin (`requireAdmin`; przed pierwszym kontem: anonimowy gość). Pierwsze konto zawsze admin. Ostatniemu adminowi nie można odebrać uprawnień ani go usunąć |
-| `GET /?sort=&filter=` | grid serii (okładka, nazwa, liczba zeszytów, zielony znaczek ✓ gdy wszystkie dostępne zeszyty przeczytane); sort: nazwa / ostatnio dodane; filtry: wszystkie / nieczytane (żaden zeszyt nie ma realnego postępu) / w trakcie czytania (jest realny postęp, nie wszystko skończone) / przeczytane (każdy dostępny zeszyt doczytany, ≥1 zeszyt) / bez metadanych z ComicVine (jakiś zeszyt ze źródłem `filename` lub `comicinfo`) / brakujące pliki (jakiś zeszyt `file_missing`). Agregaty liczone w `ListSeries` (`LEFT JOIN reading_progress`, HAVING). Samo otwarcie i zamknięcie zeszytu (tylko strona 1) nie liczy się jako „realny postęp" — próg to strona 2+, albo od razu koniec (zeszyt jednostronicowy) |
-| `GET /series/{id}` | strona serii: metadane + lista zeszytów (okładka, numer, tytuł, data, rozmiar, badge źródła metadanych, pasek postępu czytania pod okładką + „czytane: str. X z N (P%)" / „✓ przeczytane") |
-| `GET /series/{id}/edit` → `POST /series/{id}` | formularz edycji serii (nazwa, wydawca, opis) — tylko admin |
-| `POST /series/{id}/match` / `POST /series/{id}/match/{volumeID}` | wyszukanie kandydatów ComicVine / zapis wyboru — tylko admin |
-| `POST /series/{id}/scrape` | pobranie metadanych ComicVine dla zeszytów serii bez dopasowania — tylko admin |
-| `GET /issues/{id}` | szczegóły zeszytu (pełne metadane, duża okładka; przycisk „Czytaj" / „Czytaj dalej (str. X)" / „Czytaj od nowa" dla CBZ/CBR; przy postępie czytania ramka „W trakcie czytania / Przeczytane — przeczytano X z N stron (P%) · ostatnio data" z paskiem, wiersz „Przeczytano" w tabeli; „Strony" pokazuje `file_pages` z fallbackiem na `page_count`) |
-| `GET /issues/{id}/edit` → `POST /issues/{id}` | formularz edycji zeszytu (numer, tytuł, opis, data, twórcy, wydawca); zapis ustawia `manual` + `locked` — tylko admin |
-| `POST /issues/{id}/unlock` | zdjęcie blokady metadanych — tylko admin |
-| `GET /issues/{id}/read?page=N` | czytnik w przeglądarce (osobny szablon `reader.html` bez layoutu + `static/reader.js`): jedna strona na ekran, zoom (dopasuj wysokość / szerokość / skala 20–400% z przewijaniem, zapamiętana w `localStorage`), przewracanie (strzałki, Space/PageUp/PageDown, Home/End, klik w lewą/prawą 30% ekranu, swipe, kółko gdy strona mieści się w całości, suwak), pełny ekran, auto-ukrywane paski, preload sąsiednich stron, na dolnym pasku linki ◂◂/▸▸ do poprzedniego/następnego czytelnego zeszytu serii (bez popupu na końcu — użytkownik sam wychodzi; wcześniejsza nakładka „Koniec zeszytu" usunięta na życzenie). Start: `?page=` → postęp (gdy < liczba stron) → 1. Tylko CBZ/CBR obecne na dysku (404 dla PDF/brakujących); brak `file_pages` → liczy i zapisuje |
-| `GET /issues/{id}/pages/{n}?track=0` | ten sam handler co w OPDS; `track=0` (używane przez czytnik, który preloaduje) nie zapisuje postępu |
-| `POST /issues/{id}/progress` (`page=`, 1-based) | jawny zapis postępu z czytnika (fetch po zmianie strony z debounce 400 ms, `sendBeacon` przy opuszczaniu strony); `MAX` z dotychczasowym jak w OPDS; 400 poza zakresem; 204 |
-| `POST /issues/{id}/read` / `POST /issues/{id}/unread` | oznaczenie zeszytu jako przeczytany (postęp = liczba stron; dla archiwum bez policzonych stron liczy je teraz; przy nieznanej liczbie stron błąd flash) / nieprzeczytany (usunięcie postępu). Pole `next` (tylko ścieżki lokalne) wraca na stronę listy; bez niego redirect na stronę zeszytu z `?msg=` |
-| `POST /issues/{id}/scrape` | ComicVine dla pojedynczego zeszytu — tylko admin |
-| `GET /issues/{id}/cover` | miniatura z cache (Cache-Control; placeholder gdy brak) |
-| `GET /issues/{id}/download` | plik komiksu (`Content-Disposition: attachment`, oryginalna nazwa, `Content-Type` wg rozszerzenia: `application/vnd.comicbook+zip` / `-rar` / `application/pdf`) |
-| `POST /scan` — tylko admin / `GET /scan/status` | start skanu / partial HTMX z postępem |
-| `GET /search?q=` | wyniki po nazwach serii, tytułach i numerach zeszytów (LIKE) |
-| `GET /static/...` | statyki z `embed.FS` |
-| `GET /healthz` | sonda stanu (`ok`, bez logowania) — Docker/orkiestratory |
+| `GET /login` → `POST /login` (`name`, `password`, `next`) / `POST /logout` | login (only when the `users` table has at least one account; no accounts → redirect to `/`). The `withAuth` middleware: no session, GET → 303 to `/login?next=…`, other methods → 401; `/opds/*`, `/login`, `/logout`, `/static/*` are outside the gate. The username lives in the request context (`userFrom(r)`), shown in the layout as "👤 name" + "Log out" (`currentUser` bound per request on a template clone) |
+| `GET /admin` (panel) → `POST /admin/users` (add) / `POST /admin/users/{id}/password` / `POST /admin/users/{id}/admin` (grant/revoke) / `POST /admin/users/{id}/delete` | account management — admin only (`requireAdmin`; before the first account: the anonymous visitor). The first account is always admin. The last admin cannot have their privileges revoked or be deleted |
+| `GET /?sort=&filter=` | the series grid (cover, name, issue count, a green ✓ badge when every available issue is read); sort: name / recently added; filters: all / unread (no issue has real progress) / reading (there's real progress, not everything finished) / read (every available issue finished, ≥1 issue) / no ComicVine metadata (some issue sourced `filename` or `comicinfo`) / missing files (some issue `file_missing`). Aggregates computed in `ListSeries` (`LEFT JOIN reading_progress`, HAVING). Just opening and closing an issue (page 1 only) doesn't count as "real progress" — the threshold is page 2+, or an outright finish (a one-page issue) |
+| `GET /series/{id}` | the series page: metadata + issue list (cover, number, title, date, size, metadata-source badge, a reading-progress bar under the cover + "read: p. X of N (P%)" / "✓ read") |
+| `GET /series/{id}/edit` → `POST /series/{id}` | the series edit form (name, publisher, description) — admin only |
+| `POST /series/{id}/match` / `POST /series/{id}/match/{volumeID}` | search ComicVine candidates / save the choice — admin only |
+| `POST /series/{id}/scrape` | fetch ComicVine metadata for the series' unmatched issues — admin only |
+| `GET /issues/{id}` | issue details (full metadata, a large cover; a "Read" / "Continue (p. X)" / "Read again" button for CBZ/CBR; with reading progress, a "Reading / Read — read X of N pages (P%) · last date" box with a bar, a "Read" row in the table; "Pages" shows `file_pages` falling back to `page_count`) |
+| `GET /issues/{id}/edit` → `POST /issues/{id}` | the issue edit form (number, title, description, date, credits, publisher); saving sets `manual` + `locked` — admin only |
+| `POST /issues/{id}/unlock` | remove the metadata lock — admin only |
+| `GET /issues/{id}/read?page=N` | the in-browser reader (a separate `reader.html` template with no layout + `static/reader.js`): one page per screen, zoom (fit height / fit width / 20–400% scale with scrolling, remembered in `localStorage`), paging (arrow keys, Space/PageUp/PageDown, Home/End, clicking the left/right 30% of the screen, swipe, wheel when the page fits entirely, a slider), fullscreen, auto-hiding bars, preloading of neighbouring pages, ◂◂/▸▸ links on the bottom bar to the series' previous/next readable issue (no end-of-issue popup — the user leaves on their own; an earlier "End of issue" overlay was removed on request). Start page: `?page=` → progress (if < page count) → 1. CBZ/CBR present on disk only (404 for PDF/missing); no `file_pages` yet → counted and saved |
+| `GET /issues/{id}/pages/{n}?track=0` | the same handler as OPDS; `track=0` (used by the reader, which preloads) does not record progress |
+| `POST /issues/{id}/progress` (`page=`, 1-based) | explicit progress recording from the reader (a fetch after each page change, debounced 400ms, `sendBeacon` on leaving the page); `MAX` against the existing value, as in OPDS; 400 out of range; 204 |
+| `POST /issues/{id}/read` / `POST /issues/{id}/unread` | mark an issue as read (progress = page count; an archive with uncounted pages gets counted now; an unknown page count is a flash error) / unread (clears progress). The `next` field (local paths only) returns to the list page; without it, redirect to the issue page with `?msg=` |
+| `POST /issues/{id}/scrape` | ComicVine for a single issue — admin only |
+| `GET /issues/{id}/cover` | the cached thumbnail (Cache-Control; a placeholder when none exists) |
+| `GET /issues/{id}/download` | the comic file (`Content-Disposition: attachment`, the original name, `Content-Type` by extension: `application/vnd.comicbook+zip` / `-rar` / `application/pdf`) |
+| `POST /scan` — admin only / `GET /scan/status` | start a scan / an HTMX progress partial |
+| `GET /search?q=` | results by series name, title and issue numbers (LIKE) |
+| `GET /static/...` | static assets from `embed.FS` |
+| `GET /healthz` | a liveness probe (`ok`, no login) — Docker/orchestrators |
 
-Filtry na stronie serii i w gridzie: wszystkie / bez metadanych (`metadata_source='filename'`)
-/ z ComicVine / brakujące pliki — odpowiednik all/scraped/unscraped ze starego projektu.
+Filters on the series page and in the grid: all / no metadata (`metadata_source='filename'`) /
+from ComicVine / missing files — the equivalent of all/scraped/unscraped in the old project.
 
-## 9a. Katalog OPDS (`opds_enabled: true`)
+## 9a. OPDS catalog (`opds_enabled: true`)
 
-OPDS 1.2 (Atom) — format obsługiwany przez czytniki komiksów (Panels, Chunky, Moon+ Reader,
-Librera, KOReader, Mihon przez rozszerzenie). Cały katalog — feedy, okładki i pliki — żyje pod
-prefiksem `/opds`, żeby HTTP Basic auth (konta z tabeli `users`, §4) obejmowało wszystko, czego dotyka
-czytnik; zalogowany użytkownik trafia do kontekstu żądania, więc `pse:lastRead`, „Aktualnie
-czytane" i postęp ze strumieniowania są jego. Bez kont katalog jest otwarty (czytelnik anonimowy).
-Gdy OPDS jest wyłączony, trasy nie są rejestrowane (404 z catch-alla).
+OPDS 1.2 (Atom) — a format supported by comic readers (Panels, Chunky, Moon+ Reader, Librera,
+KOReader, Mihon via an extension). The whole catalog — feeds, covers and the files themselves —
+lives under the `/opds` prefix, so HTTP Basic auth (accounts from the `users` table, §4) covers
+everything a reader touches; the logged-in user lands in the request context, so `pse:lastRead`,
+"Currently reading" and streaming progress are theirs. With no accounts the catalog is open (an
+anonymous reader). When OPDS is disabled, the routes aren't registered (404 from the catch-all).
 
-Każdy feed niesie `<icon>` z absolutnym adresem `/static/favicon.png` (192×192) — czytniki pokazują
-ją obok nazwy katalogu. Ikona leży pod `/static`, czyli poza Basic auth, więc czytnik pobierze ją
-także bez poświadczeń. Ta sama grafika (`web/static/favicon.png`, `favicon-32.png`, `favicon.ico`, `apple-touch-icon.png` —
-wszystkie przeskalowane z `imgs/logo.png`, które jest źródłem ikony)
-jest faviconem stron WWW: linki w `<head>` layoutu, loginu i czytnika oraz trasa `GET /favicon.ico`
-(poza logowaniem, poza logiem żądań).
+Every feed carries an `<icon>` with the absolute address `/static/favicon.png` (192×192) — readers
+show it next to the catalog name. The icon lives under `/static`, i.e. outside Basic auth, so a
+reader fetches it even without credentials. The same artwork (`web/static/favicon.png`,
+`favicon-32.png`, `favicon.ico`, `apple-touch-icon.png` — all scaled down from `imgs/logo.png`,
+the icon's source) is also the favicon of the web pages: links in the layout's, login's and
+reader's `<head>`, plus the `GET /favicon.ico` route (outside login, outside the request log).
 
-| Ścieżka | Feed |
+| Path | Feed |
 |---|---|
-| `GET /opds` | nawigacyjny root: „Wszystkie serie", „Aktualnie czytane", „Ostatnio dodane", „Nieczytane", „Przeczytane" + link `search` |
-| `GET /opds/series?page=N` | nawigacyjny: serie alfabetycznie (50/stronę, `next`/`previous`, `opensearch:totalResults`); wpis = link `subsection` do feedu serii + okładka pierwszego zeszytu |
-| `GET /opds/series/{id}?page=N` | akwizycyjny: zeszyty serii w kolejności numerów (bez `file_missing`) |
-| `GET /opds/recent?page=N` | akwizycyjny: zeszyty wg `created_at DESC` (rel `sort/new`) |
-| `GET /opds/reading` | akwizycyjny „Aktualnie czytane": zeszyty z `reading_progress`, których ostatnia strona to 2+ i jest niższa niż liczba stron (lub liczba stron nieznana), wg ostatniego czytania (LIMIT 100). Sama strona 1 (otwarcie i zamknięcie) nie liczy się jako rozpoczęte czytanie |
-| `GET /opds/read?page=N` | akwizycyjny „Przeczytane": zeszyty, których ostatnia zapisana strona osiągnęła liczbę stron, wg czasu ukończenia malejąco (50/stronę) |
-| `GET /opds/unread?page=N` | akwizycyjny „Nieczytane": zeszyty bez wpisu w `reading_progress` dla danego użytkownika lub z postępem ograniczonym do samej strony 1 (i nieukończone), wg daty dodania malejąco (50/stronę) |
-| `GET /opds/issues/{id}/pages/{n}?width=W` | strona `n` (0-based) z archiwum CBZ/CBR (OPDS-PSE); bez `width` oryginalny plik z typem po rozszerzeniu, z `width` przeskalowanie do W px (max 4000) i JPEG; pobranie strony zapisuje postęp `n+1` (`MAX` z dotychczasowym); 404 poza zakresem, dla PDF i brakujących plików |
-| `GET /opds/search?q=` | akwizycyjny: jedna płaska lista zeszytów po nazwie serii / tytule / numerze (LIMIT 200) |
-| `GET /opds/opensearch.xml` | OpenSearch description z szablonem `…/opds/search?q={searchTerms}` i `<Image>` (ikona katalogu) |
-| `GET /opds/issues/{id}/file` | ten sam handler co `/issues/{id}/download` (Range/HEAD przez `http.ServeFile`) |
-| `GET /opds/issues/{id}/cover` | ten sam handler co `/issues/{id}/cover` |
+| `GET /opds` | the navigation root: "All series", "Currently reading", "Recently added", "Unread", "Read" + a `search` link |
+| `GET /opds/series?page=N` | navigation: series alphabetically (50/page, `next`/`previous`, `opensearch:totalResults`); an entry is a `subsection` link to the series feed + the first issue's cover |
+| `GET /opds/series/{id}?page=N` | acquisition: the series' issues in number order (excluding `file_missing`) |
+| `GET /opds/recent?page=N` | acquisition: issues by `created_at DESC` (rel `sort/new`) |
+| `GET /opds/reading` | acquisition, "Currently reading": issues from `reading_progress` whose last page is 2+ and below the page count (or the page count is unknown), by last read time (LIMIT 100). Page 1 alone (opened and closed) doesn't count as started reading |
+| `GET /opds/read?page=N` | acquisition, "Read": issues whose last saved page reached the page count, by completion time descending (50/page) |
+| `GET /opds/unread?page=N` | acquisition, "Unread": issues with no `reading_progress` entry for the given user, or with progress limited to page 1 alone (and unfinished), by date added descending (50/page) |
+| `GET /opds/issues/{id}/pages/{n}?width=W` | page `n` (0-based) from a CBZ/CBR archive (OPDS-PSE); without `width`, the original file with its type by extension; with `width`, scaled down to W px (max 4000) and JPEG; fetching a page records progress `n+1` (`MAX` against the existing value); 404 out of range, for PDFs and for missing files |
+| `GET /opds/search?q=` | acquisition: one flat list of issues by series name / title / number (LIMIT 200) |
+| `GET /opds/opensearch.xml` | the OpenSearch description with the template `…/opds/search?q={searchTerms}` and an `<Image>` (the catalog icon) |
+| `GET /opds/issues/{id}/file` | the same handler as `/issues/{id}/download` (Range/HEAD via `http.ServeFile`) |
+| `GET /opds/issues/{id}/cover` | the same handler as `/issues/{id}/cover` |
 
-**Strumieniowanie stron (OPDS-PSE 1.2, `xmlns:pse="http://vaemendis.net/opds-pse/ns"`).** Każdy
-zeszyt CBZ/CBR ze znaną liczbą stron ma link `rel="http://vaemendis.net/opds-pse/stream"
-type="image/jpeg" href="…/opds/issues/{id}/pages/{pageNumber}?width={maxWidth}" pse:count="N"`
-oraz — gdy był czytany — `pse:lastRead` (1-based) i `pse:lastReadDate` (RFC 3339). Czytniki
-(Panels, Chunky, Librera, Moon+…) czytają strony bez pobierania pliku i wznawiają od `lastRead`.
-Postęp powstaje po stronie serwera z żądań stron (czytniki nie raportują go inaczej) — prefetch
-kilku stron do przodu zawyża go nieznacznie; powrót do wcześniejszej strony postępu nie obniża.
-Liczba stron: `issues.file_pages` (rzeczywiste wpisy graficzne w archiwum, liczone przy skanie —
-także dla plików skatalogowanych wcześniej — oraz leniwie przy pierwszym strumieniowaniu),
-z fallbackiem na `page_count` z metadanych. PDF-y nie mają linku PSE (brak renderowania stron).
+**Page streaming (OPDS-PSE 1.2, `xmlns:pse="http://vaemendis.net/opds-pse/ns"`).** Every CBZ/CBR
+issue with a known page count carries a link
+`rel="http://vaemendis.net/opds-pse/stream" type="image/jpeg" href="…/opds/issues/{id}/pages/{pageNumber}?width={maxWidth}" pse:count="N"`,
+plus — once it's been read — `pse:lastRead` (1-based) and `pse:lastReadDate` (RFC 3339). Readers
+(Panels, Chunky, Librera, Moon+…) read pages without downloading the file and resume from
+`lastRead`. Progress is generated server-side from page requests (readers don't report it any
+other way) — prefetching a few pages ahead inflates it slightly; going back to an earlier page
+never lowers it. Page count: `issues.file_pages` (the actual image entries in the archive, counted
+during a scan — also for previously catalogued files — and lazily on first streaming), falling
+back to metadata `page_count`. PDFs have no PSE link (no page rendering).
 
-Wpis zeszytu: tytuł `Seria #numer – tytuł`, `author` z pola `writer` (rozbite po przecinkach),
-`dc:publisher`, `dc:issued` (data wydania), `summary` (opis, a gdy pusty — „Rysunki: …"),
-link `http://opds-spec.org/acquisition` z `type` wg rozszerzenia (`application/vnd.comicbook+zip`,
-`application/vnd.comicbook-rar`, `application/pdf`) i linki `image`/`image/thumbnail` tylko gdy
-`cover_cached=1` (zamiast linku do placeholdera SVG). Linki są **absolutne** (schemat + `Host`
-z żądania, z uwzględnieniem `X-Forwarded-Proto/Host`), bo część czytników źle rozwiązuje
-względne `href`. Layout HTML dodaje `<link rel="alternate" type="…opds-catalog…">` (autodetekcja)
-i plakietkę „OPDS" w nagłówku.
+Issue entry: title `Series #number – title`, `author` from the `writer` field (split on commas),
+`dc:publisher`, `dc:issued` (release date), `summary` (the description, or, when empty, "Art:
+…"), an `http://opds-spec.org/acquisition` link with `type` by extension
+(`application/vnd.comicbook+zip`, `application/vnd.comicbook-rar`, `application/pdf`), and
+`image`/`image/thumbnail` links only when `cover_cached=1` (instead of a link to the placeholder
+SVG). Links are **absolute** (scheme + `Host` from the request, honoring
+`X-Forwarded-Proto/Host`), since some readers mishandle relative `href`s. The HTML layout adds a
+`<link rel="alternate" type="…opds-catalog…">` (autodiscovery) and an "OPDS" badge in the header.
 
-Zgodność klientów: Thorium Reader (3.5.x) waliduje adres katalogu przez `validator.isURL` z
-`require_tld` (flaga budowania `THORIUM_ISURL_REQUIRE_TLD_FALSE` nie jest ustawiona w oficjalnych
-wydaniach), więc `http://localhost:…` odrzuca **przed** wysłaniem żądania („Błąd dostępu do
-kanału"), a adresy IP (`127.0.0.1`, IP w LAN) akceptuje. Basic auth Thorium obsługuje z nagłówka
-`WWW-Authenticate: Basic` (okno logowania, `Authorization: Basic` w kolejnych żądaniach). Dlatego
-komunikat startowy wypisuje wszystkie osiągalne adresy (localhost + IPv4 interfejsów przy `0.0.0.0`).
+Client compatibility: Thorium Reader (3.5.x) validates the catalog address with `validator.isURL`
+and `require_tld` (the `THORIUM_ISURL_REQUIRE_TLD_FALSE` build flag isn't set in official
+releases), so it rejects `http://localhost:…` **before** sending the request ("Error accessing the
+feed"), while IP addresses (`127.0.0.1`, a LAN IP) are accepted. Thorium handles Basic auth from
+the `WWW-Authenticate: Basic` header (a login prompt, then `Authorization: Basic` on later
+requests). That's why the startup message prints every reachable address (localhost + the IPv4 of
+every interface when bound to `0.0.0.0`).
 
-Ograniczenie Thorium (do wiadomości, nie obchodzone): wpisy nawigacyjne renderuje jako czysty
-tekst bez miniatur, okładki pokazuje tylko dla publikacji, a kliknięcie publikacji otwiera dialog
-informacji bez nawigacji do katalogu. Próba widoku „półki" (serie jako grupy `rel="collection"`
-z zeszytami, pojedyncze wydania jako publikacje) została wycofana na życzenie użytkownika —
-dawała większy bałagan niż zwykła lista.
+A Thorium limitation (noted, not worked around): it renders navigation entries as plain text with
+no thumbnails, shows covers only for publications, and clicking a publication opens an info dialog
+with no navigation into the catalog. An attempt at a "shelf" view (series as `rel="collection"`
+groups with issues, single releases as publications) was tried and rolled back at the user's
+request — it made a bigger mess than a plain list in Thorium.
 
-## 10. Uwagi bezpieczeństwa i jakości
+## 10. Security and quality notes
 
-- **Stary projekt ma zahardkodowany klucz ComicVine w `Old/ComicsNest/apiProcessor.go`
-  i jest w repo git — klucz należy uznać za ujawniony i zrewokować/wymienić.**
-- `html/template` zamiast `text/template` (escapowanie XSS — opisy z ComicVine
-  zawierają HTML; renderować po sanityzacji lub jako tekst).
-- Pobieranie plików wyłącznie po `id` z bazy — nigdy po ścieżce z parametru
-  (żadnego path traversal).
-- Jedno połączenie-pula do SQLite na aplikację (nie otwieranie per-request jak
-  w starym projekcie); `PRAGMA journal_mode=WAL`, `busy_timeout`.
-- Wszystkie błędy handlerów → log + strona/partial błędu; bez `log.Fatal` w runtime.
-- Serwer nasłuchuje na `localhost` domyślnie (aplikacja osobista, bez auth).
+- **The old project has a hardcoded ComicVine key in `Old/ComicsNest/apiProcessor.go`, and it's in
+  git history — the key should be treated as leaked and revoked/replaced.**
+- `html/template` instead of `text/template` (XSS escaping — ComicVine descriptions contain HTML;
+  render it sanitized or as plain text).
+- Files are only ever served by database `id` — never by a path from a request parameter (no
+  path-traversal surface).
+- One connection pool to SQLite for the whole app (not opened per request as in the old project);
+  `PRAGMA journal_mode=WAL`, `busy_timeout`.
+- Every handler error → log + an error page/partial; no `log.Fatal` at runtime.
+- The server listens on `localhost` by default (a personal app, no auth).

@@ -1,14 +1,14 @@
-{{define "title"}}ComicNest — biblioteka{{end}}
+{{define "title"}}ComicNest — library{{end}}
 
 {{define "content"}}
 <div class="page-head">
-    <h1>Biblioteka</h1>
+    <h1>Library</h1>
     <div class="page-head-tools">
         <form action="/" method="get">
             {{if ne .Filter "all"}}<input type="hidden" name="filter" value="{{.Filter}}">{{end}}
             <select name="sort" onchange="this.form.submit()">
-                <option value="name" {{if eq .Sort "name"}}selected{{end}}>Sortuj: nazwa</option>
-                <option value="recent" {{if eq .Sort "recent"}}selected{{end}}>Sortuj: ostatnio dodane</option>
+                <option value="name" {{if eq .Sort "name"}}selected{{end}}>Sort: name</option>
+                <option value="recent" {{if eq .Sort "recent"}}selected{{end}}>Sort: recently added</option>
             </select>
         </form>
     </div>
@@ -16,12 +16,12 @@
 
 {{$sort := .Sort}}{{$filter := .Filter}}
 <div class="filter-bar">
-    <a class="chip {{if eq $filter "all"}}active{{end}}" href="/?sort={{$sort}}">wszystkie</a>
-    <a class="chip {{if eq $filter "unread"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=unread">nieczytane</a>
-    <a class="chip {{if eq $filter "reading"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=reading">w trakcie czytania</a>
-    <a class="chip {{if eq $filter "read"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=read">przeczytane</a>
-    <a class="chip {{if eq $filter "nocv"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=nocv">bez metadanych z ComicVine</a>
-    <a class="chip {{if eq $filter "missing"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=missing">brakujące pliki</a>
+    <a class="chip {{if eq $filter "all"}}active{{end}}" href="/?sort={{$sort}}">all</a>
+    <a class="chip {{if eq $filter "unread"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=unread">unread</a>
+    <a class="chip {{if eq $filter "reading"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=reading">reading</a>
+    <a class="chip {{if eq $filter "read"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=read">read</a>
+    <a class="chip {{if eq $filter "nocv"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=nocv">no ComicVine metadata</a>
+    <a class="chip {{if eq $filter "missing"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=missing">missing files</a>
 </div>
 
 {{if .Series}}
@@ -35,19 +35,19 @@
                 {{else}}
                 <img src="/static/placeholder.svg" alt="">
                 {{end}}
-                {{if .AllRead}}<span class="read-mark" title="przeczytane">✓</span>{{end}}
+                {{if .AllRead}}<span class="read-mark" title="read">✓</span>{{end}}
             </div>
             <div class="card-body">
                 <span class="card-title">{{.Name}}</span>
-                <span class="card-meta">{{if .OneShot}}wydanie jednorazowe{{else}}{{.IssueCount}} {{if eq .IssueCount 1}}zeszyt{{else}}zeszytów{{end}}{{end}}</span>
+                <span class="card-meta">{{if .OneShot}}one-shot{{else}}{{.IssueCount}} {{if eq .IssueCount 1}}issue{{else}}issues{{end}}{{end}}</span>
             </div>
         </a>
     </li>
     {{end}}
 </ul>
 {{if gt .Pages 1}}
-<nav class="pager" aria-label="strony biblioteki">
-    {{if gt .Page 1}}<a class="pager-link" href="{{$.URL (.Page | dec)}}" rel="prev">&laquo; poprzednia</a>{{else}}<span class="pager-link disabled">&laquo; poprzednia</span>{{end}}
+<nav class="pager" aria-label="library pages">
+    {{if gt .Page 1}}<a class="pager-link" href="{{$.URL (.Page | dec)}}" rel="prev">&laquo; previous</a>{{else}}<span class="pager-link disabled">&laquo; previous</span>{{end}}
     <span class="pager-pages">
         {{range .PageLinks}}
         {{if eq . 0}}<span class="pager-gap">&hellip;</span>
@@ -55,23 +55,23 @@
         {{else}}<a class="pager-num" href="{{$.URL .}}">{{.}}</a>{{end}}
         {{end}}
     </span>
-    {{if lt .Page .Pages}}<a class="pager-link" href="{{$.URL (.Page | inc)}}" rel="next">następna &raquo;</a>{{else}}<span class="pager-link disabled">następna &raquo;</span>{{end}}
-    <span class="pager-info">strona {{.Page}} z {{.Pages}} &middot; {{.Total}} {{if eq .Total 1}}seria{{else if and (ge .Total 2) (le .Total 4)}}serie{{else}}serii{{end}}</span>
+    {{if lt .Page .Pages}}<a class="pager-link" href="{{$.URL (.Page | inc)}}" rel="next">next &raquo;</a>{{else}}<span class="pager-link disabled">next &raquo;</span>{{end}}
+    <span class="pager-info">page {{.Page}} of {{.Pages}} &middot; {{.Total}} {{if eq .Total 1}}series{{else}}series{{end}}</span>
 </nav>
 {{end}}
 {{else}}
 <div class="empty-state">
     {{if eq .Filter "all"}}
-    <p>Biblioteka jest pusta.</p>
-    <p class="hint">Ustaw ścieżkę <code>library</code> w <code>config.yaml</code>, a następnie zeskanuj bibliotekę (Etap&nbsp;2).</p>
+    <p>The library is empty.</p>
+    <p class="hint">Set the <code>library</code> path in <code>config.yaml</code>, then scan the library (Stage&nbsp;2).</p>
     {{else}}
-    <p>Brak serii dla tego filtra.</p>
+    <p>No series match this filter.</p>
     {{end}}
 </div>
 {{end}}
 {{with appVersion}}
 <footer class="site-footer">
-    <a href="https://github.com/MonsterArtur1/ComicNest" target="_blank" rel="noopener" title="ComicNest na GitHubie">ComicNest {{.}}</a>
+    <a href="https://github.com/MonsterArtur1/ComicNest" target="_blank" rel="noopener" title="ComicNest on GitHub">ComicNest {{.}}</a>
 </footer>
 {{end}}
 {{end}}

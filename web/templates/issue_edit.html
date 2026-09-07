@@ -1,70 +1,70 @@
-{{define "title"}}Edycja zeszytu — ComicNest{{end}}
+{{define "title"}}Edit issue — ComicNest{{end}}
 
 {{define "content"}}
 <nav class="breadcrumbs">
-    <a href="/">Biblioteka</a> <span>/</span>
+    <a href="/">Library</a> <span>/</span>
     <a href="/series/{{.Issue.SeriesID}}">{{.SeriesName}}</a> <span>/</span>
-    <a href="/issues/{{.Issue.ID}}">{{if .Issue.IssueNumber}}#{{.Issue.IssueNumber}}{{else}}zeszyt{{end}}</a>
-    <span>/</span> edycja
+    <a href="/issues/{{.Issue.ID}}">{{if .Issue.IssueNumber}}#{{.Issue.IssueNumber}}{{else}}issue{{end}}</a>
+    <span>/</span> edit
 </nav>
 
-<div class="page-head"><h1>Edycja zeszytu</h1></div>
+<div class="page-head"><h1>Edit issue</h1></div>
 
 {{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
 
 <div class="edit-layout">
-    <div class="edit-cover"><img src="/issues/{{.Issue.ID}}/cover" alt="okładka"></div>
+    <div class="edit-cover"><img src="/issues/{{.Issue.ID}}/cover" alt="cover"></div>
 
     <form class="edit-form" action="/issues/{{.Issue.ID}}" method="post">
         <div class="form-row">
-            <label>Numer
+            <label>Number
                 <input type="text" name="issue_number" value="{{.Issue.IssueNumber}}">
             </label>
-            <label>Data wydania
-                <input type="text" name="release_date" value="{{.Issue.ReleaseDate}}" placeholder="RRRR-MM-DD">
+            <label>Release date
+                <input type="text" name="release_date" value="{{.Issue.ReleaseDate}}" placeholder="YYYY-MM-DD">
             </label>
-            <label>Strony
+            <label>Pages
                 <input type="number" name="page_count" value="{{.Issue.PageCount}}" min="0">
             </label>
         </div>
-        <label>Tytuł
+        <label>Title
             <input type="text" name="title" value="{{.Issue.Title}}">
         </label>
-        <label>Opis
+        <label>Description
             <textarea name="summary" rows="6">{{.Issue.Summary}}</textarea>
         </label>
         <div class="form-row">
-            <label>Scenariusz
+            <label>Writer
                 <input type="text" name="writer" value="{{.Issue.Writer}}">
             </label>
-            <label>Rysunki
+            <label>Art
                 <input type="text" name="artist" value="{{.Issue.Artist}}">
             </label>
         </div>
-        <label>Wydawca
+        <label>Publisher
             <input type="text" name="publisher" value="{{.Issue.Publisher}}">
         </label>
-        <label>Seria
+        <label>Series
             <select name="series_id">
                 {{$current := .Issue.SeriesID}}
                 {{range .Series}}
-                <option value="{{.ID}}" {{if eq .ID $current}}selected{{end}}>{{.Name}}{{if .FolderPath.Valid}} · {{.FolderPath.String}}{{else}} · wirtualna{{end}}</option>
+                <option value="{{.ID}}" {{if eq .ID $current}}selected{{end}}>{{.Name}}{{if .FolderPath.Valid}} · {{.FolderPath.String}}{{else}} · virtual{{end}}</option>
                 {{end}}
             </select>
         </label>
-        <p class="hint">Zmiana serii przenosi ten zeszyt do wybranej pozycji — przydatne, gdy trafił do złego katalogu.</p>
-        <p class="hint">Zapis oznacza metadane jako ręczne 🔒 — skan i ComicVine ich nie nadpiszą.</p>
+        <p class="hint">Changing the series moves this issue to the selected one — useful when it ended up in the wrong catalog entry.</p>
+        <p class="hint">Saving marks the metadata as manual 🔒 — a scan or ComicVine will not overwrite it.</p>
         <div class="form-actions">
-            <button type="submit" class="btn-primary">Zapisz</button>
-            <a class="btn" href="/issues/{{.Issue.ID}}">Anuluj</a>
+            <button type="submit" class="btn-primary">Save</button>
+            <a class="btn" href="/issues/{{.Issue.ID}}">Cancel</a>
         </div>
     </form>
 </div>
 
 {{if .Issue.MetadataLocked}}
 <form class="unlock-form" action="/issues/{{.Issue.ID}}/unlock" method="post">
-    <p class="hint">Metadane są zablokowane 🔒. Zdjęcie blokady pozwoli aktualizacjom z ComicVine je nadpisać (dane pozostają).</p>
-    <button type="submit" class="btn">Zdejmij blokadę</button>
+    <p class="hint">Metadata is locked 🔒. Removing the lock will let ComicVine updates overwrite it (the current data stays).</p>
+    <button type="submit" class="btn">Remove lock</button>
 </form>
 {{end}}
 {{end}}

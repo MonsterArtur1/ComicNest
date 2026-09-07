@@ -81,7 +81,7 @@ func (s *Server) isAdmin(r *http.Request) bool {
 func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !s.isAdmin(r) {
-			s.errorPage(w, r, http.StatusForbidden, "Ta czynność wymaga uprawnień administratora.")
+			s.errorPage(w, r, http.StatusForbidden, "This action requires administrator privileges.")
 			return
 		}
 		next(w, r)
@@ -162,7 +162,7 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 			}
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			http.Error(w, "Zaloguj się, aby wykonać tę akcję.", http.StatusUnauthorized)
+			http.Error(w, "Log in to perform this action.", http.StatusUnauthorized)
 			return
 		}
 		http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusSeeOther)
@@ -200,7 +200,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !s.checkPassword(name, r.FormValue("password")) {
 		log.Printf("login failed for %q from %s", name, r.RemoteAddr)
 		s.renderLogin(w, http.StatusUnauthorized, loginData{
-			Next: r.FormValue("next"), Name: name, Error: "Nieprawidłowa nazwa użytkownika lub hasło.",
+			Next: r.FormValue("next"), Name: name, Error: "Invalid username or password.",
 		})
 		return
 	}
