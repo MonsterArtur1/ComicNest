@@ -588,6 +588,13 @@ details.desc .series-desc { margin: 12px 0 4px; }
     padding: 8px 12px;
     max-width: 640px;
 }
+.form-ok {
+    color: #6fbf73;
+    border: 1px solid #6fbf7355;
+    border-radius: 6px;
+    padding: 8px 12px;
+    max-width: 640px;
+}
 .hint { font-size: 12px; color: var(--text-dim); margin: 0; }
 
 .unlock-form {

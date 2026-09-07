@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"comicnest/internal/config"
 	"comicnest/internal/store"
 )
 
@@ -227,6 +228,65 @@ func TestAdminScanHistory(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("admin panel scan history missing %q:\n%s", want, body)
 		}
+	}
+}
+
+// TestAdminSaveConfig checks that the Configuration form persists the
+// ComicVine key, OPDS toggle and page size to config.yaml, applies the page
+// size immediately (no restart needed, unlike the other two), and rejects a
+// bad page size without touching the file.
+func TestAdminSaveConfig(t *testing.T) {
+	srv, _ := newTestServer(t, false)
+	h := srv.Handler()
+	mustCreateUser(t, srv.store, "admin", "adminpass", true)
+	c := login(t, h, "admin", "adminpass")
+
+	rec := postAs(t, h, c, "/admin/config", "comicvine_api_key=abc123&opds_enabled=1&page_size=15")
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/admin" {
+		t.Fatalf("save config: %d -> %q\n%s", rec.Code, rec.Header().Get("Location"), rec.Body)
+	}
+
+	// The page size applies right away.
+	if got := srv.config().PageSize; got != 15 {
+		t.Errorf("page size not applied live: got %d, want 15", got)
+	}
+
+	// Everything (including the fields that need a restart) is on disk.
+	saved, err := config.Load(srv.configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.ComicVineAPIKey != "abc123" || !saved.OPDSEnabled || saved.PageSize != 15 {
+		t.Errorf("config.yaml not updated as expected: %+v", saved)
+	}
+	if body := get(t, h, "/admin", asUser(c)).Body.String(); !strings.Contains(body, `value="abc123"`) {
+		t.Errorf("admin panel should reflect the saved key:\n%s", body)
+	}
+
+	// A bad page size is rejected and doesn't touch what's saved.
+	rec = postAs(t, h, c, "/admin/config", "comicvine_api_key=abc123&page_size=-5")
+	if !strings.Contains(rec.Body.String(), "non-negative") {
+		t.Errorf("negative page_size should error:\n%s", rec.Body)
+	}
+	if got := srv.config().PageSize; got != 15 {
+		t.Errorf("page size should be unchanged after a rejected save: got %d", got)
+	}
+}
+
+// TestAdminTestComicVineEmptyKey checks the "Test Connection" button's
+// no-key case, which is answered without any network call.
+func TestAdminTestComicVineEmptyKey(t *testing.T) {
+	srv, _ := newTestServer(t, false)
+	h := srv.Handler()
+	mustCreateUser(t, srv.store, "admin", "adminpass", true)
+	c := login(t, h, "admin", "adminpass")
+
+	rec := postAs(t, h, c, "/admin/config/test-comicvine", "comicvine_api_key=")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("test-comicvine: got %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "Enter an API key first.") {
+		t.Errorf("expected a prompt for a key:\n%s", rec.Body)
 	}
 }
 

@@ -45,6 +45,33 @@ func TestEnabledAndErrNoKey(t *testing.T) {
 	}
 }
 
+func TestTestKey(t *testing.T) {
+	if err := New("").TestKey(); err != ErrNoKey {
+		t.Errorf("TestKey with no key: got %v, want ErrNoKey", err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/types/" {
+			t.Errorf("path = %q, want /types/", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"error": "OK", "status_code": 1, "results": []}`)
+	}))
+	defer srv.Close()
+	if err := newTestClient(t, srv).TestKey(); err != nil {
+		t.Errorf("TestKey with a valid response: got %v, want nil", err)
+	}
+
+	bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"error": "Invalid API Key", "status_code": 100, "results": []}`)
+	}))
+	defer bad.Close()
+	if err := newTestClient(t, bad).TestKey(); err == nil || !strings.Contains(err.Error(), "Invalid API Key") {
+		t.Errorf("TestKey with an invalid key: got %v, want an error containing %q", err, "Invalid API Key")
+	}
+}
+
 func TestSearchVolumes(t *testing.T) {
 	const body = `{
 		"error": "OK",

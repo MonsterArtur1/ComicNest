@@ -3,10 +3,13 @@ package server
 import (
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"comicnest/internal/comicvine"
+	"comicnest/internal/config"
 	"comicnest/internal/opds"
 	"comicnest/internal/store"
 	"golang.org/x/crypto/bcrypt"
@@ -34,6 +37,26 @@ type scanHistoryRow struct {
 	Err       string
 }
 
+// adminConfig is the subset of config.yaml the admin panel can edit, plus
+// whether each field is currently pinned by a COMICNEST_* environment
+// variable (in which case editing it here has no effect until that variable
+// is unset — see SPECIFICATION on env overrides).
+type adminConfig struct {
+	ComicVineAPIKey    string
+	ComicVineEnvPinned bool
+	OPDSEnabled        bool
+	OPDSEnvPinned      bool
+	PageSize           int
+	PageSizeEnvPinned  bool
+}
+
+// cvTestResult is the outcome of a "Test Connection" check, shown inline
+// next to the ComicVine API key field.
+type cvTestResult struct {
+	OK      bool
+	Message string
+}
+
 type adminData struct {
 	Users []adminUserRow
 	// IsFirstRun is true when no account exists yet: the add-user form force
@@ -47,7 +70,12 @@ type adminData struct {
 	Stats store.LibraryStats
 	// ScanHistory is the most recent completed scans, newest first.
 	ScanHistory []scanHistoryRow
-	Error       string
+	// Config feeds the Configuration section's form.
+	Config adminConfig
+	// CVTest is set after a "Test Connection" click that fell back to a
+	// plain (no-JS) form post, so the result renders in the full page.
+	CVTest *cvTestResult
+	Error  string
 }
 
 // adminPageData loads the current account list and library status for the
@@ -89,7 +117,27 @@ func (s *Server) adminPageData() (adminData, error) {
 		MissingCount: missing,
 		Stats:        stats,
 		ScanHistory:  scanHistoryRows(history),
+		Config:       s.adminConfigView(),
 	}, nil
+}
+
+// adminConfigView reads the current admin-editable settings, noting which
+// ones are pinned by a COMICNEST_* environment variable and therefore can't
+// really be changed from here.
+func (s *Server) adminConfigView() adminConfig {
+	cfg := s.config()
+	envSet := func(key string) bool {
+		v, ok := os.LookupEnv(config.EnvPrefix + key)
+		return ok && v != ""
+	}
+	return adminConfig{
+		ComicVineAPIKey:    cfg.ComicVineAPIKey,
+		ComicVineEnvPinned: envSet("COMICVINE_API_KEY"),
+		OPDSEnabled:        cfg.OPDSEnabled,
+		OPDSEnvPinned:      envSet("OPDS_ENABLED"),
+		PageSize:           cfg.PageSize,
+		PageSizeEnvPinned:  envSet("PAGE_SIZE"),
+	}
 }
 
 // scanHistoryRows formats store.ScanHistoryEntry rows for the Scan History
@@ -318,4 +366,57 @@ func (s *Server) handleAdminDeleteMissing(w http.ResponseWriter, r *http.Request
 		}
 	}
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+}
+
+// handleAdminSaveConfig persists the admin-editable subset of config.yaml
+// (ComicVine key, OPDS toggle, page size). The page size takes effect on the
+// next request; the ComicVine key and OPDS toggle need a restart (the
+// client and routes are built once at startup).
+func (s *Server) handleAdminSaveConfig(w http.ResponseWriter, r *http.Request) {
+	apiKey := strings.TrimSpace(r.FormValue("comicvine_api_key"))
+	opdsEnabled := r.FormValue("opds_enabled") != ""
+	pageSize, err := strconv.Atoi(strings.TrimSpace(r.FormValue("page_size")))
+	if err != nil || pageSize < 0 {
+		s.renderAdminError(w, r, "Series per page must be a non-negative number (0 = no pagination).")
+		return
+	}
+	updated := s.setEditableConfig(apiKey, opdsEnabled, pageSize)
+	if err := config.Save(s.configPath, updated); err != nil {
+		s.serverError(w, err)
+		return
+	}
+	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+}
+
+// handleAdminTestComicVine checks a ComicVine API key against the live API,
+// without saving it — so a bad key is caught before it's written to
+// config.yaml (and before it would otherwise only surface at scrape time).
+func (s *Server) handleAdminTestComicVine(w http.ResponseWriter, r *http.Request) {
+	apiKey := strings.TrimSpace(r.FormValue("comicvine_api_key"))
+	result := testComicVineKey(apiKey)
+
+	if r.Header.Get("HX-Request") == "true" {
+		s.renderPartial(w, "cv_test_result.html", "cv-test-result", result)
+		return
+	}
+	data, err := s.adminPageData()
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	data.CVTest = &result
+	data.Config.ComicVineAPIKey = apiKey // echo what was just tested, not the saved value
+	s.render(w, r, "admin.html", data)
+}
+
+// testComicVineKey performs a minimal live request against the ComicVine
+// API with a throwaway client, to check whether apiKey actually works.
+func testComicVineKey(apiKey string) cvTestResult {
+	if apiKey == "" {
+		return cvTestResult{Message: "Enter an API key first."}
+	}
+	if err := comicvine.New(apiKey).TestKey(); err != nil {
+		return cvTestResult{Message: err.Error()}
+	}
+	return cvTestResult{OK: true, Message: "Connected — the key works."}
 }

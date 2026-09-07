@@ -62,7 +62,7 @@ func Load(path string) (Config, error) {
 		if err := cfg.applyEnv(); err != nil {
 			return cfg, err
 		}
-		if werr := save(path, cfg); werr != nil {
+		if werr := Save(path, cfg); werr != nil {
 			return cfg, fmt.Errorf("writing default config: %w", werr)
 		}
 		fmt.Printf("created default config at %s — set 'library' to your comics folder\n", path)
@@ -130,7 +130,10 @@ func (c *Config) applyEnv() error {
 	return nil
 }
 
-func save(path string, cfg Config) error {
+// Save writes cfg to path as YAML, overwriting whatever is there. Used both
+// to create the initial file and by the admin panel, which edits a few
+// fields (ComicVineAPIKey, OPDSEnabled, PageSize) from the browser.
+func Save(path string, cfg Config) error {
 	b, err := yaml.Marshal(cfg)
 	if err != nil {
 		return err

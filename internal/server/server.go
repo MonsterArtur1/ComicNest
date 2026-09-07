@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"comicnest/internal/comicvine"
@@ -33,30 +34,44 @@ func displayVersion() string {
 
 // Server holds application dependencies shared by all HTTP handlers.
 type Server struct {
-	cfg       config.Config
-	store     *store.Store
-	covers    *covers.Cache
-	scanner   *library.Scanner
-	cv        *comicvine.Client
-	scrape    *scrapeJob
-	templates map[string]*template.Template
-	partials  *template.Template
-	reader    *template.Template // standalone full-screen reader page
-	login     *template.Template // standalone login page
-	sessions  *sessions
-	mux       *http.ServeMux
+	// cfgMu guards the fields of cfg the admin panel can edit at runtime
+	// (ComicVineAPIKey, OPDSEnabled, PageSize) — read concurrently by request
+	// handlers, written by handleAdminSaveConfig. Every other field of cfg
+	// (Port, Listen, Library, DataDir) is set once at startup and never
+	// changes, so it's read directly without locking.
+	cfgMu sync.RWMutex
+	cfg   config.Config
+	// configPath is where the admin panel's config edits are persisted; set
+	// once at startup, never changes.
+	configPath string
+	// opdsRoutesRegistered reflects whether OPDS routes were mounted at
+	// startup — unlike cfg.OPDSEnabled, it never changes at runtime, since an
+	// admin-panel edit to opds_enabled needs a restart to (un)mount routes.
+	opdsRoutesRegistered bool
+	store                *store.Store
+	covers               *covers.Cache
+	scanner              *library.Scanner
+	cv                   *comicvine.Client
+	scrape               *scrapeJob
+	templates            map[string]*template.Template
+	partials             *template.Template
+	reader               *template.Template // standalone full-screen reader page
+	login                *template.Template // standalone login page
+	sessions             *sessions
+	mux                  *http.ServeMux
 }
 
-func New(cfg config.Config, st *store.Store, cv *covers.Cache, sc *library.Scanner, cvc *comicvine.Client) (*Server, error) {
+func New(cfg config.Config, configPath string, st *store.Store, cv *covers.Cache, sc *library.Scanner, cvc *comicvine.Client) (*Server, error) {
 	s := &Server{
-		cfg:     cfg,
-		store:   st,
-		covers:  cv,
-		scanner: sc,
-		cv:      cvc,
-		scrape:   &scrapeJob{},
-		sessions: newSessions(),
-		mux:      http.NewServeMux(),
+		cfg:        cfg,
+		configPath: configPath,
+		store:      st,
+		covers:     cv,
+		scanner:    sc,
+		cv:         cvc,
+		scrape:     &scrapeJob{},
+		sessions:   newSessions(),
+		mux:        http.NewServeMux(),
 	}
 	if err := s.parseTemplates(); err != nil {
 		return nil, err
@@ -68,6 +83,29 @@ func New(cfg config.Config, st *store.Store, cv *covers.Cache, sc *library.Scann
 	return s, nil
 }
 
+// config returns a snapshot of the current configuration. Safe for
+// concurrent use: ComicVineAPIKey, OPDSEnabled and PageSize can change at
+// runtime from the admin panel (see setEditableConfig).
+func (s *Server) config() config.Config {
+	s.cfgMu.RLock()
+	defer s.cfgMu.RUnlock()
+	return s.cfg
+}
+
+// setEditableConfig updates the admin-editable fields and returns the
+// resulting full config, for the caller to persist to disk. The ComicVine
+// key and OPDS toggle only take effect after a restart (the client and
+// routes are built once at startup); the page size applies to the very next
+// request.
+func (s *Server) setEditableConfig(comicVineAPIKey string, opdsEnabled bool, pageSize int) config.Config {
+	s.cfgMu.Lock()
+	defer s.cfgMu.Unlock()
+	s.cfg.ComicVineAPIKey = comicVineAPIKey
+	s.cfg.OPDSEnabled = opdsEnabled
+	s.cfg.PageSize = pageSize
+	return s.cfg
+}
+
 // funcMap holds helpers available in every template.
 func (s *Server) funcMap() template.FuncMap {
 	return template.FuncMap{
@@ -76,7 +114,7 @@ func (s *Server) funcMap() template.FuncMap {
 		"truncate":    truncateText,
 		"inc":         func(n int) int { return n + 1 },
 		"dec":         func(n int) int { return n - 1 },
-		"opdsEnabled": func() bool { return s.cfg.OPDSEnabled },
+		"opdsEnabled": func() bool { return s.opdsRoutesRegistered },
 		"appVersion":  displayVersion,
 		"canRead":     canStreamPages, // in-browser reader works for CBZ/CBR only
 		// currentUser/isAdmin are overridden per request in renderStatus; these
@@ -148,7 +186,7 @@ func (s *Server) parseTemplates() error {
 	}
 
 	// Partials are rendered standalone (no layout), mostly for HTMX swaps.
-	partials, err := template.ParseFS(web.FS, "templates/scan_status.html", "templates/scrape_status.html")
+	partials, err := template.ParseFS(web.FS, "templates/scan_status.html", "templates/scrape_status.html", "templates/cv_test_result.html")
 	if err != nil {
 		return fmt.Errorf("parsing partials: %w", err)
 	}
@@ -224,7 +262,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /admin/users/{id}/admin", s.requireAdmin(s.handleAdminSetAdmin))
 	s.mux.HandleFunc("POST /admin/users/{id}/delete", s.requireAdmin(s.handleAdminDeleteUser))
 	s.mux.HandleFunc("POST /admin/missing/delete", s.requireAdmin(s.handleAdminDeleteMissing))
-	if s.cfg.OPDSEnabled {
+	s.mux.HandleFunc("POST /admin/config", s.requireAdmin(s.handleAdminSaveConfig))
+	s.mux.HandleFunc("POST /admin/config/test-comicvine", s.requireAdmin(s.handleAdminTestComicVine))
+	s.opdsRoutesRegistered = s.cfg.OPDSEnabled
+	if s.opdsRoutesRegistered {
 		s.opdsRoutes()
 	}
 	s.mux.HandleFunc("/", s.handleNotFound) // catch-all: styled 404

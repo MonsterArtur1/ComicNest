@@ -83,7 +83,8 @@ func newTestServer(t *testing.T, opdsEnabled bool) (*Server, string) {
 	}
 	cache := covers.New(coversDir)
 	cfg := config.Config{Port: 8080, Listen: "localhost", Library: dir, DataDir: dir, OPDSEnabled: opdsEnabled}
-	srv, err := New(cfg, st, cache, library.NewScanner(st, cache, dir), comicvine.New(""))
+	configPath := filepath.Join(dir, "config.yaml")
+	srv, err := New(cfg, configPath, st, cache, library.NewScanner(st, cache, dir), comicvine.New(""))
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
 	}
