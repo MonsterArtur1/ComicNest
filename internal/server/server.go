@@ -79,9 +79,10 @@ func (s *Server) funcMap() template.FuncMap {
 		"opdsEnabled": func() bool { return s.cfg.OPDSEnabled },
 		"appVersion":  displayVersion,
 		"canRead":     canStreamPages, // in-browser reader works for CBZ/CBR only
-		// currentUser is overridden per request in renderStatus; this default
-		// only satisfies parse-time resolution.
+		// currentUser/isAdmin are overridden per request in renderStatus; these
+		// defaults only satisfy parse-time resolution.
 		"currentUser": func() string { return "" },
+		"isAdmin":     func() bool { return false },
 	}
 }
 
@@ -134,7 +135,7 @@ func sourceLabel(source string) string {
 // shared layout plus that view's blocks.
 func (s *Server) parseTemplates() error {
 	pages := []string{"index.html", "series.html", "issue.html", "search.html",
-		"series_edit.html", "issue_edit.html", "comicvine_match.html", "error.html"}
+		"series_edit.html", "issue_edit.html", "comicvine_match.html", "error.html", "admin.html"}
 
 	s.templates = make(map[string]*template.Template)
 	for _, page := range pages {
@@ -188,22 +189,25 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /login", s.handleLogin)
 	s.mux.HandleFunc("POST /logout", s.handleLogout)
 	s.mux.HandleFunc("GET /series/{id}", s.handleSeries)
-	s.mux.HandleFunc("GET /series/{id}/edit", s.handleSeriesEditForm)
-	s.mux.HandleFunc("POST /series/{id}", s.handleSeriesEditSave)
-	s.mux.HandleFunc("POST /series/{id}/unlock", s.handleSeriesUnlock)
-	s.mux.HandleFunc("POST /series/{id}/merge", s.handleSeriesMerge)
-	s.mux.HandleFunc("GET /series/{id}/match", s.handleMatchPage)
-	s.mux.HandleFunc("POST /series/{id}/match/unlink", s.handleMatchUnlink)
-	s.mux.HandleFunc("POST /series/{id}/match/{volumeID}", s.handleMatchSave)
-	s.mux.HandleFunc("POST /series/{id}/scrape", s.handleSeriesScrape)
+	s.mux.HandleFunc("GET /series/{id}/edit", s.requireAdmin(s.handleSeriesEditForm))
+	s.mux.HandleFunc("POST /series/{id}", s.requireAdmin(s.handleSeriesEditSave))
+	s.mux.HandleFunc("POST /series/{id}/unlock", s.requireAdmin(s.handleSeriesUnlock))
+	s.mux.HandleFunc("POST /series/{id}/merge", s.requireAdmin(s.handleSeriesMerge))
+	s.mux.HandleFunc("GET /series/{id}/match", s.requireAdmin(s.handleMatchPage))
+	s.mux.HandleFunc("POST /series/{id}/match/unlink", s.requireAdmin(s.handleMatchUnlink))
+	s.mux.HandleFunc("POST /series/{id}/match/{volumeID}", s.requireAdmin(s.handleMatchSave))
+	s.mux.HandleFunc("POST /series/{id}/scrape", s.requireAdmin(s.handleSeriesScrape))
+	// Read-only status of the ComicVine action strip: stays reachable by any
+	// logged-in user (the partial itself hides admin-only buttons), since the
+	// series page loads it unconditionally via HTMX.
 	s.mux.HandleFunc("GET /series/{id}/scrape/status", s.handleScrapeStatus)
 	s.mux.HandleFunc("GET /issues/{id}", s.handleIssue)
-	s.mux.HandleFunc("GET /issues/{id}/edit", s.handleIssueEditForm)
-	s.mux.HandleFunc("POST /issues/{id}", s.handleIssueEditSave)
-	s.mux.HandleFunc("POST /issues/{id}/unlock", s.handleIssueUnlock)
-	s.mux.HandleFunc("POST /issues/{id}/scrape", s.handleIssueScrape)
-	s.mux.HandleFunc("POST /issues/{id}/scrape/unlink", s.handleIssueScrapeUnlink)
-	s.mux.HandleFunc("POST /issues/{id}/delete", s.handleIssueDelete)
+	s.mux.HandleFunc("GET /issues/{id}/edit", s.requireAdmin(s.handleIssueEditForm))
+	s.mux.HandleFunc("POST /issues/{id}", s.requireAdmin(s.handleIssueEditSave))
+	s.mux.HandleFunc("POST /issues/{id}/unlock", s.requireAdmin(s.handleIssueUnlock))
+	s.mux.HandleFunc("POST /issues/{id}/scrape", s.requireAdmin(s.handleIssueScrape))
+	s.mux.HandleFunc("POST /issues/{id}/scrape/unlink", s.requireAdmin(s.handleIssueScrapeUnlink))
+	s.mux.HandleFunc("POST /issues/{id}/delete", s.requireAdmin(s.handleIssueDelete))
 	s.mux.HandleFunc("POST /issues/{id}/read", s.handleIssueMarkRead)
 	s.mux.HandleFunc("POST /issues/{id}/unread", s.handleIssueMarkUnread)
 	s.mux.HandleFunc("GET /issues/{id}/read", s.handleReader)
@@ -212,8 +216,13 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /issues/{id}/cover", s.handleIssueCover)
 	s.mux.HandleFunc("GET /issues/{id}/download", s.handleIssueDownload)
 	s.mux.HandleFunc("GET /search", s.handleSearch)
-	s.mux.HandleFunc("POST /scan", s.handleScanStart)
+	s.mux.HandleFunc("POST /scan", s.requireAdmin(s.handleScanStart))
 	s.mux.HandleFunc("GET /scan/status", s.handleScanStatus)
+	s.mux.HandleFunc("GET /admin", s.requireAdmin(s.handleAdmin))
+	s.mux.HandleFunc("POST /admin/users", s.requireAdmin(s.handleAdminCreateUser))
+	s.mux.HandleFunc("POST /admin/users/{id}/password", s.requireAdmin(s.handleAdminSetPassword))
+	s.mux.HandleFunc("POST /admin/users/{id}/admin", s.requireAdmin(s.handleAdminSetAdmin))
+	s.mux.HandleFunc("POST /admin/users/{id}/delete", s.requireAdmin(s.handleAdminDeleteUser))
 	if s.cfg.OPDSEnabled {
 		s.opdsRoutes()
 	}
@@ -334,7 +343,11 @@ func (s *Server) renderStatus(w http.ResponseWriter, r *http.Request, status int
 		return
 	}
 	user := userFrom(r)
-	t.Funcs(template.FuncMap{"currentUser": func() string { return user }})
+	admin := s.isAdmin(r)
+	t.Funcs(template.FuncMap{
+		"currentUser": func() string { return user },
+		"isAdmin":     func() bool { return admin },
+	})
 
 	var buf bytes.Buffer
 	if err := t.ExecuteTemplate(&buf, "layout", data); err != nil {
@@ -366,7 +379,11 @@ func (s *Server) errorPage(w http.ResponseWriter, r *http.Request, status int, m
 		return
 	}
 	user := userFrom(r)
-	t.Funcs(template.FuncMap{"currentUser": func() string { return user }})
+	admin := s.isAdmin(r)
+	t.Funcs(template.FuncMap{
+		"currentUser": func() string { return user },
+		"isAdmin":     func() bool { return admin },
+	})
 
 	var buf bytes.Buffer
 	if err := t.ExecuteTemplate(&buf, "layout", errorData{Status: status, Message: message}); err != nil {

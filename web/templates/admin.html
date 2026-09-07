@@ -1,0 +1,76 @@
+{{define "title"}}Panel administracyjny — ComicNest{{end}}
+
+{{define "content"}}
+<div class="page-head"><h1>Panel administracyjny</h1></div>
+
+{{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
+
+<section class="admin-section">
+    <h2>Użytkownicy</h2>
+    {{if .Users}}
+    <div class="admin-users-wrap">
+    <table class="admin-users">
+        <thead>
+            <tr><th>Login</th><th>Admin</th><th>Ostatnie logowanie</th><th>Utworzono</th><th></th></tr>
+        </thead>
+        <tbody>
+        {{range .Users}}
+            <tr>
+                <td>{{.Name}}</td>
+                <td>{{if .IsAdmin}}✓{{end}}</td>
+                <td>{{.LastLogin}}</td>
+                <td>{{.CreatedAt}}</td>
+                <td class="admin-row-actions">
+                    <form action="/admin/users/{{.ID}}/admin" method="post" class="inline-form">
+                        <input type="hidden" name="is_admin" value="{{if not .IsAdmin}}1{{end}}">
+                        <button type="submit" class="btn btn-mini">{{if .IsAdmin}}Odbierz admina{{else}}Nadaj admina{{end}}</button>
+                    </form>
+                    <details class="admin-password-toggle">
+                        <summary class="btn btn-mini">Zmień hasło</summary>
+                        <form action="/admin/users/{{.ID}}/password" method="post" class="admin-password-form">
+                            <input type="password" name="password" placeholder="nowe hasło" required autocomplete="new-password">
+                            <input type="password" name="password_confirm" placeholder="powtórz hasło" required autocomplete="new-password">
+                            <button type="submit" class="btn btn-mini">Zapisz</button>
+                        </form>
+                    </details>
+                    <form action="/admin/users/{{.ID}}/delete" method="post" class="inline-form"
+                          onsubmit="return confirm('Usunąć konto {{.Name}}?');">
+                        <button type="submit" class="btn btn-mini btn-danger">Usuń</button>
+                    </form>
+                </td>
+            </tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+    {{else}}
+    <p class="hint">Brak kont — dopóki żadne nie istnieje, jesteś anonimowym administratorem. Dodaj pierwsze konto poniżej; zostanie ono automatycznie administratorem.</p>
+    {{end}}
+</section>
+
+<section class="admin-section">
+    <h2>Dodaj użytkownika</h2>
+    <form action="/admin/users" method="post" class="edit-form">
+        <label>Login
+            <input type="text" name="name" required autocomplete="off">
+        </label>
+        <label>Hasło
+            <input type="password" name="password" required autocomplete="new-password">
+        </label>
+        <label>Powtórz hasło
+            <input type="password" name="password_confirm" required autocomplete="new-password">
+        </label>
+        {{if .IsFirstRun}}
+        <p class="hint">Pierwsze konto zostanie automatycznie administratorem.</p>
+        {{else}}
+        <label class="check-label">
+            <input type="checkbox" name="is_admin" value="1">
+            Administrator (dostęp do panelu, skanowania, edycji metadanych i ComicVine)
+        </label>
+        {{end}}
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">Dodaj</button>
+        </div>
+    </form>
+</section>
+{{end}}

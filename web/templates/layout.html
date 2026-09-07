@@ -19,17 +19,20 @@
         <input type="search" name="q" placeholder="Szukaj serii lub zeszytu…" value="{{block "searchQuery" .}}{{end}}">
     </form>
     {{if opdsEnabled}}<a class="opds-badge" href="/opds" title="Adres katalogu OPDS — wklej go w czytniku komiksów (Panels, Chunky, Moon+ Reader, Librera…)">OPDS</a>{{end}}
+    {{if isAdmin}}<a class="btn btn-mini admin-link" href="/admin" title="Panel administracyjny">⚙ Admin</a>{{end}}
     {{with currentUser}}
     <form class="user-box" action="/logout" method="post" title="Zalogowano jako {{.}}">
         <span class="user-name">👤 {{.}}</span>
         <button type="submit" class="btn btn-mini">Wyloguj</button>
     </form>
     {{end}}
+    {{if isAdmin}}
     <div class="scan-area" id="scan-area" hx-get="/scan/status" hx-trigger="load" hx-swap="innerHTML">
         <noscript>
             <form action="/scan" method="post"><button type="submit">Skanuj bibliotekę</button></form>
         </noscript>
     </div>
+    {{end}}
 </header>
 <main class="content">
 {{block "content" .}}{{end}}

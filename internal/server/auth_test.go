@@ -5,15 +5,15 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"comicnest/internal/config"
 )
 
-// newAuthTestServer is newTestServer with two accounts and OPDS enabled.
+// newAuthTestServer is newTestServer with two non-admin accounts and OPDS
+// enabled.
 func newAuthTestServer(t *testing.T) *Server {
 	t.Helper()
 	srv, _ := newTestServer(t, true)
-	srv.cfg.Users = []config.User{{Name: "ania", Password: "a-pass"}, {Name: "bartek", Password: "b-pass"}}
+	mustCreateUser(t, srv.store, "ania", "a-pass", false)
+	mustCreateUser(t, srv.store, "bartek", "b-pass", false)
 	return srv
 }
 
@@ -86,6 +86,10 @@ func TestAuthGatesWebUI(t *testing.T) {
 	body := get(t, h, "/", asUser(c)).Body.String()
 	if !strings.Contains(body, "👤 ania") || !strings.Contains(body, `action="/logout"`) {
 		t.Errorf("home page should show the logged-in user:\n%s", body)
+	}
+	// A non-admin sees neither the admin panel link nor the scan control.
+	if strings.Contains(body, `href="/admin"`) || strings.Contains(body, `id="scan-area"`) {
+		t.Errorf("non-admin should not see admin-only controls:\n%s", body)
 	}
 	// Open redirects are neutralised.
 	rec = postForm(t, h, "/login", "name=ania&password=a-pass&next=//evil.example/")
@@ -177,6 +181,33 @@ func TestAnonymousModeUnchanged(t *testing.T) {
 	}
 	if rec := get(t, h, "/opds", nil); rec.Code != http.StatusOK {
 		t.Errorf("OPDS without accounts is open: %d", rec.Code)
+	}
+}
+
+// TestAnonymousIsAdminBeforeFirstAccount covers the "first run" bootstrap:
+// with zero accounts, the anonymous visitor sees admin-only controls and can
+// reach admin-gated routes; once an account exists, that stops.
+func TestAnonymousIsAdminBeforeFirstAccount(t *testing.T) {
+	srv, _ := newTestServer(t, false)
+	h := srv.Handler()
+
+	body := get(t, h, "/", nil).Body.String()
+	if !strings.Contains(body, `href="/admin"`) || !strings.Contains(body, `id="scan-area"`) {
+		t.Errorf("anonymous visitor should be treated as admin before any account exists:\n%s", body)
+	}
+	if rec := get(t, h, "/admin", nil); rec.Code != http.StatusOK {
+		t.Errorf("anonymous admin should reach /admin: %d", rec.Code)
+	}
+	if rec := get(t, h, "/series/1/edit", nil); rec.Code != http.StatusOK {
+		t.Errorf("anonymous admin should reach series edit: %d", rec.Code)
+	}
+
+	mustCreateUser(t, srv.store, "ania", "a-pass", true)
+
+	// Once an account exists, auth is enforced — the same anonymous request
+	// (no session) is redirected to login instead of treated as admin.
+	if rec := get(t, h, "/admin", nil); rec.Code != http.StatusSeeOther {
+		t.Errorf("admin panel should require login once an account exists: %d", rec.Code)
 	}
 }
 

@@ -59,7 +59,7 @@
             {{if not .Issue.FileMissing}}
             <a class="btn {{if not (canRead .Issue.Path)}}btn-primary{{end}}" href="/issues/{{.Issue.ID}}/download">Pobierz plik</a>
             {{end}}
-            <a class="btn" href="/issues/{{.Issue.ID}}/edit">Edytuj metadane</a>
+            {{if isAdmin}}<a class="btn" href="/issues/{{.Issue.ID}}/edit">Edytuj metadane</a>{{end}}
             {{if and .Reading .Reading.Finished}}
             <form action="/issues/{{.Issue.ID}}/unread" method="post">
                 <button type="submit" class="btn" title="Wyzeruj postęp czytania">Oznacz jako nieprzeczytany</button>
@@ -74,7 +74,7 @@
             </form>
             {{end}}
             {{end}}
-            {{if .CVEnabled}}
+            {{if and isAdmin .CVEnabled}}
             <form action="/issues/{{.Issue.ID}}/scrape" method="post">
                 <button type="submit" class="btn" {{if not .CVMatched}}disabled title="Najpierw dopasuj serię w ComicVine"{{else}}title="Pobierz metadane tego zeszytu z ComicVine"{{end}}>
                     Pobierz z ComicVine
@@ -84,18 +84,18 @@
             {{if .Issue.ComicVineURL}}
             <a class="btn" href="{{.Issue.ComicVineURL}}" target="_blank" rel="noopener">Zobacz na ComicVine ↗</a>
             {{end}}
-            {{if .Issue.ComicVineIssueID.Valid}}
+            {{if and isAdmin .Issue.ComicVineIssueID.Valid}}
             <form action="/issues/{{.Issue.ID}}/scrape/unlink" method="post"
                   onsubmit="return confirm('Usunąć dopasowanie tego zeszytu do ComicVine? Pobrane dane zostają, ale przestają być oznaczone jako pochodzące z ComicVine.');">
                 <button type="submit" class="btn btn-danger" title="Usuń dopasowanie tego zeszytu do ComicVine">Usuń dopasowanie ComicVine</button>
             </form>
             {{end}}
-            {{if .Issue.MetadataLocked}}
+            {{if and isAdmin .Issue.MetadataLocked}}
             <form action="/issues/{{.Issue.ID}}/unlock" method="post">
                 <button type="submit" class="btn" title="Pozwól aktualizacjom nadpisać metadane">Zdejmij blokadę 🔒</button>
             </form>
             {{end}}
-            {{if .Issue.FileMissing}}
+            {{if and isAdmin .Issue.FileMissing}}
             <form action="/issues/{{.Issue.ID}}/delete" method="post"
                   onsubmit="return confirm('Usunąć rekord tego zeszytu z katalogu?');">
                 <button type="submit" class="btn btn-danger" title="Plik zniknął z biblioteki — usuń wpis z katalogu">Usuń rekord</button>

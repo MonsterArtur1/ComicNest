@@ -63,9 +63,13 @@ type scrapeStatusData struct {
 	CVEnabled bool
 	Matched   bool
 	URL       string // ComicVine page for the matched volume, "" when unmatched
+	// IsAdmin gates the action buttons (search/match/scrape/unlink) — this
+	// partial is rendered outside the normal template set (no funcMap), so
+	// the flag travels on the data instead of an `isAdmin` template func.
+	IsAdmin bool
 }
 
-func (s *Server) scrapeDataFor(series *store.Series) scrapeStatusData {
+func (s *Server) scrapeDataFor(r *http.Request, series *store.Series) scrapeStatusData {
 	st := s.scrape.status()
 	if st.SeriesID != series.ID {
 		st = scrapeStatus{} // another series' job — show nothing here
@@ -76,16 +80,19 @@ func (s *Server) scrapeDataFor(series *store.Series) scrapeStatusData {
 		CVEnabled:    s.cv.Enabled(),
 		Matched:      series.ComicVineVolumeID.Valid,
 		URL:          series.ComicVineURL,
+		IsAdmin:      s.isAdmin(r),
 	}
 }
 
 // handleScrapeStatus renders the ComicVine action strip on a series page.
+// Reachable by any logged-in user — the partial itself hides admin-only
+// buttons — since the series page loads it unconditionally via HTMX.
 func (s *Server) handleScrapeStatus(w http.ResponseWriter, r *http.Request) {
 	series := s.getSeriesFromPath(w, r)
 	if series == nil {
 		return
 	}
-	s.renderPartial(w, "scrape_status.html", "scrape-status", s.scrapeDataFor(series))
+	s.renderPartial(w, "scrape_status.html", "scrape-status", s.scrapeDataFor(r, series))
 }
 
 // handleSeriesScrape updates all of a series' issues that still lack
@@ -101,7 +108,7 @@ func (s *Server) handleSeriesScrape(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
-		s.renderPartial(w, "scrape_status.html", "scrape-status", s.scrapeDataFor(series))
+		s.renderPartial(w, "scrape_status.html", "scrape-status", s.scrapeDataFor(r, series))
 		return
 	}
 	http.Redirect(w, r, "/series/"+strconv.FormatInt(series.ID, 10), http.StatusSeeOther)
@@ -383,7 +390,7 @@ func (s *Server) handleMatchUnlink(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("HX-Request") == "true" {
 		series.ComicVineVolumeID = sql.NullInt64{}
 		series.ComicVineURL = ""
-		s.renderPartial(w, "scrape_status.html", "scrape-status", s.scrapeDataFor(series))
+		s.renderPartial(w, "scrape_status.html", "scrape-status", s.scrapeDataFor(r, series))
 		return
 	}
 	http.Redirect(w, r, "/series/"+strconv.FormatInt(series.ID, 10), http.StatusSeeOther)

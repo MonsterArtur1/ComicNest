@@ -116,6 +116,22 @@ var migrations = []string{
 		series_id   INTEGER NOT NULL REFERENCES series(id) ON DELETE CASCADE
 	);
 	`,
+
+	// 8: user accounts move from config.yaml into the database, with a real
+	// password hash and an admin flag (see internal/server/admin.go). Zero
+	// rows here means "no accounts yet" — the app runs open, with the visitor
+	// treated as an anonymous admin so they can create the first account.
+	`
+	CREATE TABLE users (
+		id            INTEGER PRIMARY KEY,
+		name          TEXT NOT NULL UNIQUE,
+		password_hash TEXT NOT NULL,
+		is_admin      INTEGER NOT NULL DEFAULT 0,
+		last_login_at TEXT,
+		created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+		updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+	);
+	`,
 }
 
 func migrate(db *sql.DB) error {

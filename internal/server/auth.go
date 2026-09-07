@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -13,13 +12,17 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
-// Accounts come from config.yaml (see config.User). When none are defined
-// the app runs as before: no login anywhere and one anonymous reader ("").
-// With accounts, the web UI needs a session cookie (login form) and OPDS
-// needs HTTP Basic auth; both check the same name/password pairs, and every
-// request carries the resolved user name in its context.
+// Accounts live in the database (internal/store/users.go), not config.yaml.
+// When none exist yet the app runs open: no login anywhere, one anonymous
+// reader (""), treated as an admin so they can create the first real
+// account. Once at least one account exists, the web UI needs a session
+// cookie (login form) and OPDS needs HTTP Basic auth; both check the same
+// name/password pairs, and every request carries the resolved user name in
+// its context.
 
 const (
 	sessionCookie = "comicnest_session"
@@ -44,14 +47,54 @@ func withUser(r *http.Request, user string) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), userKey, user))
 }
 
-// checkPassword verifies credentials against the configured accounts in
-// constant time per user.
-func (s *Server) checkPassword(name, password string) bool {
-	u := s.cfg.FindUser(name)
-	if u == nil {
+// authEnabled reports whether any account exists. A database error is
+// treated as "enabled" — failing open would silently drop the login gate.
+func (s *Server) authEnabled() bool {
+	n, err := s.store.CountUsers()
+	if err != nil {
+		log.Printf("auth: counting users: %v", err)
+		return true
+	}
+	return n > 0
+}
+
+// isAdmin reports whether the request may perform admin-only actions
+// (library scan, metadata editing, ComicVine search/matching, the admin
+// panel itself). Before any account exists, the anonymous visitor is
+// treated as admin, so they can create the first real account.
+func (s *Server) isAdmin(r *http.Request) bool {
+	user := userFrom(r)
+	if user == "" {
+		return !s.authEnabled()
+	}
+	u, err := s.store.GetUserByName(user)
+	if err != nil || u == nil {
 		return false
 	}
-	return subtle.ConstantTimeCompare([]byte(u.Password), []byte(password)) == 1
+	return u.IsAdmin
+}
+
+// requireAdmin wraps a handler so only admins (or, before any account
+// exists, the anonymous bootstrap visitor) may reach it. Library scanning,
+// metadata editing and ComicVine search/matching are catalog-management
+// actions, not something every reader should be able to do.
+func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !s.isAdmin(r) {
+			s.errorPage(w, r, http.StatusForbidden, "Ta czynność wymaga uprawnień administratora.")
+			return
+		}
+		next(w, r)
+	}
+}
+
+// checkPassword verifies credentials against the accounts table.
+func (s *Server) checkPassword(name, password string) bool {
+	u, err := s.store.GetUserByName(name)
+	if err != nil || u == nil {
+		return false
+	}
+	return bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) == nil
 }
 
 // sessions is the in-memory session table: token → user name. Sessions do
@@ -106,7 +149,7 @@ func (ss *sessions) drop(id string) {
 func (s *Server) withAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
-		if !s.cfg.AuthEnabled() ||
+		if !s.authEnabled() ||
 			p == "/opds" || strings.HasPrefix(p, "/opds/") ||
 			p == "/login" || p == "/logout" || p == "/favicon.ico" || p == "/healthz" || strings.HasPrefix(p, "/static/") {
 			next.ServeHTTP(w, r)
@@ -134,7 +177,7 @@ type loginData struct {
 
 // handleLoginForm shows the login page (or goes home when already logged in).
 func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
-	if !s.cfg.AuthEnabled() {
+	if !s.authEnabled() {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
@@ -149,7 +192,7 @@ func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 
 // handleLogin checks the credentials and starts a session.
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
-	if !s.cfg.AuthEnabled() {
+	if !s.authEnabled() {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
@@ -160,6 +203,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			Next: r.FormValue("next"), Name: name, Error: "Nieprawidłowa nazwa użytkownika lub hasło.",
 		})
 		return
+	}
+	if err := s.store.TouchUserLogin(name); err != nil {
+		log.Printf("login: recording last login for %q: %v", name, err)
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,
