@@ -17,7 +17,7 @@ type adminUserRow struct {
 	ID        int64
 	Name      string
 	IsAdmin   bool
-	LastLogin string // "nigdy" or "2006-01-02 15:04" local time
+	LastLogin string // "never" or "2006-01-02 15:04" local time
 	CreatedAt string
 }
 
@@ -26,10 +26,14 @@ type adminData struct {
 	// IsFirstRun is true when no account exists yet: the add-user form force
 	// the new account to be an admin (there is no other way back in).
 	IsFirstRun bool
-	Error      string
+	// MissingCount is the number of catalog records whose file has
+	// disappeared from disk (drives the "delete all missing" button).
+	MissingCount int
+	Error        string
 }
 
-// adminPageData loads the current account list for the admin panel.
+// adminPageData loads the current account list and library status for the
+// admin panel.
 func (s *Server) adminPageData() (adminData, error) {
 	users, err := s.store.ListUsers()
 	if err != nil {
@@ -49,7 +53,11 @@ func (s *Server) adminPageData() (adminData, error) {
 			CreatedAt: opds.ParseDBTime(u.CreatedAt, time.Time{}).Local().Format("2006-01-02 15:04"),
 		}
 	}
-	return adminData{Users: rows, IsFirstRun: len(rows) == 0}, nil
+	missing, err := s.store.CountMissingIssues()
+	if err != nil {
+		return adminData{}, err
+	}
+	return adminData{Users: rows, IsFirstRun: len(rows) == 0, MissingCount: missing}, nil
 }
 
 func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
@@ -228,6 +236,26 @@ func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.DeleteUser(u.ID); err != nil {
 		s.serverError(w, err)
 		return
+	}
+	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+}
+
+// handleAdminDeleteMissing removes every catalog record whose file has
+// disappeared from disk (the bulk equivalent of handleIssueDelete).
+func (s *Server) handleAdminDeleteMissing(w http.ResponseWriter, r *http.Request) {
+	issues, err := s.store.ListMissingIssues()
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	for _, issue := range issues {
+		if err := s.store.DeleteIssue(issue.ID); err != nil {
+			s.serverError(w, err)
+			return
+		}
+		if err := s.covers.Remove(issue.ID); err != nil {
+			log.Printf("delete missing issue %d: removing cover: %v", issue.ID, err)
+		}
 	}
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
 }

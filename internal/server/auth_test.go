@@ -192,11 +192,12 @@ func TestAnonymousIsAdminBeforeFirstAccount(t *testing.T) {
 	h := srv.Handler()
 
 	body := get(t, h, "/", nil).Body.String()
-	if !strings.Contains(body, `href="/admin"`) || !strings.Contains(body, `id="scan-area"`) {
+	if !strings.Contains(body, `href="/admin"`) {
 		t.Errorf("anonymous visitor should be treated as admin before any account exists:\n%s", body)
 	}
-	if rec := get(t, h, "/admin", nil); rec.Code != http.StatusOK {
-		t.Errorf("anonymous admin should reach /admin: %d", rec.Code)
+	adminRec := get(t, h, "/admin", nil)
+	if adminRec.Code != http.StatusOK || !strings.Contains(adminRec.Body.String(), `id="scan-area"`) {
+		t.Errorf("anonymous admin should reach /admin and see the scan control: %d\n%s", adminRec.Code, adminRec.Body)
 	}
 	if rec := get(t, h, "/series/1/edit", nil); rec.Code != http.StatusOK {
 		t.Errorf("anonymous admin should reach series edit: %d", rec.Code)

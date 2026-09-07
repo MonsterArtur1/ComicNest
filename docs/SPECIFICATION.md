@@ -359,14 +359,16 @@ blindly took the first search result):
 
 ## 9. Web interface — views and routing
 
-Shared layout: a header with the name, the search box, and a "Scan Library" button (plus a
-discreet scan status). HTMX for: edit forms (modal/inline), filters, scan progress, the ComicVine
-match dialog. Every view also works without JS (plain POST forms) — HTMX only improves the UX.
+Shared layout: a header with the name and the search box. The "Scan Library" control and scan
+status live in the admin panel (`/admin`), not the header. HTMX for: edit forms (modal/inline),
+filters, scan progress, the ComicVine match dialog. Every view also works without JS (plain POST
+forms) — HTMX only improves the UX.
 
 | Method and path | View / action |
 |---|---|
 | `GET /login` → `POST /login` (`name`, `password`, `next`) / `POST /logout` | login (only when the `users` table has at least one account; no accounts → redirect to `/`). The `withAuth` middleware: no session, GET → 303 to `/login?next=…`, other methods → 401; `/opds/*`, `/login`, `/logout`, `/static/*` are outside the gate. The username lives in the request context (`userFrom(r)`), shown in the layout as "👤 name" + "Log out" (`currentUser` bound per request on a template clone) |
 | `GET /admin` (panel) → `POST /admin/users` (add) / `POST /admin/users/{id}/password` / `POST /admin/users/{id}/admin` (grant/revoke) / `POST /admin/users/{id}/delete` | account management — admin only (`requireAdmin`; before the first account: the anonymous visitor). The first account is always admin. The last admin cannot have their privileges revoked or be deleted |
+| `POST /admin/missing/delete` | bulk-deletes every catalog record with `file_missing=1` (and its cached cover) — admin only; the button on `/admin` only shows up when at least one exists |
 | `GET /?sort=&filter=` | the series grid (cover, name, issue count, a green ✓ badge when every available issue is read); sort: name / recently added; filters: all / unread (no issue has real progress) / reading (there's real progress, not everything finished) / read (every available issue finished, ≥1 issue) / no ComicVine metadata (some issue sourced `filename` or `comicinfo`) / missing files (some issue `file_missing`). Aggregates computed in `ListSeries` (`LEFT JOIN reading_progress`, HAVING). Just opening and closing an issue (page 1 only) doesn't count as "real progress" — the threshold is page 2+, or an outright finish (a one-page issue) |
 | `GET /series/{id}` | the series page: metadata + issue list (cover, number, title, date, size, metadata-source badge, a reading-progress bar under the cover + "read: p. X of N (P%)" / "✓ read") |
 | `GET /series/{id}/edit` → `POST /series/{id}` | the series edit form (name, publisher, description) — admin only |

@@ -220,6 +220,34 @@ func (s *Store) CountIssues() (int, error) {
 	return n, err
 }
 
+// CountMissingIssues returns the number of issue records whose file has
+// disappeared from disk.
+func (s *Store) CountMissingIssues() (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM issues WHERE file_missing = 1`).Scan(&n)
+	return n, err
+}
+
+// ListMissingIssues returns every issue record whose file has disappeared
+// from disk (used to delete them all at once from the admin panel).
+func (s *Store) ListMissingIssues() ([]Issue, error) {
+	rows, err := s.db.Query(`SELECT ` + issueColumns + ` FROM issues WHERE file_missing = 1`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []Issue
+	for rows.Next() {
+		i, err := scanIssue(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *i)
+	}
+	return out, rows.Err()
+}
+
 // IssuesNeedingComicVine returns unlocked, present-on-disk issues that lack
 // ComicVine metadata but belong to a series matched to a ComicVine volume,
 // grouped by that volume id.

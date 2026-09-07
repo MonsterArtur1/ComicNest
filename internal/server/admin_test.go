@@ -123,6 +123,42 @@ func TestAdminSetPasswordAndDelete(t *testing.T) {
 	}
 }
 
+// TestAdminDeleteMissing checks the bulk "delete all missing files" action:
+// the button only shows up while missing records exist, and deleting them
+// removes every file_missing record (and leaves present ones alone).
+func TestAdminDeleteMissing(t *testing.T) {
+	srv, _ := newTestServer(t, false)
+	h := srv.Handler()
+	mustCreateUser(t, srv.store, "admin", "adminpass", true)
+	c := login(t, h, "admin", "adminpass")
+
+	body := get(t, h, "/admin", asUser(c)).Body.String()
+	if !strings.Contains(body, `action="/admin/missing/delete"`) || !strings.Contains(body, "Delete all missing files (1)") {
+		t.Errorf("admin panel should offer to delete the one missing record:\n%s", body)
+	}
+
+	rec := postAs(t, h, c, "/admin/missing/delete", "")
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/admin" {
+		t.Fatalf("delete missing: %d -> %q", rec.Code, rec.Header().Get("Location"))
+	}
+
+	missing, err := srv.store.ListMissingIssues()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(missing) != 0 {
+		t.Errorf("all missing records should be gone, got %v", missing)
+	}
+	if i, _ := srv.store.GetIssue(1); i == nil {
+		t.Error("the present issue should be untouched")
+	}
+
+	body = get(t, h, "/admin", asUser(c)).Body.String()
+	if strings.Contains(body, `action="/admin/missing/delete"`) {
+		t.Errorf("the delete-missing button should disappear once nothing is missing:\n%s", body)
+	}
+}
+
 // TestAdminGatingBlocksNonAdmin checks that a logged-in but non-admin user
 // gets 403 from scanning, metadata editing and ComicVine actions, and that
 // an admin can reach them.
