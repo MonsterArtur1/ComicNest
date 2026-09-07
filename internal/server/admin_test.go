@@ -45,19 +45,19 @@ func TestAdminCreateUserValidation(t *testing.T) {
 		return postAs(t, h, c, "/admin/users", form).Body.String()
 	}
 
-	if body := post("name=&password=x&password_confirm=x"); !strings.Contains(body, "nie może być pusta") {
+	if body := post("name=&password=x&password_confirm=x"); !strings.Contains(body, "cannot be empty") {
 		t.Errorf("empty name should error:\n%s", body)
 	}
 	if body := post("name=x%3Ay&password=x&password_confirm=x"); !strings.Contains(body, ":") {
 		t.Errorf("colon in name should error:\n%s", body)
 	}
-	if body := post("name=nowy&password=&password_confirm="); !strings.Contains(body, "Hasło nie może być puste") {
+	if body := post("name=nowy&password=&password_confirm="); !strings.Contains(body, "Password cannot be empty") {
 		t.Errorf("empty password should error:\n%s", body)
 	}
-	if body := post("name=nowy&password=a&password_confirm=b"); !strings.Contains(body, "nie są takie same") {
+	if body := post("name=nowy&password=a&password_confirm=b"); !strings.Contains(body, "do not match") {
 		t.Errorf("mismatched passwords should error:\n%s", body)
 	}
-	if body := post("name=admin&password=x&password_confirm=x"); !strings.Contains(body, "już istnieje") {
+	if body := post("name=admin&password=x&password_confirm=x"); !strings.Contains(body, "already exists") {
 		t.Errorf("duplicate name should error:\n%s", body)
 	}
 
@@ -81,7 +81,7 @@ func TestAdminCannotOrphanLastAdmin(t *testing.T) {
 	idPath := "/admin/users/" + strconv.FormatInt(admin.ID, 10)
 
 	// Demoting the only admin is refused.
-	if body := postAs(t, h, c, idPath+"/admin", "").Body.String(); !strings.Contains(body, "ostatniemu administratorowi") {
+	if body := postAs(t, h, c, idPath+"/admin", "").Body.String(); !strings.Contains(body, "last remaining administrator") {
 		t.Errorf("demoting the last admin should be refused:\n%s", body)
 	}
 	if u, _ := srv.store.GetUser(admin.ID); !u.IsAdmin {
@@ -89,7 +89,7 @@ func TestAdminCannotOrphanLastAdmin(t *testing.T) {
 	}
 
 	// Deleting the only admin is refused.
-	if body := postAs(t, h, c, idPath+"/delete", "").Body.String(); !strings.Contains(body, "ostatniego administratora") {
+	if body := postAs(t, h, c, idPath+"/delete", "").Body.String(); !strings.Contains(body, "last remaining administrator") {
 		t.Errorf("deleting the last admin should be refused:\n%s", body)
 	}
 	if u, _ := srv.store.GetUser(admin.ID); u == nil {

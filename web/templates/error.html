@@ -1,9 +1,9 @@
-{{define "title"}}Błąd {{.Status}} — ComicNest{{end}}
+{{define "title"}}Error {{.Status}} — ComicNest{{end}}
 
 {{define "content"}}
 <div class="empty-state error-state">
     <p class="error-code">{{.Status}}</p>
     <p>{{.Message}}</p>
-    <p><a class="btn" href="/">Wróć do biblioteki</a></p>
+    <p><a class="btn" href="/">Back to library</a></p>
 </div>
 {{end}}

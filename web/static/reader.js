@@ -33,7 +33,7 @@
             zoomLabel.textContent = zoom.scale + "%";
         } else {
             img.style.width = "";
-            zoomLabel.textContent = zoom.mode === "fit-h" ? "auto" : "szer.";
+            zoomLabel.textContent = zoom.mode === "fit-h" ? "auto" : "width";
         }
         document.querySelectorAll("[data-zoom]").forEach(function (b) {
             b.classList.toggle("active", b.dataset.zoom === zoom.mode);
@@ -94,7 +94,7 @@
         img.src = pageURL(n);
         pageNum.textContent = n;
         slider.value = n;
-        document.title = "str. " + n + "/" + total + " — " + root.querySelector(".reader-title").textContent;
+        document.title = "p. " + n + "/" + total + " — " + root.querySelector(".reader-title").textContent;
         stage.scrollTop = 0;
         stage.scrollLeft = 0;
         preload(n + 1);
@@ -108,7 +108,7 @@
     });
     img.addEventListener("error", function () {
         loading.hidden = false;
-        loading.textContent = "Nie udało się wczytać strony " + current;
+        loading.textContent = "Failed to load page " + current;
     });
 
     // Past the last page nothing happens — the reader leaves when they want
@@ -208,7 +208,7 @@
     show(current);
     showBars();
     if (nextIssue) {
-        // Warm the next issue's first page so "Następny zeszyt" opens instantly.
+        // Warm the next issue's first page so "Next issue" opens instantly.
         const warm = new Image();
         warm.src = "/issues/" + nextIssue + "/pages/0?track=0";
     }

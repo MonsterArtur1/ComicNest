@@ -1,15 +1,15 @@
-{{define "title"}}Szukaj: {{.Query}} — ComicNest{{end}}
+{{define "title"}}Search: {{.Query}} — ComicNest{{end}}
 {{define "searchQuery"}}{{.Query}}{{end}}
 
 {{define "content"}}
-<div class="page-head"><h1>Wyniki dla „{{.Query}}"</h1></div>
+<div class="page-head"><h1>Results for "{{.Query}}"</h1></div>
 
 {{if not .Query}}
-<div class="empty-state"><p>Wpisz zapytanie w polu wyszukiwania.</p></div>
+<div class="empty-state"><p>Type a query in the search box.</p></div>
 {{else}}
 
 {{if .Series}}
-<h2 class="section-title">Serie</h2>
+<h2 class="section-title">Series</h2>
 <ul class="series-grid">
     {{range .Series}}
     <li class="card">
@@ -23,7 +23,7 @@
             </div>
             <div class="card-body">
                 <span class="card-title">{{.Name}}</span>
-                <span class="card-meta">{{if .OneShot}}wydanie jednorazowe{{else}}{{.IssueCount}} {{if eq .IssueCount 1}}zeszyt{{else}}zeszytów{{end}}{{end}}</span>
+                <span class="card-meta">{{if .OneShot}}one-shot{{else}}{{.IssueCount}} {{if eq .IssueCount 1}}issue{{else}}issues{{end}}{{end}}</span>
             </div>
         </a>
     </li>
@@ -32,7 +32,7 @@
 {{end}}
 
 {{if .Issues}}
-<h2 class="section-title">Zeszyty</h2>
+<h2 class="section-title">Issues</h2>
 <ul class="issue-list">
     {{range .Issues}}
     <li class="issue-row {{if .FileMissing}}missing{{end}}">
@@ -57,7 +57,7 @@
 {{end}}
 
 {{if and (not .Series) (not .Issues)}}
-<div class="empty-state"><p>Nic nie znaleziono.</p></div>
+<div class="empty-state"><p>Nothing found.</p></div>
 {{end}}
 {{end}}
 {{end}}

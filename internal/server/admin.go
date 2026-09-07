@@ -37,7 +37,7 @@ func (s *Server) adminPageData() (adminData, error) {
 	}
 	rows := make([]adminUserRow, len(users))
 	for i, u := range users {
-		last := "nigdy"
+		last := "never"
 		if t := opds.ParseDBTime(u.LastLoginAt.String, time.Time{}); !t.IsZero() {
 			last = t.Local().Format("2006-01-02 15:04")
 		}
@@ -94,16 +94,16 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case name == "":
-		s.renderAdminError(w, r, "Nazwa użytkownika nie może być pusta.")
+		s.renderAdminError(w, r, "Username cannot be empty.")
 		return
 	case strings.ContainsAny(name, ":\n\r"):
-		s.renderAdminError(w, r, `Nazwa użytkownika nie może zawierać ":" (potrzebne do HTTP Basic w OPDS).`)
+		s.renderAdminError(w, r, `Username cannot contain ":" (needed for HTTP Basic in OPDS).`)
 		return
 	case password == "":
-		s.renderAdminError(w, r, "Hasło nie może być puste.")
+		s.renderAdminError(w, r, "Password cannot be empty.")
 		return
 	case password != confirm:
-		s.renderAdminError(w, r, "Podane hasła nie są takie same.")
+		s.renderAdminError(w, r, "The passwords do not match.")
 		return
 	}
 	existing, err := s.store.GetUserByName(name)
@@ -112,7 +112,7 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if existing != nil {
-		s.renderAdminError(w, r, "Taki użytkownik już istnieje.")
+		s.renderAdminError(w, r, "That username already exists.")
 		return
 	}
 
@@ -166,7 +166,7 @@ func (s *Server) handleAdminSetPassword(w http.ResponseWriter, r *http.Request) 
 	password := r.FormValue("password")
 	confirm := r.FormValue("password_confirm")
 	if password == "" || password != confirm {
-		s.renderAdminError(w, r, "Nowe hasło jest puste albo powtórzone hasło się różni.")
+		s.renderAdminError(w, r, "The new password is empty or the confirmation doesn't match.")
 		return
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -196,7 +196,7 @@ func (s *Server) handleAdminSetAdmin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if admins <= 1 {
-			s.renderAdminError(w, r, "Nie można odebrać uprawnień ostatniemu administratorowi.")
+			s.renderAdminError(w, r, "Cannot revoke admin rights from the last remaining administrator.")
 			return
 		}
 	}
@@ -221,7 +221,7 @@ func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if admins <= 1 {
-			s.renderAdminError(w, r, "Nie można usunąć ostatniego administratora.")
+			s.renderAdminError(w, r, "Cannot delete the last remaining administrator.")
 			return
 		}
 	}

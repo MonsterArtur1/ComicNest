@@ -330,13 +330,13 @@ func (s *Server) handleMatchPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !s.cv.Enabled() {
-		data.Error = "Brak klucza API — ustaw comicvine_api_key w config.yaml."
+		data.Error = "No API key — set comicvine_api_key in config.yaml."
 	} else {
 		var err error
 		data.Candidates, err = s.cv.SearchVolumes(data.Query)
 		if err != nil {
 			log.Printf("comicvine: search %q: %v", data.Query, err)
-			data.Error = "Wyszukiwanie w ComicVine nie powiodło się: " + err.Error()
+			data.Error = "ComicVine search failed: " + err.Error()
 		}
 	}
 	s.render(w, r, "comicvine_match.html", data)

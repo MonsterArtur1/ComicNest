@@ -55,7 +55,7 @@ func (s *Server) opdsAuth(next http.Handler) http.Handler {
 		u, p, ok := r.BasicAuth()
 		if !ok || !s.checkPassword(u, p) {
 			w.Header().Set("WWW-Authenticate", `Basic realm="ComicNest OPDS", charset="UTF-8"`)
-			http.Error(w, "Wymagane logowanie do katalogu OPDS.", http.StatusUnauthorized)
+			http.Error(w, "Login required for the OPDS catalog.", http.StatusUnauthorized)
 			return
 		}
 		if err := s.store.TouchUserLogin(u); err != nil {
@@ -124,37 +124,37 @@ func (s *Server) handleOPDSRoot(w http.ResponseWriter, r *http.Request) {
 	f.Entries = []opds.Entry{
 		{
 			ID:      "urn:comicnest:series",
-			Title:   "Wszystkie serie",
+			Title:   "All series",
 			Updated: opds.FormatTime(now),
-			Content: &opds.Text{Type: "text", Value: "Serie i wydania jednorazowe alfabetycznie"},
+			Content: &opds.Text{Type: "text", Value: "Series and one-shots, alphabetically"},
 			Links:   []opds.Link{{Rel: opds.RelSubsection, Href: base + "/opds/series", Type: opds.TypeNavigation}},
 		},
 		{
 			ID:      "urn:comicnest:reading",
-			Title:   "Aktualnie czytane",
+			Title:   "Currently reading",
 			Updated: opds.FormatTime(now),
-			Content: &opds.Text{Type: "text", Value: "Zeszyty rozpoczęte w czytniku, ale nieprzeczytane do końca"},
+			Content: &opds.Text{Type: "text", Value: "Issues started in the reader but not finished"},
 			Links:   []opds.Link{{Rel: opds.RelSubsection, Href: base + "/opds/reading", Type: opds.TypeAcquisition}},
 		},
 		{
 			ID:      "urn:comicnest:recent",
-			Title:   "Ostatnio dodane",
+			Title:   "Recently added",
 			Updated: opds.FormatTime(now),
-			Content: &opds.Text{Type: "text", Value: "Zeszyty w kolejności dodania do biblioteki"},
+			Content: &opds.Text{Type: "text", Value: "Issues in the order they were added to the library"},
 			Links:   []opds.Link{{Rel: opds.RelNew, Href: base + "/opds/recent", Type: opds.TypeAcquisition}},
 		},
 		{
 			ID:      "urn:comicnest:unread",
-			Title:   "Nieczytane",
+			Title:   "Unread",
 			Updated: opds.FormatTime(now),
-			Content: &opds.Text{Type: "text", Value: "Zeszyty, których nikt jeszcze nie otworzył"},
+			Content: &opds.Text{Type: "text", Value: "Issues nobody has opened yet"},
 			Links:   []opds.Link{{Rel: opds.RelSubsection, Href: base + "/opds/unread", Type: opds.TypeAcquisition}},
 		},
 		{
 			ID:      "urn:comicnest:read",
-			Title:   "Przeczytane",
+			Title:   "Read",
 			Updated: opds.FormatTime(now),
-			Content: &opds.Text{Type: "text", Value: "Zeszyty przeczytane do końca"},
+			Content: &opds.Text{Type: "text", Value: "Issues read to the end"},
 			Links:   []opds.Link{{Rel: opds.RelSubsection, Href: base + "/opds/read", Type: opds.TypeAcquisition}},
 		},
 	}
@@ -187,7 +187,7 @@ func (s *Server) handleOPDSReading(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	base := opdsBaseURL(r)
-	f := s.newOPDSFeed(r, "reading", "Aktualnie czytane", time.Now())
+	f := s.newOPDSFeed(r, "reading", "Currently reading", time.Now())
 	f.Links[0].Type = opds.TypeAcquisition
 	f.AddLink(opds.RelUp, base+"/opds", opds.TypeNavigation)
 	f.TotalResults, f.ItemsPerPage, f.StartIndex = len(items), len(items), 1
@@ -216,11 +216,11 @@ func (s *Server) handleIssuePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canStreamPages(issue.Path) {
-		http.Error(w, "Strumieniowanie stron działa tylko dla archiwów CBZ/CBR.", http.StatusNotFound)
+		http.Error(w, "Page streaming only works for CBZ/CBR archives.", http.StatusNotFound)
 		return
 	}
 	if _, err := os.Stat(issue.Path); err != nil {
-		http.Error(w, "Plik nie istnieje na dysku (oznaczony jako brakujący?).", http.StatusNotFound)
+		http.Error(w, "The file does not exist on disk (marked as missing?).", http.StatusNotFound)
 		return
 	}
 
@@ -292,7 +292,7 @@ func (s *Server) handleOPDSSeriesList(w http.ResponseWriter, r *http.Request) {
 	page := opdsPage(r)
 	from, to, hasNext := pageBounds(page, len(series))
 
-	f := s.newOPDSFeed(r, "series", "Wszystkie serie", time.Now())
+	f := s.newOPDSFeed(r, "series", "All series", time.Now())
 	f.Links[0].Type = opds.TypeNavigation
 	f.AddLink(opds.RelUp, base+"/opds", opds.TypeNavigation)
 	if hasNext {
@@ -314,7 +314,7 @@ func (s *Server) opdsSeriesEntry(base string, sr store.Series) opds.Entry {
 	id := strconv.FormatInt(sr.ID, 10)
 	desc := pluralIssues(sr.IssueCount)
 	if sr.OneShot {
-		desc = "wydanie jednorazowe"
+		desc = "one-shot"
 	}
 	if sr.Publisher != "" {
 		desc += " · " + sr.Publisher
@@ -338,15 +338,12 @@ func (s *Server) opdsSeriesEntry(base string, sr store.Series) opds.Entry {
 	return e
 }
 
-// pluralIssues renders "N zeszytów" with Polish plural forms.
+// pluralIssues renders "N issues" ("1 issue" for the singular case).
 func pluralIssues(n int) string {
-	switch {
-	case n == 1:
-		return "1 zeszyt"
-	case n%10 >= 2 && n%10 <= 4 && (n%100 < 10 || n%100 >= 20):
-		return fmt.Sprintf("%d zeszyty", n)
+	if n == 1 {
+		return "1 issue"
 	}
-	return fmt.Sprintf("%d zeszytów", n)
+	return fmt.Sprintf("%d issues", n)
 }
 
 // handleOPDSSeries serves the acquisition feed of one series' issues.
@@ -422,7 +419,7 @@ func (s *Server) handleOPDSRecent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	base := opdsBaseURL(r)
-	f := s.newOPDSFeed(r, "recent", "Ostatnio dodane", time.Now())
+	f := s.newOPDSFeed(r, "recent", "Recently added", time.Now())
 	f.Links[0].Type = opds.TypeAcquisition
 	f.AddLink(opds.RelUp, base+"/opds", opds.TypeNavigation)
 	if hasNext {
@@ -458,7 +455,7 @@ func (s *Server) handleOPDSRead(w http.ResponseWriter, r *http.Request) {
 	}
 
 	base := opdsBaseURL(r)
-	f := s.newOPDSFeed(r, "read", "Przeczytane", time.Now())
+	f := s.newOPDSFeed(r, "read", "Read", time.Now())
 	f.Links[0].Type = opds.TypeAcquisition
 	f.AddLink(opds.RelUp, base+"/opds", opds.TypeNavigation)
 	if hasNext {
@@ -493,7 +490,7 @@ func (s *Server) handleOPDSUnread(w http.ResponseWriter, r *http.Request) {
 	}
 
 	base := opdsBaseURL(r)
-	f := s.newOPDSFeed(r, "unread", "Nieczytane", time.Now())
+	f := s.newOPDSFeed(r, "unread", "Unread", time.Now())
 	f.Links[0].Type = opds.TypeAcquisition
 	f.AddLink(opds.RelUp, base+"/opds", opds.TypeNavigation)
 	if hasNext {
@@ -533,7 +530,7 @@ func (s *Server) handleOPDSSearch(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.FormValue("q"))
 	base := opdsBaseURL(r)
 
-	f := s.newOPDSFeed(r, "search", "Wyniki wyszukiwania: "+q, time.Now())
+	f := s.newOPDSFeed(r, "search", "Search results: "+q, time.Now())
 	f.Links[0].Type = opds.TypeAcquisition
 	f.AddLink(opds.RelUp, base+"/opds", opds.TypeNavigation)
 
@@ -594,7 +591,7 @@ func opdsIssueEntry(base string, i store.Issue, seriesName string, progress *sto
 	if i.Summary != "" {
 		e.Summary = &opds.Text{Type: "text", Value: i.Summary}
 	} else if i.Artist != "" {
-		e.Summary = &opds.Text{Type: "text", Value: "Rysunki: " + i.Artist}
+		e.Summary = &opds.Text{Type: "text", Value: "Art: " + i.Artist}
 	}
 	if i.CoverCached {
 		cover := base + "/opds/issues/" + id + "/cover"

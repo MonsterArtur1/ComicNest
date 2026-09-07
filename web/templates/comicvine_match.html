@@ -1,20 +1,20 @@
-{{define "title"}}Dopasowanie ComicVine: {{.Series.Name}} — ComicNest{{end}}
+{{define "title"}}ComicVine match: {{.Series.Name}} — ComicNest{{end}}
 
 {{define "content"}}
 <nav class="breadcrumbs">
-    <a href="/">Biblioteka</a> <span>/</span>
-    <a href="/series/{{.Series.ID}}">{{.Series.Name}}</a> <span>/</span> dopasowanie ComicVine
+    <a href="/">Library</a> <span>/</span>
+    <a href="/series/{{.Series.ID}}">{{.Series.Name}}</a> <span>/</span> ComicVine match
 </nav>
 
-<div class="page-head"><h1>Dopasuj serię w ComicVine</h1></div>
+<div class="page-head"><h1>Match series in ComicVine</h1></div>
 
 {{if .Series.ComicVineVolumeID.Valid}}
-<p class="hint">Obecne dopasowanie: wolumen ComicVine #{{.Series.ComicVineVolumeID.Int64}}. Wybór nowego nadpisze je.</p>
+<p class="hint">Current match: ComicVine volume #{{.Series.ComicVineVolumeID.Int64}}. Picking a new one will overwrite it.</p>
 {{end}}
 
 <form class="cv-search" action="/series/{{.Series.ID}}/match" method="get">
-    <input type="text" name="q" value="{{.Query}}" placeholder="Nazwa serii w ComicVine…">
-    <button type="submit" class="btn">Szukaj</button>
+    <input type="text" name="q" value="{{.Query}}" placeholder="Series name in ComicVine…">
+    <button type="submit" class="btn">Search</button>
 </form>
 
 {{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
@@ -29,20 +29,20 @@
         <div class="cv-info">
             <strong>{{.Name}}</strong>
             <span class="cv-meta">
-                {{if .StartYear}}{{.StartYear}} · {{end}}{{if .Publisher}}{{.Publisher}} · {{end}}{{.CountOfIssues}} zeszytów
+                {{if .StartYear}}{{.StartYear}} · {{end}}{{if .Publisher}}{{.Publisher}} · {{end}}{{.CountOfIssues}} issues
             </span>
             {{if .Description}}<p class="cv-desc">{{.Description}}</p>{{end}}
         </div>
         <div class="cv-candidate-actions">
-            {{if .URL}}<a class="btn" href="{{.URL}}" target="_blank" rel="noopener">Otwórz stronę ↗</a>{{end}}
+            {{if .URL}}<a class="btn" href="{{.URL}}" target="_blank" rel="noopener">Open page ↗</a>{{end}}
             <form action="/series/{{$.Series.ID}}/match/{{.ID}}" method="post">
-                <button type="submit" class="btn-primary">Wybierz</button>
+                <button type="submit" class="btn-primary">Select</button>
             </form>
         </div>
     </li>
     {{end}}
 </ul>
 {{else if and .Query (not .Error)}}
-<div class="empty-state"><p>Brak wyników dla „{{.Query}}".</p></div>
+<div class="empty-state"><p>No results for "{{.Query}}".</p></div>
 {{end}}
 {{end}}

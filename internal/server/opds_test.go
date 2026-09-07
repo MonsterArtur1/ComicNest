@@ -404,7 +404,7 @@ func TestWebShowsReadingProgress(t *testing.T) {
 	if body := get(t, h, "/series/1", nil).Body.String(); strings.Contains(body, `class="progress`) {
 		t.Errorf("unread issue should show no progress bar:\n%s", body)
 	}
-	if body := get(t, h, "/issues/1", nil).Body.String(); strings.Contains(body, "Przeczytano") {
+	if body := get(t, h, "/issues/1", nil).Body.String(); strings.Contains(body, "<dt>Read</dt>") {
 		t.Errorf("unread issue should show no read count:\n%s", body)
 	}
 
@@ -414,19 +414,19 @@ func TestWebShowsReadingProgress(t *testing.T) {
 	}
 	body := get(t, h, "/series/1", nil).Body.String()
 	if !strings.Contains(body, `class="progress "`) || !strings.Contains(body, `style="width: 66%"`) ||
-		!strings.Contains(body, "czytane: str. 2 z 3 (66%)") {
+		!strings.Contains(body, "read: p. 2 of 3 (66%)") {
 		t.Errorf("series list lacks the progress bar:\n%s", body)
 	}
 	body = get(t, h, "/issues/1", nil).Body.String()
-	if !strings.Contains(body, "<dt>Przeczytano</dt><dd>2 z 3 stron (66%)</dd>") ||
-		!strings.Contains(body, "W trakcie czytania") {
+	if !strings.Contains(body, "<dt>Read</dt><dd>2 of 3 pages (66%)</dd>") ||
+		!strings.Contains(body, "Reading") {
 		t.Errorf("issue page lacks the read count:\n%s", body)
 	}
 
 	// Last page → finished.
 	get(t, h, "/opds/issues/1/pages/2", nil)
 	body = get(t, h, "/issues/1", nil).Body.String()
-	if !strings.Contains(body, "<strong>Przeczytane</strong>") || !strings.Contains(body, `class="progress progress-lg done"`) {
+	if !strings.Contains(body, "<strong>Read</strong>") || !strings.Contains(body, `class="progress progress-lg done"`) {
 		t.Errorf("finished issue should be marked as read:\n%s", body)
 	}
 }
@@ -521,15 +521,15 @@ func TestMarkReadUnread(t *testing.T) {
 		t.Fatalf("mark read: %d -> %q", rec.Code, rec.Header().Get("Location"))
 	}
 	body := get(t, h, "/issues/1", nil).Body.String()
-	if !strings.Contains(body, "<dt>Przeczytano</dt><dd>3 z 3 stron (100%)</dd>") ||
-		!strings.Contains(body, "Oznacz jako nieprzeczytany") || strings.Contains(body, "Oznacz jako przeczytany") {
+	if !strings.Contains(body, "<dt>Read</dt><dd>3 of 3 pages (100%)</dd>") ||
+		!strings.Contains(body, "Mark as unread") || strings.Contains(body, "Mark as read") {
 		t.Errorf("issue page after mark read:\n%s", body)
 	}
 	if !strings.Contains(get(t, h, "/", nil).Body.String(), `class="read-mark"`) {
 		t.Error("home grid should show the read mark after marking read")
 	}
 	body = get(t, h, "/series/1", nil).Body.String()
-	if !strings.Contains(body, "↺ nieprzeczytany") || strings.Contains(body, "✓ przeczytany") {
+	if !strings.Contains(body, "↺ unread") || strings.Contains(body, "✓ read") {
 		t.Errorf("series list should offer 'unread' for a finished issue:\n%s", body)
 	}
 
@@ -539,7 +539,7 @@ func TestMarkReadUnread(t *testing.T) {
 		t.Fatalf("mark unread: %d -> %q", rec.Code, rec.Header().Get("Location"))
 	}
 	body = get(t, h, "/issues/1?msg=unread_ok", nil).Body.String()
-	if strings.Contains(body, "Przeczytano") || !strings.Contains(body, "Zeszyt oznaczony jako nieprzeczytany.") {
+	if strings.Contains(body, "<dt>Read</dt>") || !strings.Contains(body, "Issue marked as unread.") {
 		t.Errorf("issue page after mark unread:\n%s", body)
 	}
 	if p, _ := srv.store.GetReadingProgress("", 1); p != nil {
@@ -609,8 +609,8 @@ func TestOPDSBasicAuth(t *testing.T) {
 }
 
 func TestPluralIssues(t *testing.T) {
-	cases := map[int]string{1: "1 zeszyt", 2: "2 zeszyty", 4: "4 zeszyty", 5: "5 zeszytów",
-		12: "12 zeszytów", 22: "22 zeszyty", 25: "25 zeszytów", 112: "112 zeszytów"}
+	cases := map[int]string{1: "1 issue", 2: "2 issues", 4: "4 issues", 5: "5 issues",
+		12: "12 issues", 22: "22 issues", 25: "25 issues", 112: "112 issues"}
 	for n, want := range cases {
 		if got := pluralIssues(n); got != want {
 			t.Errorf("pluralIssues(%d) = %q, want %q", n, got, want)

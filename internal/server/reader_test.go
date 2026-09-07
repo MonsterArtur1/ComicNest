@@ -39,10 +39,10 @@ func TestReaderPageAndProgress(t *testing.T) {
 			t.Errorf("reader page missing %q\n%s", want, body)
 		}
 	}
-	if strings.Contains(body, "Następny zeszyt") || strings.Contains(body, "Poprzedni zeszyt") {
+	if strings.Contains(body, "Next issue") || strings.Contains(body, "Previous issue") {
 		t.Errorf("no neighbouring issues exist, yet the bar links to one:\n%s", body)
 	}
-	if strings.Contains(body, "Koniec zeszytu") {
+	if strings.Contains(body, "End of issue") {
 		t.Errorf("the end-of-issue popup was removed on purpose:\n%s", body)
 	}
 
@@ -68,13 +68,13 @@ func TestReaderPageAndProgress(t *testing.T) {
 		t.Errorf("?page= should override the resume point:\n%s", body)
 	}
 	// Same record as OPDS: the catalog shows lastRead="2" and the issue page
-	// offers "Czytaj dalej".
+	// offers "Continue".
 	srv2, _ := newTestServer(t, true)
 	postForm(t, srv2.Handler(), "/issues/1/progress", "page=2")
 	if body := get(t, srv2.Handler(), "/opds/series/1", nil).Body.String(); !strings.Contains(body, `pse:lastRead="2"`) {
 		t.Errorf("OPDS feed should reflect web progress:\n%s", body)
 	}
-	if body := get(t, h, "/issues/1", nil).Body.String(); !strings.Contains(body, "Czytaj dalej (str. 2)") {
+	if body := get(t, h, "/issues/1", nil).Body.String(); !strings.Contains(body, "Continue (p. 2)") {
 		t.Errorf("issue page should offer to continue:\n%s", body)
 	}
 
@@ -88,7 +88,7 @@ func TestReaderPageAndProgress(t *testing.T) {
 	if p, _ := srv.store.GetReadingProgress("", 1); p == nil || p.Page != 3 {
 		t.Errorf("progress must keep the furthest page, got %+v", p)
 	}
-	if body := get(t, h, "/issues/1", nil).Body.String(); !strings.Contains(body, "Czytaj od nowa") {
+	if body := get(t, h, "/issues/1", nil).Body.String(); !strings.Contains(body, "Read again") {
 		t.Errorf("finished issue page should offer to reread:\n%s", body)
 	}
 
@@ -127,16 +127,16 @@ func TestReaderNeighboursAndPDF(t *testing.T) {
 
 	// #55 → next is #57 (#56 is missing on disk, #58 is a PDF).
 	body := get(t, h, "/issues/1/read", nil).Body.String()
-	if !strings.Contains(body, `data-next="`+itoa(i57.ID)+`"`) || !strings.Contains(body, `href="/issues/`+itoa(i57.ID)+`/read" title="Następny zeszyt"`) {
+	if !strings.Contains(body, `data-next="`+itoa(i57.ID)+`"`) || !strings.Contains(body, `href="/issues/`+itoa(i57.ID)+`/read" title="Next issue"`) {
 		t.Errorf("#55 should point at #57 as next:\n%s", body)
 	}
 	body = get(t, h, "/issues/"+itoa(i57.ID)+"/read", nil).Body.String()
 	if !strings.Contains(body, `data-prev="1"`) || !strings.Contains(body, `data-next="0"`) ||
-		!strings.Contains(body, `href="/issues/1/read" title="Poprzedni zeszyt"`) {
+		!strings.Contains(body, `href="/issues/1/read" title="Previous issue"`) {
 		t.Errorf("#57 should point back at #55 and have no next:\n%s", body)
 	}
 
-	// PDFs cannot be read in the browser and get no "Czytaj" button.
+	// PDFs cannot be read in the browser and get no "Read" button.
 	if rec := get(t, h, "/issues/"+itoa(i58.ID)+"/read", nil); rec.Code != http.StatusNotFound {
 		t.Errorf("reader for a PDF: got %d, want 404", rec.Code)
 	}
@@ -145,8 +145,8 @@ func TestReaderNeighboursAndPDF(t *testing.T) {
 		t.Errorf("PDF issue page should offer download as the primary action:\n%s", body)
 	}
 	body = get(t, h, "/series/1", nil).Body.String()
-	if strings.Count(body, ">Czytaj</a>") != 2 {
-		t.Errorf("series list should show 'Czytaj' for the two CBZ issues only:\n%s", body)
+	if strings.Count(body, ">Read</a>") != 2 {
+		t.Errorf("series list should show 'Read' for the two CBZ issues only:\n%s", body)
 	}
 }
 

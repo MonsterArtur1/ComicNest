@@ -76,7 +76,7 @@ func TestAuthGatesWebUI(t *testing.T) {
 	// Wrong password → 401 with the form and message; unknown user the same.
 	for _, form := range []string{"name=ania&password=wrong", "name=nobody&password=a-pass", ""} {
 		rec := postForm(t, h, "/login", form)
-		if rec.Code != http.StatusUnauthorized || !strings.Contains(rec.Body.String(), "Nieprawidłowa nazwa użytkownika lub hasło.") {
+		if rec.Code != http.StatusUnauthorized || !strings.Contains(rec.Body.String(), "Invalid username or password.") {
 			t.Errorf("bad login %q: %d", form, rec.Code)
 		}
 	}
@@ -117,10 +117,10 @@ func TestProgressIsPerUser(t *testing.T) {
 	if rec := postAs(t, h, ania, "/issues/1/progress", "page=2"); rec.Code != http.StatusNoContent {
 		t.Fatalf("progress: %d", rec.Code)
 	}
-	if body := get(t, h, "/issues/1", asUser(ania)).Body.String(); !strings.Contains(body, "Czytaj dalej (str. 2)") {
+	if body := get(t, h, "/issues/1", asUser(ania)).Body.String(); !strings.Contains(body, "Continue (p. 2)") {
 		t.Errorf("ania should see her progress:\n%s", body)
 	}
-	if body := get(t, h, "/issues/1", asUser(bartek)).Body.String(); strings.Contains(body, "Przeczytano") {
+	if body := get(t, h, "/issues/1", asUser(bartek)).Body.String(); strings.Contains(body, "<dt>Read</dt>") {
 		t.Errorf("bartek must not see ania's progress:\n%s", body)
 	}
 	if body := get(t, h, "/?filter=reading", asUser(bartek)).Body.String(); strings.Contains(body, `card-title">Saga`) {

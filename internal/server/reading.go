@@ -76,7 +76,7 @@ type readingView struct {
 //
 // A lone first page (opened and immediately closed) does not count as
 // "started" — only real progress (page 2+) or an outright finish does. This
-// keeps a barely-glanced-at issue out of "w trakcie czytania".
+// keeps a barely-glanced-at issue out of "reading".
 func newReadingView(i *store.Issue, p *store.ReadingProgress) *readingView {
 	if p == nil || p.Page <= 0 {
 		return nil

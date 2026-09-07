@@ -27,16 +27,16 @@ var flashMessages = map[string]struct {
 	text  string
 	isErr bool
 }{
-	"cv_ok":        {"Metadane zaktualizowane z ComicVine.", false},
-	"cv_nomatch":   {"Nie znaleziono zeszytu o tym numerze w dopasowanym wolumenie ComicVine.", true},
-	"cv_locked":    {"Metadane są zablokowane — najpierw zdejmij blokadę.", true},
-	"cv_novolume":  {"Seria nie jest dopasowana do wolumenu ComicVine.", true},
-	"cv_nokey":     {"Brak klucza API ComicVine w config.yaml.", true},
-	"cv_error":     {"Aktualizacja z ComicVine nie powiodła się — szczegóły w logu serwera.", true},
-	"cv_unlinked":  {"Dopasowanie zeszytu do ComicVine usunięte.", false},
-	"read_ok":      {"Zeszyt oznaczony jako przeczytany.", false},
-	"unread_ok":    {"Zeszyt oznaczony jako nieprzeczytany.", false},
-	"read_nopages": {"Nie można oznaczyć jako przeczytany — nieznana liczba stron (brak pliku lub format bez stron).", true},
+	"cv_ok":        {"Metadata updated from ComicVine.", false},
+	"cv_nomatch":   {"No issue with this number was found in the matched ComicVine volume.", true},
+	"cv_locked":    {"Metadata is locked — unlock it first.", true},
+	"cv_novolume":  {"The series is not matched to a ComicVine volume.", true},
+	"cv_nokey":     {"No ComicVine API key in config.yaml.", true},
+	"cv_error":     {"The ComicVine update failed — see the server log for details.", true},
+	"cv_unlinked":  {"The issue's ComicVine match was removed.", false},
+	"read_ok":      {"Issue marked as read.", false},
+	"unread_ok":    {"Issue marked as unread.", false},
+	"read_nopages": {"Cannot mark as read — unknown page count (missing file, or a format with no pages).", true},
 }
 
 // getIssueFromPath resolves the {id} path value to an issue, writing the
@@ -101,7 +101,7 @@ func (s *Server) handleIssueDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	if !issue.FileMissing {
 		s.errorPage(w, r, http.StatusConflict,
-			"Ten zeszyt ma plik na dysku — rekordów istniejących plików nie można usuwać.")
+			"This issue has a file on disk — records for existing files cannot be deleted.")
 		return
 	}
 
@@ -124,7 +124,7 @@ func (s *Server) handleIssueDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := os.Stat(issue.Path); err != nil {
-		http.Error(w, "Plik nie istnieje na dysku (oznaczony jako brakujący?).", http.StatusNotFound)
+		http.Error(w, "The file does not exist on disk (marked as missing?).", http.StatusNotFound)
 		return
 	}
 

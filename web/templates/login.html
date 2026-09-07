@@ -1,9 +1,9 @@
 {{define "login"}}<!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Logowanie — ComicNest</title>
+    <title>Log in — ComicNest</title>
     <link rel="icon" href="/static/favicon-32.png" type="image/png" sizes="32x32">
     <link rel="icon" href="/static/favicon.png" type="image/png" sizes="192x192">
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
@@ -13,17 +13,17 @@
 <body class="login-body">
 <main class="login-box">
     <h1 class="brand"><img class="brand-logo" src="/static/favicon.png" alt="" width="40" height="40"><span class="brand-name">Comic<span>Nest</span></span></h1>
-    <p class="login-hint">Zaloguj się swoim kontem ComicNest. To samo hasło działa w czytniku OPDS.</p>
+    <p class="login-hint">Log in with your ComicNest account. The same password works in the OPDS reader.</p>
     {{if .Error}}<p class="flash flash-error">{{.Error}}</p>{{end}}
     <form method="post" action="/login" class="login-form">
         <input type="hidden" name="next" value="{{.Next}}">
-        <label>Użytkownik
+        <label>Username
             <input type="text" name="name" value="{{.Name}}" autocomplete="username" autofocus required>
         </label>
-        <label>Hasło
+        <label>Password
             <input type="password" name="password" autocomplete="current-password" required>
         </label>
-        <button type="submit" class="btn btn-primary">Zaloguj</button>
+        <button type="submit" class="btn btn-primary">Log in</button>
     </form>
 </main>
 </body>

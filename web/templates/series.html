@@ -1,13 +1,13 @@
 {{define "title"}}{{.Series.Name}} — ComicNest{{end}}
 
 {{define "content"}}
-<nav class="breadcrumbs"><a href="/">Biblioteka</a> <span>/</span> {{.Series.Name}}</nav>
+<nav class="breadcrumbs"><a href="/">Library</a> <span>/</span> {{.Series.Name}}</nav>
 
 <div class="series-head">
     <div>
-        <h1>{{.Series.Name}} {{if .Series.MetadataLocked}}<span class="lock" title="metadane zablokowane">🔒</span>{{end}}</h1>
+        <h1>{{.Series.Name}} {{if .Series.MetadataLocked}}<span class="lock" title="metadata locked">🔒</span>{{end}}</h1>
         <p class="series-meta">
-            {{if .Series.OneShot}}wydanie jednorazowe{{else}}{{.Series.IssueCount}} {{if eq .Series.IssueCount 1}}zeszyt{{else}}zeszytów{{end}}{{end}}
+            {{if .Series.OneShot}}one-shot{{else}}{{.Series.IssueCount}} {{if eq .Series.IssueCount 1}}issue{{else}}issues{{end}}{{end}}
             {{if .Series.Publisher}} · {{.Series.Publisher}}{{end}}
             {{if .Series.FolderPath.Valid}} · <code>{{.Series.FolderPath.String}}</code>{{end}}
         </p>
@@ -16,8 +16,8 @@
             <details class="desc">
                 <summary>
                     <span class="desc-preview">{{truncate .Series.Description 300}}</span>
-                    <span class="desc-toggle desc-more">Pokaż cały opis ▾</span>
-                    <span class="desc-toggle desc-less">Zwiń opis ▴</span>
+                    <span class="desc-toggle desc-more">Show full description ▾</span>
+                    <span class="desc-toggle desc-less">Collapse description ▴</span>
                 </summary>
                 <p class="series-desc">{{.Series.Description}}</p>
             </details>
@@ -27,20 +27,20 @@
         {{end}}
     </div>
     <div class="series-actions">
-        {{if isAdmin}}<a class="btn" href="/series/{{.Series.ID}}/edit">Edytuj</a>{{end}}
+        {{if isAdmin}}<a class="btn" href="/series/{{.Series.ID}}/edit">Edit</a>{{end}}
     </div>
 </div>
 
 <div class="scrape-area" id="scrape-area"
      hx-get="/series/{{.Series.ID}}/scrape/status" hx-trigger="load" hx-swap="innerHTML">
-    <noscript>{{if isAdmin}}<a class="btn" href="/series/{{.Series.ID}}/match">Dopasuj w ComicVine</a>{{end}}</noscript>
+    <noscript>{{if isAdmin}}<a class="btn" href="/series/{{.Series.ID}}/match">Match in ComicVine</a>{{end}}</noscript>
 </div>
 
 <div class="filter-bar">
-    <a class="chip {{if eq .Filter "all"}}active{{end}}" href="/series/{{.Series.ID}}">wszystkie</a>
-    <a class="chip {{if eq .Filter "nometa"}}active{{end}}" href="/series/{{.Series.ID}}?filter=nometa">bez metadanych</a>
-    <a class="chip {{if eq .Filter "comicvine"}}active{{end}}" href="/series/{{.Series.ID}}?filter=comicvine">z ComicVine</a>
-    <a class="chip {{if eq .Filter "missing"}}active{{end}}" href="/series/{{.Series.ID}}?filter=missing">brakujące pliki</a>
+    <a class="chip {{if eq .Filter "all"}}active{{end}}" href="/series/{{.Series.ID}}">all</a>
+    <a class="chip {{if eq .Filter "nometa"}}active{{end}}" href="/series/{{.Series.ID}}?filter=nometa">no metadata</a>
+    <a class="chip {{if eq .Filter "comicvine"}}active{{end}}" href="/series/{{.Series.ID}}?filter=comicvine">from ComicVine</a>
+    <a class="chip {{if eq .Filter "missing"}}active{{end}}" href="/series/{{.Series.ID}}?filter=missing">missing files</a>
 </div>
 
 {{if .Issues}}
@@ -51,7 +51,7 @@
         <a class="issue-thumb" href="/issues/{{.ID}}">
             <img src="/issues/{{.ID}}/cover" alt="" loading="lazy">
             {{with .Reading}}
-            <span class="progress {{if .Finished}}done{{end}}" title="{{if .Finished}}przeczytane{{else}}przeczytano {{.Page}}{{if .Total}} z {{.Total}}{{end}} stron{{end}}">
+            <span class="progress {{if .Finished}}done{{end}}" title="{{if .Finished}}read{{else}}read {{.Page}}{{if .Total}} of {{.Total}}{{end}} pages{{end}}">
                 <span style="width: {{if .Total}}{{.Percent}}{{else}}100{{end}}%"></span>
             </span>
             {{end}}
@@ -64,41 +64,41 @@
             <div class="issue-sub">
                 {{if .ReleaseDate}}<span>{{.ReleaseDate}}</span>{{end}}
                 <span>{{prettySize .FileSize}}</span>
-                {{if .PageCount}}<span>{{.PageCount}} stron</span>{{end}}
-                {{with .Reading}}<span class="reading-note">{{if .Finished}}✓ przeczytane{{else}}czytane: str. {{.Page}}{{if .Total}} z {{.Total}} ({{.Percent}}%){{end}}{{end}}</span>{{end}}
+                {{if .PageCount}}<span>{{.PageCount}} pages</span>{{end}}
+                {{with .Reading}}<span class="reading-note">{{if .Finished}}✓ finished{{else}}read: p. {{.Page}}{{if .Total}} of {{.Total}} ({{.Percent}}%){{end}}{{end}}</span>{{end}}
             </div>
         </div>
         <div class="issue-badges">
-            {{if .FileMissing}}<span class="badge badge-missing">brak pliku</span>{{end}}
-            {{if .MetadataLocked}}<span class="badge badge-lock" title="metadane zablokowane">🔒</span>{{end}}
+            {{if .FileMissing}}<span class="badge badge-missing">missing file</span>{{end}}
+            {{if .MetadataLocked}}<span class="badge badge-lock" title="metadata locked">🔒</span>{{end}}
             <span class="badge badge-{{.MetadataSource}}">{{sourceLabel .MetadataSource}}</span>
         </div>
         {{if .FileMissing}}
         {{if isAdmin}}
         <form action="/issues/{{.ID}}/delete" method="post"
-              onsubmit="return confirm('Usunąć rekord tego zeszytu z katalogu?');">
-            <button type="submit" class="btn btn-danger" title="Plik zniknął z biblioteki — usuń wpis z katalogu">Usuń</button>
+              onsubmit="return confirm('Delete this issue\'s record from the catalog?');">
+            <button type="submit" class="btn btn-danger" title="The file disappeared from the library — delete the catalog entry">Delete</button>
         </form>
         {{end}}
         {{else}}
         {{if and .Reading .Reading.Finished}}
         <form action="/issues/{{.ID}}/unread" method="post">
             <input type="hidden" name="next" value="{{$next}}">
-            <button type="submit" class="btn btn-mini" title="Oznacz jako nieprzeczytany">↺ nieprzeczytany</button>
+            <button type="submit" class="btn btn-mini" title="Mark as unread">↺ unread</button>
         </form>
         {{else}}
         <form action="/issues/{{.ID}}/read" method="post">
             <input type="hidden" name="next" value="{{$next}}">
-            <button type="submit" class="btn btn-mini" title="Oznacz jako przeczytany">✓ przeczytany</button>
+            <button type="submit" class="btn btn-mini" title="Mark as read">✓ read</button>
         </form>
         {{end}}
-        {{if canRead .Path}}<a class="btn download" href="/issues/{{.ID}}/read" title="{{if and .Reading (not .Reading.Finished)}}Czytaj dalej od strony {{.Reading.Page}}{{else}}Czytaj w przeglądarce{{end}}">Czytaj</a>{{end}}
-        <a class="btn download" href="/issues/{{.ID}}/download" title="Pobierz plik">Pobierz</a>
+        {{if canRead .Path}}<a class="btn download" href="/issues/{{.ID}}/read" title="{{if and .Reading (not .Reading.Finished)}}Continue reading from page {{.Reading.Page}}{{else}}Read in browser{{end}}">Read</a>{{end}}
+        <a class="btn download" href="/issues/{{.ID}}/download" title="Download file">Download</a>
         {{end}}
     </li>
     {{end}}
 </ul>
 {{else}}
-<div class="empty-state"><p>Brak zeszytów dla tego filtra.</p></div>
+<div class="empty-state"><p>No issues match this filter.</p></div>
 {{end}}
 {{end}}

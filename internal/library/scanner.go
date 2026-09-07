@@ -79,11 +79,11 @@ func (sc *Scanner) Start() error {
 		return ErrScanRunning
 	}
 	if strings.TrimSpace(sc.root) == "" {
-		sc.status.Err = "ścieżka biblioteki nie jest ustawiona w config.yaml"
+		sc.status.Err = "library path is not set in config.yaml"
 		return errors.New(sc.status.Err)
 	}
 	if info, err := os.Stat(sc.root); err != nil || !info.IsDir() {
-		sc.status.Err = "folder biblioteki nie istnieje: " + sc.root
+		sc.status.Err = "library folder does not exist: " + sc.root
 		return errors.New(sc.status.Err)
 	}
 
