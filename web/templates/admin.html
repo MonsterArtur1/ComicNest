@@ -5,27 +5,41 @@
 
 {{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
 
+{{if or .Config.ComicVineRestartPending .Config.OPDSRestartPending}}
+<div class="restart-banner">
+    <span class="restart-banner-icon">⚠</span>
+    Restart required — the
+    {{if and .Config.ComicVineRestartPending .Config.OPDSRestartPending}}ComicVine API key and OPDS catalog changes{{else if .Config.ComicVineRestartPending}}ComicVine API key change{{else}}OPDS catalog change{{end}}
+    you saved won't take effect until the app is restarted.
+</div>
+{{end}}
+
 <section class="admin-section">
     <h2>Statistics</h2>
-    <dl class="meta-table">
-        <dt>Series</dt><dd>{{.Stats.SeriesCount}}</dd>
-        <dt>One-shots</dt><dd>{{.Stats.OneShotCount}}</dd>
-        <dt>Locked series</dt><dd>{{.Stats.LockedSeriesCount}}</dd>
-        <dt>Issues</dt><dd>{{.Stats.IssueCount}}</dd>
-        <dt>Missing files</dt><dd>{{.Stats.MissingCount}}</dd>
-        <dt>Library size</dt><dd>{{prettySize .Stats.TotalSize}}</dd>
-        <dt>From ComicVine</dt><dd>{{.Stats.ComicVineCount}}</dd>
-        <dt>No ComicVine metadata</dt><dd>{{.Stats.NoMetadataCount}}</dd>
-        <dt>Locked issues</dt><dd>{{.Stats.LockedIssueCount}}</dd>
-    </dl>
+    <div class="stat-grid">
+        <div class="stat-tile"><span class="stat-label">Series</span><span class="stat-value">{{.Stats.SeriesCount}}</span></div>
+        <div class="stat-tile"><span class="stat-label">One-shots</span><span class="stat-value">{{.Stats.OneShotCount}}</span></div>
+        <div class="stat-tile"><span class="stat-label">Locked series</span><span class="stat-value">{{.Stats.LockedSeriesCount}}</span></div>
+        <div class="stat-tile"><span class="stat-label">Issues</span><span class="stat-value">{{.Stats.IssueCount}}</span></div>
+        <div class="stat-tile"><span class="stat-label">Missing files</span><span class="stat-value">{{.Stats.MissingCount}}</span></div>
+        <div class="stat-tile"><span class="stat-label">Library size</span><span class="stat-value">{{prettySize .Stats.TotalSize}}</span></div>
+        <div class="stat-tile"><span class="stat-label">From ComicVine</span><span class="stat-value">{{.Stats.ComicVineCount}}</span></div>
+        <div class="stat-tile"><span class="stat-label">No ComicVine metadata</span><span class="stat-value">{{.Stats.NoMetadataCount}}</span></div>
+        <div class="stat-tile"><span class="stat-label">Locked issues</span><span class="stat-value">{{.Stats.LockedIssueCount}}</span></div>
+    </div>
 </section>
 
 <section class="admin-section">
     <h2>Configuration</h2>
     <form action="/admin/config" method="post" class="edit-form">
         <label>ComicVine API key
-            <input type="text" name="comicvine_api_key" value="{{.Config.ComicVineAPIKey}}"
-                   placeholder="get one at comicvine.gamespot.com/api" autocomplete="off">
+            <div class="input-group">
+                <input type="text" name="comicvine_api_key" value="{{.Config.ComicVineAPIKey}}"
+                       placeholder="get one at comicvine.gamespot.com/api" autocomplete="off">
+                <button type="submit" formaction="/admin/config/test-comicvine" formnovalidate class="btn"
+                        hx-post="/admin/config/test-comicvine" hx-include="closest form"
+                        hx-target="#cv-test-result" hx-swap="innerHTML">Test Connection</button>
+            </div>
         </label>
         {{if .Config.ComicVineEnvPinned}}
         <p class="hint">Overridden by the COMICNEST_COMICVINE_API_KEY environment variable — edit it there instead.</p>
@@ -54,9 +68,6 @@
 
         <div class="form-actions">
             <button type="submit" class="btn-primary">Save</button>
-            <button type="submit" formaction="/admin/config/test-comicvine" formnovalidate class="btn"
-                    hx-post="/admin/config/test-comicvine" hx-include="closest form"
-                    hx-target="#cv-test-result" hx-swap="innerHTML">Test Connection</button>
         </div>
     </form>
 </section>

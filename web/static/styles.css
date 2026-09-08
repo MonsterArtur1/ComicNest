@@ -570,6 +570,10 @@ details.desc .series-desc { margin: 12px 0 4px; }
 }
 .edit-form input:focus, .edit-form textarea:focus { outline: 1px solid var(--accent); }
 
+.input-group { display: flex; gap: 8px; }
+.input-group input { flex: 1; min-width: 0; }
+.input-group .btn { flex: none; white-space: nowrap; }
+
 .form-row { display: flex; gap: 14px; }
 .check-label {
     flex-direction: row !important;
@@ -624,16 +628,78 @@ details.desc .series-desc { margin: 12px 0 4px; }
     color: var(--text-dim);
 }
 
-.admin-section { max-width: 900px; margin-bottom: 32px; }
-.admin-section h2 { font-size: 16px; margin: 0 0 12px; }
+.restart-banner {
+    max-width: 900px;
+    margin: 0 0 20px;
+    padding: 10px 16px;
+    background: var(--bg-raised);
+    border: 1px solid #e8a33d55;
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text);
+}
+.restart-banner-icon { color: var(--accent); margin-right: 4px; }
+
+.admin-section {
+    max-width: 900px;
+    margin-bottom: 20px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+}
+.admin-section h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: 0.2px;
+}
+.admin-section .edit-form input,
+.admin-section .edit-form textarea,
+.admin-section .edit-form select {
+    background: var(--bg);
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+}
+.stat-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+.stat-value { font-size: 22px; font-weight: 600; line-height: 1.15; }
+.stat-label { font-size: 12px; color: var(--text-dim); }
+
 .admin-users-wrap { overflow-x: auto; }
 .admin-users { width: 100%; border-collapse: collapse; font-size: 14px; }
-.admin-users th, .admin-users td {
+.admin-users th {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-dim);
+}
+.admin-users td {
     text-align: left;
     padding: 8px 10px;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
 }
+.admin-users tbody tr:hover { background: var(--bg-hover); }
 .admin-row-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .inline-form { display: inline-flex; }
 .admin-password-toggle { position: relative; }
@@ -649,9 +715,10 @@ details.desc .series-desc { margin: 12px 0 4px; }
     display: flex;
     flex-direction: column;
     gap: 8px;
-    background: var(--bg-raised);
+    background: var(--bg-hover);
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     white-space: nowrap;
 }
 .admin-password-form input {
@@ -668,6 +735,7 @@ details.desc .series-desc { margin: 12px 0 4px; }
 @media (max-width: 700px) {
     .edit-layout { flex-direction: column; }
     .form-row { flex-direction: column; }
+    .input-group { flex-direction: column; }
 }
 
 /* --- comicvine --- */

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"comicnest/internal/comicvine"
 	"comicnest/internal/config"
 	"comicnest/internal/store"
 )
@@ -173,15 +174,15 @@ func TestAdminStatistics(t *testing.T) {
 
 	body := get(t, h, "/admin", asUser(c)).Body.String()
 	for _, want := range []string{
-		"<dt>Series</dt><dd>1</dd>",
-		"<dt>One-shots</dt><dd>0</dd>",
-		"<dt>Locked series</dt><dd>0</dd>",
-		"<dt>Issues</dt><dd>1</dd>",
-		"<dt>Missing files</dt><dd>1</dd>",
-		"<dt>Library size</dt><dd>10 B</dd>",
-		"<dt>From ComicVine</dt><dd>0</dd>",
-		"<dt>No ComicVine metadata</dt><dd>1</dd>",
-		"<dt>Locked issues</dt><dd>0</dd>",
+		`<span class="stat-label">Series</span><span class="stat-value">1</span>`,
+		`<span class="stat-label">One-shots</span><span class="stat-value">0</span>`,
+		`<span class="stat-label">Locked series</span><span class="stat-value">0</span>`,
+		`<span class="stat-label">Issues</span><span class="stat-value">1</span>`,
+		`<span class="stat-label">Missing files</span><span class="stat-value">1</span>`,
+		`<span class="stat-label">Library size</span><span class="stat-value">10 B</span>`,
+		`<span class="stat-label">From ComicVine</span><span class="stat-value">0</span>`,
+		`<span class="stat-label">No ComicVine metadata</span><span class="stat-value">1</span>`,
+		`<span class="stat-label">Locked issues</span><span class="stat-value">0</span>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("admin panel stats missing %q:\n%s", want, body)
@@ -259,8 +260,28 @@ func TestAdminSaveConfig(t *testing.T) {
 	if saved.ComicVineAPIKey != "abc123" || !saved.OPDSEnabled || saved.PageSize != 15 {
 		t.Errorf("config.yaml not updated as expected: %+v", saved)
 	}
-	if body := get(t, h, "/admin", asUser(c)).Body.String(); !strings.Contains(body, `value="abc123"`) {
+	body := get(t, h, "/admin", asUser(c)).Body.String()
+	if !strings.Contains(body, `value="abc123"`) {
 		t.Errorf("admin panel should reflect the saved key:\n%s", body)
+	}
+
+	// The ComicVine key and OPDS toggle need a restart to actually take
+	// effect (the client and routes were built at startup with the old
+	// values), so the panel should banner that until then.
+	if !strings.Contains(body, "restart-banner") || !strings.Contains(body, "Restart required") {
+		t.Errorf("admin panel should show a restart-pending banner after saving the key and OPDS toggle:\n%s", body)
+	}
+
+	// A freshly started server (config.yaml already has the saved values, so
+	// the client/routes it builds match what's on disk) shows no banner.
+	restarted, err := New(saved, srv.configPath, srv.store, srv.covers, srv.scanner, comicvine.New(saved.ComicVineAPIKey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rh := restarted.Handler()
+	rc := login(t, rh, "admin", "adminpass")
+	if body := get(t, rh, "/admin", asUser(rc)).Body.String(); strings.Contains(body, "restart-banner") {
+		t.Errorf("a freshly restarted server should not show the restart-pending banner:\n%s", body)
 	}
 
 	// A bad page size is rejected and doesn't touch what's saved.
