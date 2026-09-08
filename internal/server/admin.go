@@ -48,6 +48,12 @@ type adminConfig struct {
 	OPDSEnvPinned      bool
 	PageSize           int
 	PageSizeEnvPinned  bool
+	// ComicVineRestartPending and OPDSRestartPending are true when the saved
+	// value differs from what's actually running (the ComicVine client and
+	// OPDS routes are built once at startup) — the admin panel banners this
+	// until the app is restarted and the two converge again.
+	ComicVineRestartPending bool
+	OPDSRestartPending      bool
 }
 
 // cvTestResult is the outcome of a "Test Connection" check, shown inline
@@ -131,12 +137,14 @@ func (s *Server) adminConfigView() adminConfig {
 		return ok && v != ""
 	}
 	return adminConfig{
-		ComicVineAPIKey:    cfg.ComicVineAPIKey,
-		ComicVineEnvPinned: envSet("COMICVINE_API_KEY"),
-		OPDSEnabled:        cfg.OPDSEnabled,
-		OPDSEnvPinned:      envSet("OPDS_ENABLED"),
-		PageSize:           cfg.PageSize,
-		PageSizeEnvPinned:  envSet("PAGE_SIZE"),
+		ComicVineAPIKey:         cfg.ComicVineAPIKey,
+		ComicVineEnvPinned:      envSet("COMICVINE_API_KEY"),
+		OPDSEnabled:             cfg.OPDSEnabled,
+		OPDSEnvPinned:           envSet("OPDS_ENABLED"),
+		PageSize:                cfg.PageSize,
+		PageSizeEnvPinned:       envSet("PAGE_SIZE"),
+		ComicVineRestartPending: cfg.ComicVineAPIKey != s.activeComicVineAPIKey,
+		OPDSRestartPending:      cfg.OPDSEnabled != s.opdsRoutesRegistered,
 	}
 }
 

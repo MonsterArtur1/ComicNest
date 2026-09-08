@@ -48,30 +48,36 @@ type Server struct {
 	// startup — unlike cfg.OPDSEnabled, it never changes at runtime, since an
 	// admin-panel edit to opds_enabled needs a restart to (un)mount routes.
 	opdsRoutesRegistered bool
-	store                *store.Store
-	covers               *covers.Cache
-	scanner              *library.Scanner
-	cv                   *comicvine.Client
-	scrape               *scrapeJob
-	templates            map[string]*template.Template
-	partials             *template.Template
-	reader               *template.Template // standalone full-screen reader page
-	login                *template.Template // standalone login page
-	sessions             *sessions
-	mux                  *http.ServeMux
+	// activeComicVineAPIKey is the key s.cv was actually built with at
+	// startup — unlike cfg.ComicVineAPIKey, it never changes at runtime,
+	// since an admin-panel edit needs a restart to rebuild the client. The
+	// admin panel diffs the two to show a "restart required" notice.
+	activeComicVineAPIKey string
+	store                 *store.Store
+	covers                *covers.Cache
+	scanner               *library.Scanner
+	cv                    *comicvine.Client
+	scrape                *scrapeJob
+	templates             map[string]*template.Template
+	partials              *template.Template
+	reader                *template.Template // standalone full-screen reader page
+	login                 *template.Template // standalone login page
+	sessions              *sessions
+	mux                   *http.ServeMux
 }
 
 func New(cfg config.Config, configPath string, st *store.Store, cv *covers.Cache, sc *library.Scanner, cvc *comicvine.Client) (*Server, error) {
 	s := &Server{
-		cfg:        cfg,
-		configPath: configPath,
-		store:      st,
-		covers:     cv,
-		scanner:    sc,
-		cv:         cvc,
-		scrape:     &scrapeJob{},
-		sessions:   newSessions(),
-		mux:        http.NewServeMux(),
+		cfg:                   cfg,
+		configPath:            configPath,
+		activeComicVineAPIKey: cfg.ComicVineAPIKey,
+		store:                 st,
+		covers:                cv,
+		scanner:               sc,
+		cv:                    cvc,
+		scrape:                &scrapeJob{},
+		sessions:              newSessions(),
+		mux:                   http.NewServeMux(),
 	}
 	if err := s.parseTemplates(); err != nil {
 		return nil, err
