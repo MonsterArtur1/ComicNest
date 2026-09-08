@@ -23,10 +23,11 @@ type Series struct {
 	CoverIssueID int64 // first issue of the series (used for cover + one-shot links)
 
 	// Reading aggregates over issues present on disk (list views only).
-	IssuesPresent int // issues whose file exists
-	IssuesStarted int // present issues with real reading progress (page 2+, or finished)
-	IssuesRead    int // present issues read to the last page
-	PageCount     int // total pages across present issues (list views only)
+	IssuesPresent int    // issues whose file exists
+	IssuesStarted int    // present issues with real reading progress (page 2+, or finished)
+	IssuesRead    int    // present issues read to the last page
+	PageCount     int    // total pages across present issues (list views only)
+	ReleaseYear   string // earliest issue's release year, e.g. "2016" (list views only)
 }
 
 // IssuesUnread returns the number of present issues not yet read to the end.
@@ -301,13 +302,16 @@ const (
 	SeriesSortUnreadAsc SeriesSort = "unread_asc" // fewest unread issues first
 	SeriesSortPages     SeriesSort = "pages"      // most pages first
 	SeriesSortPagesAsc  SeriesSort = "pages_asc"  // fewest pages first
+	SeriesSortYear      SeriesSort = "year"       // most recent release year first
+	SeriesSortYearAsc   SeriesSort = "year_asc"   // oldest release year first
 )
 
 // ParseSeriesSort maps a query value to a sort (unknown → name).
 func ParseSeriesSort(v string) SeriesSort {
 	switch s := SeriesSort(v); s {
 	case SeriesSortName, SeriesSortNameDesc, SeriesSortRecent, SeriesSortRecentAsc,
-		SeriesSortUnread, SeriesSortUnreadAsc, SeriesSortPages, SeriesSortPagesAsc:
+		SeriesSortUnread, SeriesSortUnreadAsc, SeriesSortPages, SeriesSortPagesAsc,
+		SeriesSortYear, SeriesSortYearAsc:
 		return s
 	}
 	return SeriesSortName
@@ -373,6 +377,10 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 		order = "pages_total DESC"
 	case SeriesSortPagesAsc:
 		order = "pages_total ASC"
+	case SeriesSortYear:
+		order = "release_year = '', release_year DESC"
+	case SeriesSortYearAsc:
+		order = "release_year = '', release_year ASC"
 	}
 
 	// An issue counts as read when its progress reached the page total
@@ -399,7 +407,8 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 		       COALESCE(SUM(i.file_missing = 0 AND ` + started + `), 0) AS started_cnt,
 		       COALESCE(SUM(i.file_missing = 0 AND rp.page IS NOT NULL
 		                    AND ` + total + ` > 0 AND rp.page >= ` + total + `), 0) AS read_cnt,
-		       COALESCE(SUM(CASE WHEN i.file_missing = 0 THEN ` + total + ` ELSE 0 END), 0) AS pages_total
+		       COALESCE(SUM(CASE WHEN i.file_missing = 0 THEN ` + total + ` ELSE 0 END), 0) AS pages_total,
+		       COALESCE(MIN(NULLIF(substr(i.release_date, 1, 4), '')), '') AS release_year
 		FROM series s
 		JOIN issues i ON i.series_id = s.id
 		LEFT JOIN reading_progress rp ON rp.issue_id = i.id AND rp.user = ?
@@ -424,7 +433,7 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 		err := rows.Scan(&sr.ID, &sr.Name, &sr.FolderPath, &sr.Publisher, &sr.Description,
 			&sr.ComicVineVolumeID, &sr.MetadataLocked, &sr.OneShot,
 			&sr.CreatedAt, &sr.UpdatedAt, &sr.IssueCount, &sr.CoverIssueID,
-			&sr.IssuesPresent, &sr.IssuesStarted, &sr.IssuesRead, &sr.PageCount)
+			&sr.IssuesPresent, &sr.IssuesStarted, &sr.IssuesRead, &sr.PageCount, &sr.ReleaseYear)
 		if err != nil {
 			return nil, err
 		}
