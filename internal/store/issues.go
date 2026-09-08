@@ -161,14 +161,16 @@ func scanIssuesWithSeries(rows *sql.Rows) ([]IssueWithSeries, error) {
 	return out, rows.Err()
 }
 
-// SearchIssues finds issues whose title or number matches the query.
+// SearchIssues finds issues whose title, number, writer, artist or publisher
+// matches the query.
 func (s *Store) SearchIssues(q string) ([]IssueWithSeries, error) {
 	rows, err := s.db.Query(`
 		SELECT `+issueWithSeriesColumns+`
 		FROM issues i JOIN series s ON s.id = i.series_id
 		WHERE i.title LIKE '%' || ? || '%' OR i.issue_number LIKE '%' || ? || '%'
+		   OR i.writer LIKE '%' || ? || '%' OR i.artist LIKE '%' || ? || '%' OR i.publisher LIKE '%' || ? || '%'
 		ORDER BY s.name COLLATE NOCASE, CAST(i.issue_number AS REAL)
-		LIMIT 100`, q, q)
+		LIMIT 100`, q, q, q, q, q)
 	if err != nil {
 		return nil, err
 	}
@@ -176,20 +178,25 @@ func (s *Store) SearchIssues(q string) ([]IssueWithSeries, error) {
 	return scanIssuesWithSeries(rows)
 }
 
-// SearchIssuesBroad finds present-on-disk issues whose series name, title or
-// number matches the query — one flat result list for clients (OPDS readers)
-// that cannot show series and issues separately.
+// SearchIssuesBroad finds present-on-disk issues whose series name,
+// publisher, title, number, writer or artist matches the query — one flat
+// result list for clients (OPDS readers) that cannot show series and issues
+// separately.
 func (s *Store) SearchIssuesBroad(q string, limit int) ([]IssueWithSeries, error) {
 	rows, err := s.db.Query(`
 		SELECT `+issueWithSeriesColumns+`
 		FROM issues i JOIN series s ON s.id = i.series_id
 		WHERE i.file_missing = 0
 		  AND (s.name LIKE '%' || ? || '%'
+		       OR s.publisher LIKE '%' || ? || '%'
 		       OR i.title LIKE '%' || ? || '%'
-		       OR i.issue_number LIKE '%' || ? || '%')
+		       OR i.issue_number LIKE '%' || ? || '%'
+		       OR i.writer LIKE '%' || ? || '%'
+		       OR i.artist LIKE '%' || ? || '%'
+		       OR i.publisher LIKE '%' || ? || '%')
 		ORDER BY s.name COLLATE NOCASE, i.issue_number = '',
 			CAST(i.issue_number AS REAL), i.issue_number, i.title
-		LIMIT ?`, q, q, q, limit)
+		LIMIT ?`, q, q, q, q, q, q, q, limit)
 	if err != nil {
 		return nil, err
 	}

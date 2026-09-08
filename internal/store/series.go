@@ -329,8 +329,9 @@ func (f SeriesFilter) having() string {
 }
 
 // ListSeries returns series that have at least one issue, optionally filtered
-// by a case-insensitive name substring and a SeriesFilter, with the given
-// user's reading aggregates filled in.
+// by a case-insensitive substring matched against the series name/publisher
+// or any of its issues' writer/artist/publisher, and a SeriesFilter, with the
+// given user's reading aggregates filled in.
 func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter SeriesFilter) ([]Series, error) {
 	order := "s.name COLLATE NOCASE ASC"
 	if sort == SeriesSortRecent {
@@ -364,12 +365,16 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 		FROM series s
 		JOIN issues i ON i.series_id = s.id
 		LEFT JOIN reading_progress rp ON rp.issue_id = i.id AND rp.user = ?
-		WHERE (? = '' OR s.name LIKE '%' || ? || '%')
+		WHERE (? = '' OR s.name LIKE '%' || ? || '%' OR s.publisher LIKE '%' || ? || '%'
+		       OR EXISTS (
+		           SELECT 1 FROM issues i2 WHERE i2.series_id = s.id
+		           AND (i2.writer LIKE '%' || ? || '%' OR i2.artist LIKE '%' || ? || '%' OR i2.publisher LIKE '%' || ? || '%')
+		       ))
 		GROUP BY s.id
 		` + filter.having() + `
 		ORDER BY ` + order
 
-	rows, err := s.db.Query(query, user, nameFilter, nameFilter)
+	rows, err := s.db.Query(query, user, nameFilter, nameFilter, nameFilter, nameFilter, nameFilter, nameFilter)
 	if err != nil {
 		return nil, err
 	}
