@@ -7,8 +7,14 @@
         <form action="/" method="get">
             {{if ne .Filter "all"}}<input type="hidden" name="filter" value="{{.Filter}}">{{end}}
             <select name="sort" onchange="this.form.submit()">
-                <option value="name" {{if eq .Sort "name"}}selected{{end}}>Sort: name</option>
+                <option value="name" {{if eq .Sort "name"}}selected{{end}}>Sort: name (A–Z)</option>
+                <option value="name_desc" {{if eq .Sort "name_desc"}}selected{{end}}>Sort: name (Z–A)</option>
                 <option value="recent" {{if eq .Sort "recent"}}selected{{end}}>Sort: recently added</option>
+                <option value="recent_asc" {{if eq .Sort "recent_asc"}}selected{{end}}>Sort: oldest added</option>
+                <option value="unread" {{if eq .Sort "unread"}}selected{{end}}>Sort: most unread</option>
+                <option value="unread_asc" {{if eq .Sort "unread_asc"}}selected{{end}}>Sort: fewest unread</option>
+                <option value="pages" {{if eq .Sort "pages"}}selected{{end}}>Sort: most pages</option>
+                <option value="pages_asc" {{if eq .Sort "pages_asc"}}selected{{end}}>Sort: fewest pages</option>
             </select>
         </form>
     </div>

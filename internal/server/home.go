@@ -41,10 +41,7 @@ func (d homeData) URL(page int) string {
 }
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
-	sort := store.SeriesSortName
-	if r.FormValue("sort") == "recent" {
-		sort = store.SeriesSortRecent
-	}
+	sort := store.ParseSeriesSort(r.FormValue("sort"))
 	filter := store.ParseSeriesFilter(r.FormValue("filter"))
 
 	series, err := s.store.ListSeries(userFrom(r), "", sort, filter)

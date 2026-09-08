@@ -26,6 +26,12 @@ type Series struct {
 	IssuesPresent int // issues whose file exists
 	IssuesStarted int // present issues with real reading progress (page 2+, or finished)
 	IssuesRead    int // present issues read to the last page
+	PageCount     int // total pages across present issues (list views only)
+}
+
+// IssuesUnread returns the number of present issues not yet read to the end.
+func (sr *Series) IssuesUnread() int {
+	return sr.IssuesPresent - sr.IssuesRead
 }
 
 // AllRead reports whether every downloadable issue has been read to the end.
@@ -281,13 +287,31 @@ func (s *Store) FindOrCreateSeriesByName(name string) (int64, error) {
 	return res.LastInsertId()
 }
 
-// SeriesSort names a supported ordering for ListSeries.
+// SeriesSort names a supported ordering for ListSeries. Each criterion has an
+// ascending and descending variant; the bare value is whichever direction
+// makes sense as the default (e.g. "recent" is newest-first).
 type SeriesSort string
 
 const (
-	SeriesSortName   SeriesSort = "name"
-	SeriesSortRecent SeriesSort = "recent"
+	SeriesSortName      SeriesSort = "name"       // A→Z
+	SeriesSortNameDesc  SeriesSort = "name_desc"  // Z→A
+	SeriesSortRecent    SeriesSort = "recent"     // newest added first
+	SeriesSortRecentAsc SeriesSort = "recent_asc" // oldest added first
+	SeriesSortUnread    SeriesSort = "unread"     // most unread issues first
+	SeriesSortUnreadAsc SeriesSort = "unread_asc" // fewest unread issues first
+	SeriesSortPages     SeriesSort = "pages"      // most pages first
+	SeriesSortPagesAsc  SeriesSort = "pages_asc"  // fewest pages first
 )
+
+// ParseSeriesSort maps a query value to a sort (unknown → name).
+func ParseSeriesSort(v string) SeriesSort {
+	switch s := SeriesSort(v); s {
+	case SeriesSortName, SeriesSortNameDesc, SeriesSortRecent, SeriesSortRecentAsc,
+		SeriesSortUnread, SeriesSortUnreadAsc, SeriesSortPages, SeriesSortPagesAsc:
+		return s
+	}
+	return SeriesSortName
+}
 
 // SeriesFilter narrows the series grid.
 type SeriesFilter string
@@ -334,8 +358,21 @@ func (f SeriesFilter) having() string {
 // given user's reading aggregates filled in.
 func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter SeriesFilter) ([]Series, error) {
 	order := "s.name COLLATE NOCASE ASC"
-	if sort == SeriesSortRecent {
+	switch sort {
+	case SeriesSortNameDesc:
+		order = "s.name COLLATE NOCASE DESC"
+	case SeriesSortRecent:
 		order = "MAX(i.created_at) DESC"
+	case SeriesSortRecentAsc:
+		order = "MAX(i.created_at) ASC"
+	case SeriesSortUnread:
+		order = "(present_cnt - read_cnt) DESC"
+	case SeriesSortUnreadAsc:
+		order = "(present_cnt - read_cnt) ASC"
+	case SeriesSortPages:
+		order = "pages_total DESC"
+	case SeriesSortPagesAsc:
+		order = "pages_total ASC"
 	}
 
 	// An issue counts as read when its progress reached the page total
@@ -361,7 +398,8 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 		       COALESCE(SUM(i.file_missing = 0), 0) AS present_cnt,
 		       COALESCE(SUM(i.file_missing = 0 AND ` + started + `), 0) AS started_cnt,
 		       COALESCE(SUM(i.file_missing = 0 AND rp.page IS NOT NULL
-		                    AND ` + total + ` > 0 AND rp.page >= ` + total + `), 0) AS read_cnt
+		                    AND ` + total + ` > 0 AND rp.page >= ` + total + `), 0) AS read_cnt,
+		       COALESCE(SUM(CASE WHEN i.file_missing = 0 THEN ` + total + ` ELSE 0 END), 0) AS pages_total
 		FROM series s
 		JOIN issues i ON i.series_id = s.id
 		LEFT JOIN reading_progress rp ON rp.issue_id = i.id AND rp.user = ?
@@ -386,7 +424,7 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 		err := rows.Scan(&sr.ID, &sr.Name, &sr.FolderPath, &sr.Publisher, &sr.Description,
 			&sr.ComicVineVolumeID, &sr.MetadataLocked, &sr.OneShot,
 			&sr.CreatedAt, &sr.UpdatedAt, &sr.IssueCount, &sr.CoverIssueID,
-			&sr.IssuesPresent, &sr.IssuesStarted, &sr.IssuesRead)
+			&sr.IssuesPresent, &sr.IssuesStarted, &sr.IssuesRead, &sr.PageCount)
 		if err != nil {
 			return nil, err
 		}
