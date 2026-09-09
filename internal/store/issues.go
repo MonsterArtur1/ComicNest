@@ -136,6 +136,31 @@ func (s *Store) ListIssuesBySeries(seriesID int64, filter IssueFilter) ([]Issue,
 	return out, rows.Err()
 }
 
+// ListSeriesComicVineIssues returns a series' unlocked issues currently
+// sourced from ComicVine — the ones a volume unlink should roll back to
+// file-derived metadata (see library.ResetIssueMetadata). Locked issues (the
+// user's own edit) are excluded, same as the old unlink cascade.
+func (s *Store) ListSeriesComicVineIssues(seriesID int64) ([]Issue, error) {
+	rows, err := s.db.Query(`
+		SELECT `+issueColumns+` FROM issues
+		WHERE series_id = ? AND metadata_locked = 0 AND metadata_source = ?`,
+		seriesID, SourceComicVine)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []Issue
+	for rows.Next() {
+		i, err := scanIssue(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *i)
+	}
+	return out, rows.Err()
+}
+
 // IssueWithSeries is an issue joined with its series name, for search results.
 type IssueWithSeries struct {
 	Issue
@@ -333,23 +358,6 @@ func (s *Store) UpdateIssueMetadata(i *Issue) error {
 		i.IssueNumber, i.Title, i.Summary, i.ReleaseDate, i.Writer, i.Artist,
 		i.Publisher, i.PageCount, i.ComicVineIssueID, i.ComicVineURL, i.MetadataSource,
 		i.MetadataLocked, i.HasComicInfo, i.ID)
-	return err
-}
-
-// ClearIssueComicVine undoes a single issue's ComicVine match: the matched
-// id is forgotten and the metadata source falls back to what the file
-// itself carries (ComicInfo.xml when present, else the filename), so a
-// future scan or scrape can pick the issue up again. Fields ComicVine wrote
-// (title, summary, credits...) are left as they are — only the "this came
-// from ComicVine" tag and id are removed, mirroring how unlocking keeps data
-// while lifting the write-protection.
-func (s *Store) ClearIssueComicVine(id int64) error {
-	_, err := s.db.Exec(`
-		UPDATE issues SET comicvine_issue_id = NULL, comicvine_url = '',
-			metadata_source = CASE WHEN has_comicinfo THEN ? ELSE ? END,
-			updated_at = datetime('now')
-		WHERE id = ? AND metadata_source = ?`,
-		SourceComicInfo, SourceFilename, id, SourceComicVine)
 	return err
 }
 

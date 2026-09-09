@@ -17,54 +17,48 @@ func openTestStore(t *testing.T) *Store {
 	return st
 }
 
-func TestClearIssueComicVine(t *testing.T) {
+func TestListSeriesComicVineIssues(t *testing.T) {
 	st := openTestStore(t)
 	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	issue := &Issue{SeriesID: seriesID, Path: "Saga 001.cbz", IssueNumber: "1", MetadataSource: SourceFilename}
-	if err := st.InsertIssue(issue); err != nil {
+	// A ComicVine-sourced, unlocked issue: returned for rollback.
+	unlocked := &Issue{SeriesID: seriesID, Path: "Saga 001.cbz", IssueNumber: "1", MetadataSource: SourceFilename}
+	if err := st.InsertIssue(unlocked); err != nil {
 		t.Fatal(err)
 	}
-	issue.ComicVineIssueID = sql.NullInt64{Int64: 42, Valid: true}
-	issue.ComicVineURL = "https://comicvine.gamespot.com/saga-1/4000-42/"
-	issue.MetadataSource = SourceComicVine
-	issue.Title = "Chapter One"
-	if err := st.UpdateIssueMetadata(issue); err != nil {
+	unlocked.ComicVineIssueID = sql.NullInt64{Int64: 100, Valid: true}
+	unlocked.MetadataSource = SourceComicVine
+	if err := st.UpdateIssueMetadata(unlocked); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := st.ClearIssueComicVine(issue.ID); err != nil {
-		t.Fatalf("ClearIssueComicVine: %v", err)
+	// A ComicVine-sourced but locked issue: the user's own edit, excluded.
+	locked := &Issue{SeriesID: seriesID, Path: "Saga 002.cbz", IssueNumber: "2", MetadataSource: SourceFilename}
+	if err := st.InsertIssue(locked); err != nil {
+		t.Fatal(err)
 	}
-	got, err := st.GetIssue(issue.ID)
+	locked.ComicVineIssueID = sql.NullInt64{Int64: 101, Valid: true}
+	locked.MetadataSource = SourceComicVine
+	locked.MetadataLocked = true
+	if err := st.UpdateIssueMetadata(locked); err != nil {
+		t.Fatal(err)
+	}
+
+	// An issue that was never matched: excluded.
+	never := &Issue{SeriesID: seriesID, Path: "Saga 003.cbz", IssueNumber: "3", MetadataSource: SourceFilename}
+	if err := st.InsertIssue(never); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := st.ListSeriesComicVineIssues(seriesID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ComicVineIssueID.Valid {
-		t.Error("comicvine_issue_id should be cleared")
-	}
-	if got.ComicVineURL != "" {
-		t.Errorf("comicvine_url should be cleared, got %q", got.ComicVineURL)
-	}
-	if got.MetadataSource != SourceFilename {
-		t.Errorf("metadata_source = %q, want %q", got.MetadataSource, SourceFilename)
-	}
-	// Fields ComicVine wrote are left as they are — only the source tag and
-	// id are removed.
-	if got.Title != "Chapter One" {
-		t.Errorf("title should survive unlinking, got %q", got.Title)
-	}
-
-	// An issue never matched to begin with is left alone (no-op, no error).
-	other := &Issue{SeriesID: seriesID, Path: "Saga 002.cbz", IssueNumber: "2", MetadataSource: SourceFilename}
-	if err := st.InsertIssue(other); err != nil {
-		t.Fatal(err)
-	}
-	if err := st.ClearIssueComicVine(other.ID); err != nil {
-		t.Fatalf("ClearIssueComicVine on unmatched issue: %v", err)
+	if len(got) != 1 || got[0].ID != unlocked.ID {
+		t.Fatalf("ListSeriesComicVineIssues = %+v, want just the unlocked issue", got)
 	}
 }
 
@@ -77,27 +71,7 @@ func TestClearSeriesComicVineVolume(t *testing.T) {
 	if err := st.SetSeriesComicVineVolume(seriesID, 7, "https://comicvine.gamespot.com/saga/4050-7/"); err != nil {
 		t.Fatal(err)
 	}
-
-	// A ComicVine-sourced, unlocked issue: rolled back by the cascade.
-	unlocked := &Issue{SeriesID: seriesID, Path: "Saga 001.cbz", IssueNumber: "1", MetadataSource: SourceFilename}
-	if err := st.InsertIssue(unlocked); err != nil {
-		t.Fatal(err)
-	}
-	unlocked.ComicVineIssueID = sql.NullInt64{Int64: 100, Valid: true}
-	unlocked.MetadataSource = SourceComicVine
-	if err := st.UpdateIssueMetadata(unlocked); err != nil {
-		t.Fatal(err)
-	}
-
-	// A ComicVine-sourced but locked issue: the user's own edit, left alone.
-	locked := &Issue{SeriesID: seriesID, Path: "Saga 002.cbz", IssueNumber: "2", MetadataSource: SourceFilename}
-	if err := st.InsertIssue(locked); err != nil {
-		t.Fatal(err)
-	}
-	locked.ComicVineIssueID = sql.NullInt64{Int64: 101, Valid: true}
-	locked.MetadataSource = SourceComicVine
-	locked.MetadataLocked = true
-	if err := st.UpdateIssueMetadata(locked); err != nil {
+	if err := st.EnrichSeriesFromComicVine(seriesID, "Saga", "Image", "A space opera."); err != nil {
 		t.Fatal(err)
 	}
 
@@ -115,22 +89,37 @@ func TestClearSeriesComicVineVolume(t *testing.T) {
 	if sr.ComicVineURL != "" {
 		t.Errorf("series comicvine_url should be cleared, got %q", sr.ComicVineURL)
 	}
+	if sr.Publisher != "" || sr.Description != "" {
+		t.Errorf("unlocked series' publisher/description should be cleared, got %q / %q", sr.Publisher, sr.Description)
+	}
+}
 
-	gotUnlocked, err := st.GetIssue(unlocked.ID)
+func TestClearSeriesComicVineVolumeLocked(t *testing.T) {
+	st := openTestStore(t)
+	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if gotUnlocked.ComicVineIssueID.Valid || gotUnlocked.MetadataSource != SourceFilename {
-		t.Errorf("unlocked issue should be rolled back, got id valid=%v source=%q",
-			gotUnlocked.ComicVineIssueID.Valid, gotUnlocked.MetadataSource)
+	if err := st.SetSeriesComicVineVolume(seriesID, 7, "https://comicvine.gamespot.com/saga/4050-7/"); err != nil {
+		t.Fatal(err)
+	}
+	// A manual edit locks the series and sets its own publisher/description.
+	if err := st.UpdateSeriesManual(seriesID, "Saga", "Image Comics", "My own summary.", false); err != nil {
+		t.Fatal(err)
 	}
 
-	gotLocked, err := st.GetIssue(locked.ID)
+	if err := st.ClearSeriesComicVineVolume(seriesID); err != nil {
+		t.Fatalf("ClearSeriesComicVineVolume: %v", err)
+	}
+
+	sr, err := st.GetSeries(seriesID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !gotLocked.ComicVineIssueID.Valid || gotLocked.MetadataSource != SourceComicVine {
-		t.Errorf("locked issue should be left untouched, got id valid=%v source=%q",
-			gotLocked.ComicVineIssueID.Valid, gotLocked.MetadataSource)
+	if sr.ComicVineVolumeID.Valid {
+		t.Error("series comicvine_volume_id should be cleared even when locked")
+	}
+	if sr.Publisher != "Image Comics" || sr.Description != "My own summary." {
+		t.Errorf("locked series' publisher/description should survive, got %q / %q", sr.Publisher, sr.Description)
 	}
 }

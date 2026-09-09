@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"comicnest/internal/comicvine"
+	"comicnest/internal/library"
 	"comicnest/internal/store"
 )
 
@@ -376,12 +377,25 @@ func (s *Server) handleMatchSave(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/series/"+strconv.FormatInt(series.ID, 10), http.StatusSeeOther)
 }
 
-// handleMatchUnlink removes the series' ComicVine volume match and rolls
-// back issues that came from it (see store.ClearSeriesComicVineVolume).
+// handleMatchUnlink removes the series' ComicVine volume match and rebuilds
+// every unlocked issue that came from it straight off the file itself (see
+// library.ResetIssueMetadata), so a bad match doesn't leave stale metadata
+// or cover art behind.
 func (s *Server) handleMatchUnlink(w http.ResponseWriter, r *http.Request) {
 	series := s.getSeriesFromPath(w, r)
 	if series == nil {
 		return
+	}
+	issues, err := s.store.ListSeriesComicVineIssues(series.ID)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	for i := range issues {
+		if err := library.ResetIssueMetadata(s.store, s.covers, &issues[i]); err != nil {
+			s.serverError(w, err)
+			return
+		}
 	}
 	if err := s.store.ClearSeriesComicVineVolume(series.ID); err != nil {
 		s.serverError(w, err)
@@ -396,18 +410,30 @@ func (s *Server) handleMatchUnlink(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/series/"+strconv.FormatInt(series.ID, 10), http.StatusSeeOther)
 }
 
-// handleIssueScrapeUnlink undoes a single issue's ComicVine match (see
-// store.ClearIssueComicVine).
+// handleIssueScrapeUnlink undoes a single issue's ComicVine match, rebuilding
+// it straight off the file itself (see library.ResetIssueMetadata) so a bad
+// match doesn't leave stale metadata or cover art behind. A locked issue (the
+// user's own edit) is left untouched, and an issue not currently sourced from
+// ComicVine is a no-op.
 func (s *Server) handleIssueScrapeUnlink(w http.ResponseWriter, r *http.Request) {
 	issue := s.getIssueFromPath(w, r)
 	if issue == nil {
 		return
 	}
-	if err := s.store.ClearIssueComicVine(issue.ID); err != nil {
-		s.serverError(w, err)
+	back := func(msg string) {
+		http.Redirect(w, r, "/issues/"+strconv.FormatInt(issue.ID, 10)+"?msg="+msg, http.StatusSeeOther)
+	}
+	if issue.MetadataLocked {
+		back("cv_locked")
 		return
 	}
-	http.Redirect(w, r, "/issues/"+strconv.FormatInt(issue.ID, 10)+"?msg=cv_unlinked", http.StatusSeeOther)
+	if issue.MetadataSource == store.SourceComicVine {
+		if err := library.ResetIssueMetadata(s.store, s.covers, issue); err != nil {
+			s.serverError(w, err)
+			return
+		}
+	}
+	back("cv_unlinked")
 }
 
 // --- helpers ---

@@ -501,6 +501,61 @@ func applyComicInfo(issue *store.Issue, ci *ComicInfo) {
 	issue.HasComicInfo = true
 }
 
+// ResetIssueMetadata discards whatever a ComicVine match wrote to issue and
+// rebuilds it purely from the file itself — filename parsing plus
+// ComicInfo.xml, if present — the same starting point a freshly scanned file
+// gets. Used when a match is unlinked, so a bad match doesn't leave stale
+// ComicVine text (or cover) behind. The issue is persisted, including its
+// cover thumbnail, which is re-extracted from the file's own first page,
+// undoing a ComicVine-downloaded one; cover failures are logged, not fatal,
+// same as during a scan.
+func ResetIssueMetadata(st *store.Store, cache *covers.Cache, issue *store.Issue) error {
+	parsed := ParseFilename(filepath.Base(issue.Path))
+
+	issue.IssueNumber = parsed.Number
+	issue.Title = parsed.Title
+	issue.Summary = ""
+	issue.ReleaseDate = parsed.Year
+	issue.Writer = ""
+	issue.Artist = ""
+	issue.Publisher = ""
+	issue.PageCount = 0
+	issue.MetadataSource = store.SourceFilename
+	issue.HasComicInfo = false
+	issue.ComicVineIssueID = sql.NullInt64{}
+	issue.ComicVineURL = ""
+
+	if isArchive(issue.Path) {
+		if ci, found, err := ReadComicInfo(issue.Path); err == nil && found {
+			applyComicInfo(issue, ci)
+		}
+	}
+	if issue.PageCount == 0 && issue.FilePages > 0 {
+		issue.PageCount = issue.FilePages
+	}
+
+	if err := st.UpdateIssueMetadata(issue); err != nil {
+		return err
+	}
+
+	if !isArchive(issue.Path) {
+		return nil
+	}
+	raw, err := ExtractCover(issue.Path)
+	if err != nil {
+		log.Printf("comicvine unlink: cover %s: %v", issue.Path, err)
+		return nil
+	}
+	if err := cache.Save(issue.ID, raw); err != nil {
+		log.Printf("comicvine unlink: thumbnail %s: %v", issue.Path, err)
+		return nil
+	}
+	if err := st.SetCoverCached(issue.ID, true); err != nil {
+		log.Printf("comicvine unlink: cover flag %s: %v", issue.Path, err)
+	}
+	return nil
+}
+
 // cacheCover extracts the first page and stores its thumbnail; failures are
 // logged, not fatal — the UI falls back to a placeholder.
 func (sc *Scanner) cacheCover(issue *store.Issue) {

@@ -361,13 +361,15 @@ blindly took the first search result):
    as a "View on ComicVine ↗" link on the series page (action bar) and on the issue page.
 4. Records with `metadata_locked=1` are skipped, with a note in the UI.
 5. Undoing a match: "Remove match" on the series page (`POST /series/{id}/match/unlink`) clears
-   `series.comicvine_volume_id` + `comicvine_url` and cascades to roll back its unlocked issues
-   sourced from `comicvine` (`comicvine_issue_id`/`comicvine_url` → NULL/'', `metadata_source` →
-   `comicinfo`/`filename` depending on `has_comicinfo`) — locked issues (manually edited) are left
-   untouched. Separately, "Remove ComicVine match" on an issue (`POST /issues/{id}/scrape/unlink`)
-   rolls back just that one issue with the same mechanism; previously fetched data (title,
-   description, credits…) stays — only the source marker, the link and the matched ComicVine
-   number are cleared.
+   `series.comicvine_volume_id` + `comicvine_url` (also the series' own `publisher`/`description`
+   when it's unlocked — those can only have come from `EnrichSeriesFromComicVine`, since a manual
+   edit always locks) and rebuilds every unlocked issue sourced from `comicvine` straight off the
+   file itself: filename parsing plus its own `ComicInfo.xml`, if present — the same starting point
+   a freshly scanned file gets (`library.ResetIssueMetadata`). That also re-extracts the issue's
+   cover from the archive, undoing a ComicVine-downloaded one. Locked issues (manually edited) are
+   left untouched. Separately, "Remove ComicVine match" on an issue
+   (`POST /issues/{id}/scrape/unlink`) does the same single-issue rebuild; a locked issue is left
+   untouched instead.
 
 ## 9. Web interface — views and routing
 

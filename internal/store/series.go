@@ -126,32 +126,24 @@ func (s *Store) SetSeriesComicVineVolume(id, volumeID int64, url string) error {
 	return err
 }
 
-// ClearSeriesComicVineVolume removes the series' ComicVine volume match and
-// rolls back its unlocked issues that came from that volume — their matched
-// id and metadata source are reset, same as ClearIssueComicVine — so a
-// future rematch starts clean instead of silently keeping stale ComicVine
-// ids around. Locked issues (the user's own edits) are left untouched.
+// ClearSeriesComicVineVolume removes the series' ComicVine volume match. Its
+// publisher/description are cleared too, but only when the series is
+// unlocked: an unlocked series can only have picked those up from
+// EnrichSeriesFromComicVine (a manual edit always locks via
+// UpdateSeriesManual), so forgetting the match should forget them along with
+// it. A locked series (the user's own edit) keeps everything as it is.
+//
+// The series' own issues are the caller's responsibility — see
+// ListSeriesComicVineIssues and library.ResetIssueMetadata — since resetting
+// their metadata needs the files themselves, not just the database.
 func (s *Store) ClearSeriesComicVineVolume(id int64) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.Exec(`
-		UPDATE issues SET comicvine_issue_id = NULL, comicvine_url = '',
-			metadata_source = CASE WHEN has_comicinfo THEN ? ELSE ? END,
+	_, err := s.db.Exec(`
+		UPDATE series SET comicvine_volume_id = NULL, comicvine_url = '',
+			publisher   = CASE WHEN metadata_locked THEN publisher   ELSE '' END,
+			description = CASE WHEN metadata_locked THEN description ELSE '' END,
 			updated_at = datetime('now')
-		WHERE series_id = ? AND metadata_locked = 0 AND metadata_source = ?`,
-		SourceComicInfo, SourceFilename, id, SourceComicVine); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(`
-		UPDATE series SET comicvine_volume_id = NULL, comicvine_url = '', updated_at = datetime('now')
-		WHERE id = ?`, id); err != nil {
-		return err
-	}
-	return tx.Commit()
+		WHERE id = ?`, id)
+	return err
 }
 
 // EnrichSeriesFromComicVine applies ComicVine volume data to an unlocked
