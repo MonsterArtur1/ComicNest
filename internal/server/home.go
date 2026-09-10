@@ -12,6 +12,7 @@ type homeData struct {
 	Series []store.Series
 	Sort   string
 	Filter string
+	Stats  readingStats
 
 	// Pagination over the filtered series list (Pages == 1 hides the pager).
 	Page  int
@@ -49,8 +50,13 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
+	stats, err := s.userReadingStats(r)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
 
-	data := homeData{Sort: string(sort), Filter: string(filter), Total: len(series), Page: 1, Pages: 1}
+	data := homeData{Sort: string(sort), Filter: string(filter), Stats: stats, Total: len(series), Page: 1, Pages: 1}
 	if size := s.config().PageSize; size > 0 {
 		data.Pages = max(1, (len(series)+size-1)/size)
 		data.Page = min(pageParam(r), data.Pages)

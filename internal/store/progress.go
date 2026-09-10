@@ -185,6 +185,31 @@ func (s *Store) ListUnreadIssues(user string, limit, offset int) ([]IssueWithSer
 	return scanIssuesWithSeries(rows)
 }
 
+// FinishedAtTimes returns the update timestamps (SQLite UTC datetime text,
+// "2006-01-02 15:04:05") of every present-on-disk issue the user has read to
+// the end. Order is unspecified — callers bucket these into calendar days
+// themselves, since that depends on a timezone the store has no opinion on.
+func (s *Store) FinishedAtTimes(user string) ([]string, error) {
+	rows, err := s.db.Query(`
+		SELECT rp.updated_at
+		FROM issues i JOIN reading_progress rp ON rp.issue_id = i.id AND rp.user = ?
+		WHERE i.file_missing = 0 AND `+totalPagesExpr+` > 0 AND rp.page >= `+totalPagesExpr,
+		user)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
 // AdoptAnonymousProgress hands progress recorded before accounts existed
 // (empty user name) to the given user, keeping the user's own rows where
 // both exist. Returns how many rows moved.
