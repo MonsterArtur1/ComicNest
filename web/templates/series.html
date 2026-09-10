@@ -68,33 +68,35 @@
                 {{with .Reading}}<span class="reading-note">{{if .Finished}}✓ finished{{else}}read: p. {{.Page}}{{if .Total}} of {{.Total}} ({{.Percent}}%){{end}}{{end}}</span>{{end}}
             </div>
         </div>
-        <div class="issue-badges">
-            {{if .FileMissing}}<span class="badge badge-missing">missing file</span>{{end}}
-            {{if .MetadataLocked}}<span class="badge badge-lock" title="metadata locked">🔒</span>{{end}}
-            <span class="badge badge-{{.MetadataSource}}">{{sourceLabel .MetadataSource}}</span>
+        <div class="issue-actions">
+            <div class="issue-badges">
+                {{if .FileMissing}}<span class="badge badge-missing">missing file</span>{{end}}
+                {{if .MetadataLocked}}<span class="badge badge-lock" title="metadata locked">🔒</span>{{end}}
+                <span class="badge badge-{{.MetadataSource}}">{{sourceLabel .MetadataSource}}</span>
+            </div>
+            {{if .FileMissing}}
+            {{if isAdmin}}
+            <form action="/issues/{{.ID}}/delete" method="post"
+                  onsubmit="return confirm('Delete this issue\'s record from the catalog?');">
+                <button type="submit" class="btn btn-danger" title="The file disappeared from the library — delete the catalog entry">Delete</button>
+            </form>
+            {{end}}
+            {{else}}
+            {{if and .Reading .Reading.Finished}}
+            <form action="/issues/{{.ID}}/unread" method="post">
+                <input type="hidden" name="next" value="{{$next}}">
+                <button type="submit" class="btn btn-mini" title="Mark as unread">↺ unread</button>
+            </form>
+            {{else}}
+            <form action="/issues/{{.ID}}/read" method="post">
+                <input type="hidden" name="next" value="{{$next}}">
+                <button type="submit" class="btn btn-mini" title="Mark as read">✓ read</button>
+            </form>
+            {{end}}
+            {{if canRead .Path}}<a class="btn download" href="/issues/{{.ID}}/read" title="{{if and .Reading (not .Reading.Finished)}}Continue reading from page {{.Reading.Page}}{{else}}Read in browser{{end}}">Read</a>{{end}}
+            <a class="btn download" href="/issues/{{.ID}}/download" title="Download file">Download</a>
+            {{end}}
         </div>
-        {{if .FileMissing}}
-        {{if isAdmin}}
-        <form action="/issues/{{.ID}}/delete" method="post"
-              onsubmit="return confirm('Delete this issue\'s record from the catalog?');">
-            <button type="submit" class="btn btn-danger" title="The file disappeared from the library — delete the catalog entry">Delete</button>
-        </form>
-        {{end}}
-        {{else}}
-        {{if and .Reading .Reading.Finished}}
-        <form action="/issues/{{.ID}}/unread" method="post">
-            <input type="hidden" name="next" value="{{$next}}">
-            <button type="submit" class="btn btn-mini" title="Mark as unread">↺ unread</button>
-        </form>
-        {{else}}
-        <form action="/issues/{{.ID}}/read" method="post">
-            <input type="hidden" name="next" value="{{$next}}">
-            <button type="submit" class="btn btn-mini" title="Mark as read">✓ read</button>
-        </form>
-        {{end}}
-        {{if canRead .Path}}<a class="btn download" href="/issues/{{.ID}}/read" title="{{if and .Reading (not .Reading.Finished)}}Continue reading from page {{.Reading.Page}}{{else}}Read in browser{{end}}">Read</a>{{end}}
-        <a class="btn download" href="/issues/{{.ID}}/download" title="Download file">Download</a>
-        {{end}}
     </li>
     {{end}}
 </ul>
