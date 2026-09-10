@@ -36,6 +36,7 @@ func (s *Server) opdsRoutes() {
 	handle("GET /opds/reading", s.handleOPDSReading)
 	handle("GET /opds/read", s.handleOPDSRead)
 	handle("GET /opds/unread", s.handleOPDSUnread)
+	handle("GET /opds/favorites", s.handleOPDSFavorites)
 	handle("GET /opds/search", s.handleOPDSSearch)
 	handle("GET /opds/opensearch.xml", s.handleOPDSOpenSearch)
 	handle("GET /opds/issues/{id}/file", s.handleIssueDownload)
@@ -156,6 +157,13 @@ func (s *Server) handleOPDSRoot(w http.ResponseWriter, r *http.Request) {
 			Updated: opds.FormatTime(now),
 			Content: &opds.Text{Type: "text", Value: "Issues read to the end"},
 			Links:   []opds.Link{{Rel: opds.RelSubsection, Href: base + "/opds/read", Type: opds.TypeAcquisition}},
+		},
+		{
+			ID:      "urn:comicnest:favorites",
+			Title:   "Favorites",
+			Updated: opds.FormatTime(now),
+			Content: &opds.Text{Type: "text", Value: "Favorited issues, and every issue of a favorited series"},
+			Links:   []opds.Link{{Rel: opds.RelSubsection, Href: base + "/opds/favorites", Type: opds.TypeAcquisition}},
 		},
 	}
 	s.writeFeed(w, f, opds.TypeNavigation)
@@ -498,6 +506,42 @@ func (s *Server) handleOPDSUnread(w http.ResponseWriter, r *http.Request) {
 	}
 	if page > 1 {
 		f.AddLink(opds.RelPrevious, fmt.Sprintf("%s/opds/unread?page=%d", base, page-1), opds.TypeAcquisition)
+	}
+	f.TotalResults, f.ItemsPerPage, f.StartIndex = total, opdsPageSize, from+1
+
+	if err := s.appendIssueEntries(user, f, base, issues); err != nil {
+		s.serverError(w, err)
+		return
+	}
+	s.writeFeed(w, f, opds.TypeAcquisition)
+}
+
+// handleOPDSFavorites serves favorited issues, and every issue of a
+// favorited series, most recently favorited first.
+func (s *Server) handleOPDSFavorites(w http.ResponseWriter, r *http.Request) {
+	user := userFrom(r)
+	total, err := s.store.CountFavoriteIssues(user)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	page := opdsPage(r)
+	from, _, hasNext := pageBounds(page, total)
+	issues, err := s.store.ListFavoriteIssues(user, opdsPageSize, from)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+
+	base := opdsBaseURL(r)
+	f := s.newOPDSFeed(r, "favorites", "Favorites", time.Now())
+	f.Links[0].Type = opds.TypeAcquisition
+	f.AddLink(opds.RelUp, base+"/opds", opds.TypeNavigation)
+	if hasNext {
+		f.AddLink(opds.RelNext, fmt.Sprintf("%s/opds/favorites?page=%d", base, page+1), opds.TypeAcquisition)
+	}
+	if page > 1 {
+		f.AddLink(opds.RelPrevious, fmt.Sprintf("%s/opds/favorites?page=%d", base, page-1), opds.TypeAcquisition)
 	}
 	f.TotalResults, f.ItemsPerPage, f.StartIndex = total, opdsPageSize, from+1
 

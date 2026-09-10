@@ -59,6 +59,12 @@
             {{if not .Issue.FileMissing}}
             <a class="btn {{if not (canRead .Issue.Path)}}btn-primary{{end}}" href="/issues/{{.Issue.ID}}/download">Download file</a>
             {{end}}
+            <form action="/issues/{{.Issue.ID}}/favorite" method="post">
+                <button type="submit" class="btn {{if .Favorite}}btn-fav-active{{end}}"
+                        title="{{if .Favorite}}Remove from favorites{{else}}Add to favorites{{end}}">
+                    {{if .Favorite}}★ Favorited{{else}}☆ Add to favorites{{end}}
+                </button>
+            </form>
             {{if isAdmin}}<a class="btn" href="/issues/{{.Issue.ID}}/edit">Edit metadata</a>{{end}}
             {{if and .Reading .Reading.Finished}}
             <form action="/issues/{{.Issue.ID}}/unread" method="post">

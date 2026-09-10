@@ -28,6 +28,7 @@ type Series struct {
 	IssuesRead    int    // present issues read to the last page
 	PageCount     int    // total pages across present issues (list views only)
 	ReleaseYear   string // earliest issue's release year, e.g. "2016" (list views only)
+	IsFavorite    bool   // user has favorited this series (list views only)
 }
 
 // IssuesUnread returns the number of present issues not yet read to the end.
@@ -313,18 +314,20 @@ func ParseSeriesSort(v string) SeriesSort {
 type SeriesFilter string
 
 const (
-	SeriesFilterAll     SeriesFilter = "all"
-	SeriesFilterUnread  SeriesFilter = "unread"  // no reading progress at all
-	SeriesFilterRead    SeriesFilter = "read"    // every present issue read to the end
-	SeriesFilterReading SeriesFilter = "reading" // started, not all finished
-	SeriesFilterNoCV    SeriesFilter = "nocv"    // some issue without ComicVine (or manual) metadata
-	SeriesFilterMissing SeriesFilter = "missing" // some issue's file is gone
+	SeriesFilterAll      SeriesFilter = "all"
+	SeriesFilterUnread   SeriesFilter = "unread"   // no reading progress at all
+	SeriesFilterRead     SeriesFilter = "read"     // every present issue read to the end
+	SeriesFilterReading  SeriesFilter = "reading"  // started, not all finished
+	SeriesFilterNoCV     SeriesFilter = "nocv"     // some issue without ComicVine (or manual) metadata
+	SeriesFilterMissing  SeriesFilter = "missing"  // some issue's file is gone
+	SeriesFilterFavorite SeriesFilter = "favorite" // user has favorited the series
 )
 
 // ParseSeriesFilter maps a query value to a filter (unknown → all).
 func ParseSeriesFilter(v string) SeriesFilter {
 	switch f := SeriesFilter(v); f {
-	case SeriesFilterUnread, SeriesFilterRead, SeriesFilterReading, SeriesFilterNoCV, SeriesFilterMissing:
+	case SeriesFilterUnread, SeriesFilterRead, SeriesFilterReading, SeriesFilterNoCV,
+		SeriesFilterMissing, SeriesFilterFavorite:
 		return f
 	}
 	return SeriesFilterAll
@@ -344,6 +347,8 @@ func (f SeriesFilter) having() string {
 		return "HAVING SUM(i.metadata_source IN ('filename', 'comicinfo')) > 0"
 	case SeriesFilterMissing:
 		return "HAVING SUM(i.file_missing) > 0"
+	case SeriesFilterFavorite:
+		return "HAVING is_fav = 1"
 	}
 	return ""
 }
@@ -384,6 +389,12 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 
 	// The cover endpoint falls back to a placeholder on its own, so the
 	// representative issue is simply the series' first one.
+	//
+	// There is no series-level favorite: is_fav is true when the series
+	// contains at least one favorited issue, so favoriting a single issue
+	// surfaces its series in the "favorite" filter and star. It's wrapped in
+	// MAX() rather than summed since a plain SUM would count the number of
+	// favorited issues instead of a 0/1 flag.
 	query := `
 		SELECT s.id, s.name, s.folder_path, s.publisher, s.description,
 		       s.comicvine_volume_id, s.metadata_locked, s.one_shot,
@@ -400,10 +411,12 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 		       COALESCE(SUM(i.file_missing = 0 AND rp.page IS NOT NULL
 		                    AND ` + total + ` > 0 AND rp.page >= ` + total + `), 0) AS read_cnt,
 		       COALESCE(SUM(CASE WHEN i.file_missing = 0 THEN ` + total + ` ELSE 0 END), 0) AS pages_total,
-		       COALESCE(MIN(NULLIF(substr(i.release_date, 1, 4), '')), '') AS release_year
+		       COALESCE(MIN(NULLIF(substr(i.release_date, 1, 4), '')), '') AS release_year,
+		       COALESCE(MAX(fi.issue_id IS NOT NULL), 0) AS is_fav
 		FROM series s
 		JOIN issues i ON i.series_id = s.id
 		LEFT JOIN reading_progress rp ON rp.issue_id = i.id AND rp.user = ?
+		LEFT JOIN issue_favorites fi ON fi.issue_id = i.id AND fi.user = ?
 		WHERE (? = '' OR s.name LIKE '%' || ? || '%' OR s.publisher LIKE '%' || ? || '%'
 		       OR EXISTS (
 		           SELECT 1 FROM issues i2 WHERE i2.series_id = s.id
@@ -413,7 +426,7 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 		` + filter.having() + `
 		ORDER BY ` + order
 
-	rows, err := s.db.Query(query, user, nameFilter, nameFilter, nameFilter, nameFilter, nameFilter, nameFilter)
+	rows, err := s.db.Query(query, user, user, nameFilter, nameFilter, nameFilter, nameFilter, nameFilter, nameFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -425,7 +438,8 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 		err := rows.Scan(&sr.ID, &sr.Name, &sr.FolderPath, &sr.Publisher, &sr.Description,
 			&sr.ComicVineVolumeID, &sr.MetadataLocked, &sr.OneShot,
 			&sr.CreatedAt, &sr.UpdatedAt, &sr.IssueCount, &sr.CoverIssueID,
-			&sr.IssuesPresent, &sr.IssuesStarted, &sr.IssuesRead, &sr.PageCount, &sr.ReleaseYear)
+			&sr.IssuesPresent, &sr.IssuesStarted, &sr.IssuesRead, &sr.PageCount, &sr.ReleaseYear,
+			&sr.IsFavorite)
 		if err != nil {
 			return nil, err
 		}

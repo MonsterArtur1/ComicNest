@@ -264,6 +264,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /issues/{id}/delete", s.requireAdmin(s.handleIssueDelete))
 	s.mux.HandleFunc("POST /issues/{id}/read", s.handleIssueMarkRead)
 	s.mux.HandleFunc("POST /issues/{id}/unread", s.handleIssueMarkUnread)
+	s.mux.HandleFunc("POST /issues/{id}/favorite", s.handleIssueFavorite)
 	s.mux.HandleFunc("GET /issues/{id}/read", s.handleReader)
 	s.mux.HandleFunc("GET /issues/{id}/pages/{page}", s.handleIssuePage)
 	s.mux.HandleFunc("POST /issues/{id}/progress", s.handleIssueProgress)

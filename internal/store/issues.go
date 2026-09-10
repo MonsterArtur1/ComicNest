@@ -98,6 +98,10 @@ const (
 	IssueFilterNoMeta    IssueFilter = "nometa"    // only filename-derived metadata
 	IssueFilterComicVine IssueFilter = "comicvine" // scraped from ComicVine
 	IssueFilterMissing   IssueFilter = "missing"   // file gone from disk
+	// IssueFilterFavorite is handled separately by the caller (see
+	// Store.ListFavoriteIssuesBySeries) since, unlike the other filters, it
+	// depends on the requesting user rather than the issue row alone.
+	IssueFilterFavorite IssueFilter = "favorite"
 )
 
 func (f IssueFilter) where() string {

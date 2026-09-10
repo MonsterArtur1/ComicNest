@@ -38,13 +38,14 @@
     <a class="chip {{if eq $filter "read"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=read">read</a>
     <a class="chip {{if eq $filter "nocv"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=nocv">no ComicVine metadata</a>
     <a class="chip {{if eq $filter "missing"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=missing">missing files</a>
+    <a class="chip {{if eq $filter "favorite"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=favorite">★ favorites</a>
 </div>
 
 {{if .Series}}
 <ul class="series-grid">
     {{range .Series}}
     <li class="card">
-        <a href="{{if .OneShot}}/issues/{{.CoverIssueID}}{{else}}/series/{{.ID}}{{end}}">
+        <a href="{{if .OneShot}}/issues/{{.CoverIssueID}}{{else}}/series/{{.ID}}{{if eq $filter "favorite"}}?filter=favorite{{end}}{{end}}">
             <div class="card-cover">
                 {{if .CoverIssueID}}
                 <img src="/issues/{{.CoverIssueID}}/cover" alt="" loading="lazy">
@@ -52,6 +53,7 @@
                 <img src="/static/placeholder.svg" alt="">
                 {{end}}
                 {{if .AllRead}}<span class="read-mark" title="read">✓</span>{{end}}
+                {{if .IsFavorite}}<span class="favorite-mark" title="favorite">★</span>{{end}}
             </div>
             <div class="card-body">
                 <span class="card-title">{{.Name}}</span>

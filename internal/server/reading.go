@@ -98,21 +98,36 @@ func newReadingView(i *store.Issue, p *store.ReadingProgress) *readingView {
 	return v
 }
 
-// issueRow is an issue plus its reading progress, for list views.
+// issueRow is an issue plus its reading progress and favorite status, for
+// list views.
 type issueRow struct {
 	store.Issue
-	Reading *readingView
+	Reading  *readingView
+	Favorite bool
 }
 
-// issueRows attaches reading progress to issues in one query.
+// issueRows attaches reading progress and favorite status to issues in two
+// batched queries.
 func (s *Server) issueRows(user string, issues []store.Issue) ([]issueRow, error) {
 	progress, err := s.progressFor(user, issues)
 	if err != nil {
 		return nil, err
 	}
+	ids := make([]int64, len(issues))
+	for i, is := range issues {
+		ids[i] = is.ID
+	}
+	favorites, err := s.store.IssueFavoritesFor(user, ids)
+	if err != nil {
+		return nil, err
+	}
 	rows := make([]issueRow, len(issues))
 	for k := range issues {
-		rows[k] = issueRow{Issue: issues[k], Reading: newReadingView(&issues[k], progressPtr(progress, issues[k].ID))}
+		rows[k] = issueRow{
+			Issue:    issues[k],
+			Reading:  newReadingView(&issues[k], progressPtr(progress, issues[k].ID)),
+			Favorite: favorites[issues[k].ID],
+		}
 	}
 	return rows, nil
 }

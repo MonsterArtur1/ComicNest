@@ -15,6 +15,7 @@ type issueData struct {
 	Issue     *store.Issue
 	Series    *store.Series
 	Reading   *readingView // nil when never read
+	Favorite  bool
 	Filename  string
 	CVEnabled bool
 	CVMatched bool
@@ -37,6 +38,8 @@ var flashMessages = map[string]struct {
 	"read_ok":      {"Issue marked as read.", false},
 	"unread_ok":    {"Issue marked as unread.", false},
 	"read_nopages": {"Cannot mark as read — unknown page count (missing file, or a format with no pages).", true},
+	"fav_ok":       {"Added to favorites.", false},
+	"unfav_ok":     {"Removed from favorites.", false},
 }
 
 // getIssueFromPath resolves the {id} path value to an issue, writing the
@@ -70,7 +73,13 @@ func (s *Server) handleIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	progress, err := s.store.GetReadingProgress(userFrom(r), issue.ID)
+	user := userFrom(r)
+	progress, err := s.store.GetReadingProgress(user, issue.ID)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	favorite, err := s.store.IsIssueFavorite(user, issue.ID)
 	if err != nil {
 		s.serverError(w, err)
 		return
@@ -80,6 +89,7 @@ func (s *Server) handleIssue(w http.ResponseWriter, r *http.Request) {
 		Issue:     issue,
 		Series:    series,
 		Reading:   newReadingView(issue, progress),
+		Favorite:  favorite,
 		Filename:  filepath.Base(issue.Path),
 		CVEnabled: s.cv.Enabled(),
 		CVMatched: series.ComicVineVolumeID.Valid,

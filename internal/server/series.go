@@ -31,19 +31,25 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user := userFrom(r)
 	filter := store.IssueFilter(r.FormValue("filter"))
 	switch filter {
-	case store.IssueFilterNoMeta, store.IssueFilterComicVine, store.IssueFilterMissing:
+	case store.IssueFilterNoMeta, store.IssueFilterComicVine, store.IssueFilterMissing, store.IssueFilterFavorite:
 	default:
 		filter = store.IssueFilterAll
 	}
 
-	issues, err := s.store.ListIssuesBySeries(id, filter)
+	var issues []store.Issue
+	if filter == store.IssueFilterFavorite {
+		issues, err = s.store.ListFavoriteIssuesBySeries(user, id)
+	} else {
+		issues, err = s.store.ListIssuesBySeries(id, filter)
+	}
 	if err != nil {
 		s.serverError(w, err)
 		return
 	}
-	rows, err := s.issueRows(userFrom(r), issues)
+	rows, err := s.issueRows(user, issues)
 	if err != nil {
 		s.serverError(w, err)
 		return

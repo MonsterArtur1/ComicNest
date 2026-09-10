@@ -41,6 +41,7 @@
     <a class="chip {{if eq .Filter "nometa"}}active{{end}}" href="/series/{{.Series.ID}}?filter=nometa">no metadata</a>
     <a class="chip {{if eq .Filter "comicvine"}}active{{end}}" href="/series/{{.Series.ID}}?filter=comicvine">from ComicVine</a>
     <a class="chip {{if eq .Filter "missing"}}active{{end}}" href="/series/{{.Series.ID}}?filter=missing">missing files</a>
+    <a class="chip {{if eq .Filter "favorite"}}active{{end}}" href="/series/{{.Series.ID}}?filter=favorite">★ favorites</a>
 </div>
 
 {{if .Issues}}
@@ -58,6 +59,7 @@
         </a>
         <div class="issue-info">
             <a class="issue-title" href="/issues/{{.ID}}">
+                {{if .Favorite}}<span class="favorite-mark-inline" title="favorite">★</span>{{end}}
                 {{if .IssueNumber}}<span class="issue-num">#{{.IssueNumber}}</span>{{end}}
                 {{if .Title}}{{.Title}}{{else if not .IssueNumber}}{{.Path}}{{end}}
             </a>
@@ -82,6 +84,11 @@
             </form>
             {{end}}
             {{else}}
+            <form action="/issues/{{.ID}}/favorite" method="post">
+                <input type="hidden" name="next" value="{{$next}}">
+                <button type="submit" class="btn btn-mini {{if .Favorite}}btn-fav-active{{end}}"
+                        title="{{if .Favorite}}Remove from favorites{{else}}Add to favorites{{end}}">{{if .Favorite}}★{{else}}☆{{end}} favorite</button>
+            </form>
             {{if and .Reading .Reading.Finished}}
             <form action="/issues/{{.ID}}/unread" method="post">
                 <input type="hidden" name="next" value="{{$next}}">

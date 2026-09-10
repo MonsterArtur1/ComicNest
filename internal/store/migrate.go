@@ -149,6 +149,33 @@ var migrations = []string{
 		error       TEXT NOT NULL DEFAULT ''
 	);
 	`,
+
+	// 10: per-user favorites on series and on individual issues, kept in their
+	// own tables (same shape as reading_progress) so the anonymous reader and
+	// each account keep separate lists.
+	`
+	CREATE TABLE series_favorites (
+		user       TEXT NOT NULL,
+		series_id  INTEGER NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+		created_at TEXT NOT NULL DEFAULT (datetime('now')),
+		PRIMARY KEY (user, series_id)
+	);
+	CREATE TABLE issue_favorites (
+		user       TEXT NOT NULL,
+		issue_id   INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+		created_at TEXT NOT NULL DEFAULT (datetime('now')),
+		PRIMARY KEY (user, issue_id)
+	);
+	CREATE INDEX idx_issue_favorites_issue ON issue_favorites(issue_id);
+	`,
+
+	// 11: series can no longer be favorited on their own — only individual
+	// issues. A series still shows up under the "favorite" filter/star when
+	// it contains a favorited issue, computed from issue_favorites alone
+	// (see Store.ListSeries).
+	`
+	DROP TABLE series_favorites;
+	`,
 }
 
 func migrate(db *sql.DB) error {
