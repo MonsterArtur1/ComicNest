@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"io/fs"
 	"log"
+	"mime"
 	"net"
 	"net/http"
 	"strings"
@@ -218,10 +219,19 @@ func (s *Server) routes() {
 	if err != nil {
 		panic(err) // embedded FS layout is fixed at compile time
 	}
+	// application/manifest+json isn't in every platform's built-in mime table
+	// (notably not Windows), so the manifest would otherwise serve as
+	// text/plain or octet-stream and browsers would ignore it.
+	mime.AddExtensionType(".webmanifest", "application/manifest+json")
 	s.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
 	// Browsers and some OPDS readers probe /favicon.ico directly.
 	s.mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(w, r, static, "favicon.ico")
+	})
+	// Served at the root (not /static/sw.js) so its default scope covers the
+	// whole site — no Service-Worker-Allowed header needed.
+	s.mux.HandleFunc("GET /sw.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFileFS(w, r, static, "sw.js")
 	})
 	s.mux.HandleFunc("GET /{$}", s.handleHome)
 	// Liveness probe for Docker/orchestrators: 200 once the server answers.
@@ -293,7 +303,7 @@ func (w *statusWriter) WriteHeader(status int) {
 func (s *Server) withLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
-		if strings.HasPrefix(p, "/static/") || p == "/favicon.ico" || p == "/healthz" || p == "/scan/status" ||
+		if strings.HasPrefix(p, "/static/") || p == "/favicon.ico" || p == "/sw.js" || p == "/healthz" || p == "/scan/status" ||
 			strings.HasSuffix(p, "/scrape/status") || strings.HasSuffix(p, "/cover") {
 			next.ServeHTTP(w, r)
 			return

@@ -8,9 +8,15 @@
     <link rel="icon" href="/static/favicon.png" type="image/png" sizes="192x192">
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
     <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+    <link rel="manifest" href="/static/manifest.webmanifest">
+    <meta name="theme-color" content="#1f2229">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ComicNest">
     <link rel="stylesheet" href="/static/styles.css">
     {{if opdsEnabled}}<link rel="alternate" type="application/atom+xml;profile=opds-catalog;kind=navigation" title="ComicNest OPDS" href="/opds">{{end}}
     <script src="/static/htmx.min.js" defer></script>
+    <script>if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js')); }</script>
 </head>
 <body>
 <header class="topbar">
