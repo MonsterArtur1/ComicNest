@@ -42,17 +42,27 @@ file, no cloud account.
 <p align="center">
   <img src="imgs/scrn1.jpg" alt="Library grid with covers, sorting and reading filters" width="800">
 </p>
-<p align="center"><em>The library: every series as a tile, with sorting, reading filters and pagination.</em></p>
+<p align="center"><em>The library: every series as a tile, with sorting, reading filters</em></p>
 
 <table>
   <tr>
     <td align="center" width="50%">
       <img src="imgs/scrn2.jpg" alt="Series page with the list of issues">
-      <br><em>A series: description from ComicVine, issue list with metadata source, read marks, read and download buttons.</em>
+      <br><em>A series: description from ComicVine, issue list with metadata source.</em>
     </td>
     <td align="center" width="50%">
       <img src="imgs/scrn3.jpg" alt="Issue details with cover and metadata">
-      <br><em>An issue: cover, summary, credits, file details and actions (read, download, edit, mark as read, fetch from ComicVine).</em>
+      <br><em>An issue: cover, summary, credits, file details and actions.</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="imgs/scrn4.png" alt="Library grid on a mobile phone, with a favorites filter">
+      <br><em>Mobile view: the library grid installed as a web application or page.</em>
+    </td>
+    <td align="center" width="50%">
+      <img src="imgs/scrn5.jpg" alt="Admin panel with library statistics and configuration">
+      <br><em>Admin panel: library statistics, configuration.</em>
     </td>
   </tr>
 </table>
