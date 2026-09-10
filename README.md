@@ -11,7 +11,7 @@
 ComicNest is a small self-hosted server for a personal comic library. Point it at the folder
 where your `.cbz`, `.cbr` and `.pdf` files live, and it builds a catalog of series and issues
 with covers, metadata and reading progress. Everything runs locally: one program, one config
-file, no cloud account.
+file, no cloud account. Your library is **read-only**, the **app didin't modify** or reorganise your library. 
 
 **What it does**
 
