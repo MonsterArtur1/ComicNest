@@ -25,6 +25,11 @@
         </label>
         <button type="submit" class="btn btn-primary">Log in</button>
     </form>
+    {{with appVersion}}
+    <footer class="site-footer">
+        <a href="https://github.com/MonsterArtur1/ComicNest" target="_blank" rel="noopener" title="ComicNest on GitHub">ComicNest {{.}}</a>
+    </footer>
+    {{end}}
 </main>
 </body>
 </html>{{end}}
