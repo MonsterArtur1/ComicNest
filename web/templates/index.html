@@ -22,6 +22,14 @@
     </div>
 </div>
 
+{{if .Stats.Any}}
+<div class="stats-strip">
+    {{if .Stats.ReadThisMonth}}<span class="stat"><strong>{{.Stats.ReadThisMonth}}</strong> read this month</span>{{end}}
+    {{if .Stats.CurrentStreak}}<span class="stat">🔥 <strong>{{.Stats.CurrentStreak}}</strong>-day streak</span>{{end}}
+    {{if gt .Stats.LongestStreak .Stats.CurrentStreak}}<span class="stat dim">best: {{.Stats.LongestStreak}} days</span>{{end}}
+</div>
+{{end}}
+
 {{$sort := .Sort}}{{$filter := .Filter}}
 <div class="filter-bar">
     <a class="chip {{if eq $filter "all"}}active{{end}}" href="/?sort={{$sort}}">all</a>
