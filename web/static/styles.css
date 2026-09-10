@@ -471,12 +471,22 @@ details.desc .series-desc { margin: 12px 0 4px; }
 
 .issue-sub {
     display: flex;
-    gap: 12px;
+    flex-wrap: wrap;
+    gap: 4px 12px;
     font-size: 12px;
     color: var(--text-dim);
 }
 
-.issue-badges { display: flex; gap: 6px; align-items: center; flex: none; }
+.issue-actions { display: flex; align-items: center; gap: 14px; flex: none; flex-wrap: wrap; }
+.issue-badges { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; flex: none; }
+
+@media (max-width: 700px) {
+    .issue-row { flex-wrap: wrap; }
+    .issue-actions { flex-basis: 100%; margin-left: 58px; }
+}
+@media (max-width: 420px) {
+    .issue-actions { margin-left: 0; }
+}
 
 .badge {
     font-size: 11px;
