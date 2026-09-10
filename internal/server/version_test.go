@@ -22,9 +22,10 @@ func TestVersionFooterOnlyForStampedBuilds(t *testing.T) {
 		!strings.Contains(body, "ComicNest v1.2.3-4-gabcdef0") {
 		t.Errorf("stamped build should render the footer with a GitHub link:\n%s", body)
 	}
-	// Only the library page carries the footer.
+	// The login page carries the footer too, since it's the only page an
+	// unauthenticated visitor ever sees.
 	mustCreateUser(t, srv.store, "ania", "x", false)
-	if body := get(t, srv.Handler(), "/login", nil).Body.String(); strings.Contains(body, "site-footer") {
-		t.Error("login page should not render the footer")
+	if body := get(t, srv.Handler(), "/login", nil).Body.String(); !strings.Contains(body, "site-footer") {
+		t.Error("login page should render the version footer")
 	}
 }
