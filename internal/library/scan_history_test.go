@@ -30,7 +30,7 @@ func TestScanRecordsHistory(t *testing.T) {
 		t.Fatal("scan did not finish within 2s")
 	}
 
-	history, err := st.ListScanHistory(10)
+	history, err := st.ListScanHistory(10, "")
 	if err != nil {
 		t.Fatalf("ListScanHistory: %v", err)
 	}

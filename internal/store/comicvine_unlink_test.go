@@ -19,7 +19,7 @@ func openTestStore(t *testing.T) *Store {
 
 func TestListSeriesComicVineIssues(t *testing.T) {
 	st := openTestStore(t)
-	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga")
+	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestListSeriesComicVineIssues(t *testing.T) {
 
 func TestClearSeriesComicVineVolume(t *testing.T) {
 	st := openTestStore(t)
-	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga")
+	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestClearSeriesComicVineVolume(t *testing.T) {
 
 func TestClearSeriesComicVineVolumeLocked(t *testing.T) {
 	st := openTestStore(t)
-	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga")
+	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga", "")
 	if err != nil {
 		t.Fatal(err)
 	}

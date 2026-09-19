@@ -1,7 +1,7 @@
 {{define "scan-status"}}
 {{if .Running}}
 <div class="scan-status running"
-     hx-get="/scan/status" hx-trigger="every 2s" hx-target="#scan-area" hx-swap="innerHTML">
+     hx-get="/scan/status?lib={{.Lib}}" hx-trigger="every 2s" hx-target="#{{.AreaID}}" hx-swap="innerHTML">
     <span class="spinner"></span>
     {{if .CVPhase}}
     <span>Updating ComicVine… {{.CVDone}}/{{.CVTotal}}</span>
@@ -11,8 +11,8 @@
 </div>
 {{else}}
 <div class="scan-status">
-    <form hx-post="/scan" hx-target="#scan-area" hx-swap="innerHTML" action="/scan" method="post">
-        <button type="submit">Scan Library</button>
+    <form hx-post="/scan?lib={{.Lib}}" hx-target="#{{.AreaID}}" hx-swap="innerHTML" action="/scan?lib={{.Lib}}" method="post">
+        <button type="submit">{{if eq .Lib "all"}}Scan All Libraries{{else}}Scan Library{{end}}</button>
     </form>
     {{if .Err}}
     <span class="scan-note scan-error" title="{{.Err}}">scan error</span>

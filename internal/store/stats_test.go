@@ -8,18 +8,18 @@ import "testing"
 func TestLibraryStats(t *testing.T) {
 	st := openTestStore(t)
 
-	regular, err := st.FindOrCreateSeriesByFolder("Saga", "Saga")
+	regular, err := st.FindOrCreateSeriesByFolder("Saga", "Saga", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	locked, err := st.FindOrCreateSeriesByFolder("Locke & Key", "Locke & Key")
+	locked, err := st.FindOrCreateSeriesByFolder("Locke & Key", "Locke & Key", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := st.SetSeriesLocked(locked, true); err != nil {
 		t.Fatal(err)
 	}
-	oneShot, err := st.FindOrCreateSeriesByFolder("Deadpool Killogy", "Deadpool Killogy")
+	oneShot, err := st.FindOrCreateSeriesByFolder("Deadpool Killogy", "Deadpool Killogy", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +27,7 @@ func TestLibraryStats(t *testing.T) {
 		t.Fatal(err)
 	}
 	// An empty series (no issues) must not be counted.
-	if _, err := st.FindOrCreateSeriesByFolder("Empty", "Empty"); err != nil {
+	if _, err := st.FindOrCreateSeriesByFolder("Empty", "Empty", ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -63,7 +63,7 @@ func TestLibraryStats(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stats, err := st.LibraryStats()
+	stats, err := st.LibraryStats("")
 	if err != nil {
 		t.Fatalf("LibraryStats: %v", err)
 	}
@@ -81,5 +81,43 @@ func TestLibraryStats(t *testing.T) {
 	}
 	if stats != want {
 		t.Errorf("LibraryStats() = %+v, want %+v", stats, want)
+	}
+}
+
+// TestLibraryStatsScoping checks that LibraryStats("") aggregates every
+// library while LibraryStats(path) counts only the series stamped with that
+// library's root path (see Store.FindOrCreateSeriesBy*).
+func TestLibraryStatsScoping(t *testing.T) {
+	st := openTestStore(t)
+
+	a, err := st.FindOrCreateSeriesByFolder("A-Series", "A-Series", "/libA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.InsertIssue(&Issue{SeriesID: a, Path: "/libA/A-Series/1.cbz", FileSize: 10, IssueNumber: "1"}); err != nil {
+		t.Fatal(err)
+	}
+	b, err := st.FindOrCreateSeriesByFolder("B-Series", "B-Series", "/libB")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.InsertIssue(&Issue{SeriesID: b, Path: "/libB/B-Series/1.cbz", FileSize: 20, IssueNumber: "1"}); err != nil {
+		t.Fatal(err)
+	}
+
+	statsA, err := st.LibraryStats("/libA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if statsA.SeriesCount != 1 || statsA.IssueCount != 1 || statsA.TotalSize != 10 {
+		t.Errorf("LibraryStats(/libA) = %+v, want just A's series", statsA)
+	}
+
+	all, err := st.LibraryStats("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if all.SeriesCount != 2 || all.IssueCount != 2 || all.TotalSize != 30 {
+		t.Errorf("LibraryStats(\"\") = %+v, want both libraries combined", all)
 	}
 }

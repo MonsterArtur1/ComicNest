@@ -37,7 +37,7 @@ type seriesEditData struct {
 // mergeOptions lists every series but the one being edited, for the merge
 // form's target picker.
 func (s *Server) mergeOptions(user string, excludeID int64) ([]store.Series, error) {
-	all, err := s.store.ListSeries(user, "", store.SeriesSortName, store.SeriesFilterAll)
+	all, err := s.store.ListSeries(user, "", store.SeriesSortName, store.SeriesFilterAll, "")
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +167,7 @@ func (s *Server) handleIssueEditForm(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
-	all, err := s.store.ListSeries(userFrom(r), "", store.SeriesSortName, store.SeriesFilterAll)
+	all, err := s.store.ListSeries(userFrom(r), "", store.SeriesSortName, store.SeriesFilterAll, "")
 	if err != nil {
 		s.serverError(w, err)
 		return

@@ -10,11 +10,11 @@ import "testing"
 func TestMergeSeriesFolderSurvivesRescan(t *testing.T) {
 	st := openTestStore(t)
 
-	fromID, err := st.FindOrCreateSeriesByFolder("Mad Max Fury Road", "Mad Max Fury Road")
+	fromID, err := st.FindOrCreateSeriesByFolder("Mad Max Fury Road", "Mad Max Fury Road", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	intoID, err := st.FindOrCreateSeriesByFolder("Mad Max", "Mad Max")
+	intoID, err := st.FindOrCreateSeriesByFolder("Mad Max", "Mad Max", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +29,7 @@ func TestMergeSeriesFolderSurvivesRescan(t *testing.T) {
 
 	// A rescan re-resolves the same folder — it must land back on intoID,
 	// not recreate a series for the now-deleted fromID.
-	resolved, err := st.FindOrCreateSeriesByFolder("Mad Max Fury Road", "Mad Max Fury Road")
+	resolved, err := st.FindOrCreateSeriesByFolder("Mad Max Fury Road", "Mad Max Fury Road", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,11 +55,11 @@ func TestMergeSeriesFolderSurvivesRescan(t *testing.T) {
 func TestMergeSeriesNameSurvivesRescan(t *testing.T) {
 	st := openTestStore(t)
 
-	fromID, err := st.FindOrCreateSeriesByName("The Boys: Dear Becky")
+	fromID, err := st.FindOrCreateSeriesByName("The Boys: Dear Becky", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	intoID, err := st.FindOrCreateSeriesByName("The Boys Dear Becky")
+	intoID, err := st.FindOrCreateSeriesByName("The Boys Dear Becky", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestMergeSeriesNameSurvivesRescan(t *testing.T) {
 		t.Fatalf("MergeSeries: %v", err)
 	}
 
-	resolved, err := st.FindOrCreateSeriesByName("The Boys: Dear Becky")
+	resolved, err := st.FindOrCreateSeriesByName("The Boys: Dear Becky", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,15 +87,15 @@ func TestMergeSeriesNameSurvivesRescan(t *testing.T) {
 func TestMergeSeriesChainedAliasesFollow(t *testing.T) {
 	st := openTestStore(t)
 
-	a, err := st.FindOrCreateSeriesByFolder("A", "A")
+	a, err := st.FindOrCreateSeriesByFolder("A", "A", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := st.FindOrCreateSeriesByFolder("B", "B")
+	b, err := st.FindOrCreateSeriesByFolder("B", "B", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	c, err := st.FindOrCreateSeriesByFolder("C", "C")
+	c, err := st.FindOrCreateSeriesByFolder("C", "C", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,14 +107,14 @@ func TestMergeSeriesChainedAliasesFollow(t *testing.T) {
 		t.Fatalf("merge B into C: %v", err)
 	}
 
-	resolved, err := st.FindOrCreateSeriesByFolder("A", "A")
+	resolved, err := st.FindOrCreateSeriesByFolder("A", "A", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if resolved != c {
 		t.Errorf("folder A resolved to %d, want the final target %d", resolved, c)
 	}
-	resolvedB, err := st.FindOrCreateSeriesByFolder("B", "B")
+	resolvedB, err := st.FindOrCreateSeriesByFolder("B", "B", "")
 	if err != nil {
 		t.Fatal(err)
 	}

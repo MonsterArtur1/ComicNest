@@ -274,7 +274,7 @@ func TestAdminSaveConfig(t *testing.T) {
 
 	// A freshly started server (config.yaml already has the saved values, so
 	// the client/routes it builds match what's on disk) shows no banner.
-	restarted, err := New(saved, srv.configPath, srv.store, srv.covers, srv.scanner, comicvine.New(saved.ComicVineAPIKey))
+	restarted, err := New(saved, srv.configPath, srv.store, srv.covers, srv.scanners, comicvine.New(saved.ComicVineAPIKey))
 	if err != nil {
 		t.Fatal(err)
 	}

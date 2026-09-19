@@ -170,6 +170,17 @@ code {
 .user-box { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); min-width: 0; }
 .user-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+.library-switcher { flex-shrink: 0; }
+.library-switcher select {
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    max-width: 180px;
+}
+
 @media (max-width: 700px) {
     .topbar {
         flex-wrap: wrap;
@@ -184,6 +195,7 @@ code {
     }
     .admin-link span { display: none; }
     .user-name { max-width: 30vw; }
+    .library-switcher select { max-width: 40vw; }
 }
 
 /* --- login page --- */
@@ -215,6 +227,7 @@ code {
 .scan-area { margin-left: auto; }
 .admin-scan-area { margin-left: 0; margin-bottom: 12px; }
 .admin-missing-form { margin-top: 4px; }
+.admin-rename-form { margin-bottom: 12px; }
 
 .scan-status {
     display: flex;

@@ -1,5 +1,45 @@
 {{define "title"}}Admin panel — ComicNest{{end}}
 
+{{define "stat-grid"}}
+<div class="stat-grid">
+    <div class="stat-tile"><span class="stat-label">Series</span><span class="stat-value">{{.SeriesCount}}</span></div>
+    <div class="stat-tile"><span class="stat-label">One-shots</span><span class="stat-value">{{.OneShotCount}}</span></div>
+    <div class="stat-tile"><span class="stat-label">Locked series</span><span class="stat-value">{{.LockedSeriesCount}}</span></div>
+    <div class="stat-tile"><span class="stat-label">Issues</span><span class="stat-value">{{.IssueCount}}</span></div>
+    <div class="stat-tile"><span class="stat-label">Missing files</span><span class="stat-value">{{.MissingCount}}</span></div>
+    <div class="stat-tile"><span class="stat-label">Library size</span><span class="stat-value">{{prettySize .TotalSize}}</span></div>
+    <div class="stat-tile"><span class="stat-label">From ComicVine</span><span class="stat-value">{{.ComicVineCount}}</span></div>
+    <div class="stat-tile"><span class="stat-label">No ComicVine metadata</span><span class="stat-value">{{.NoMetadataCount}}</span></div>
+    <div class="stat-tile"><span class="stat-label">Locked issues</span><span class="stat-value">{{.LockedIssueCount}}</span></div>
+</div>
+{{end}}
+
+{{define "scan-history-table"}}
+{{if .}}
+<div class="admin-users-wrap">
+<table class="admin-users">
+    <thead>
+        <tr><th>Started</th><th>Duration</th><th>Files</th><th>Missing</th><th>ComicVine</th><th>Result</th></tr>
+    </thead>
+    <tbody>
+    {{range .}}
+        <tr>
+            <td>{{.Started}}</td>
+            <td>{{.Duration}}</td>
+            <td>{{.Processed}} / {{.Found}}</td>
+            <td>{{.Missing}}</td>
+            <td>{{if or .CVUpdated .CVFailed}}{{.CVUpdated}} updated{{if .CVFailed}}, {{.CVFailed}} failed{{end}}{{else}}—{{end}}</td>
+            <td>{{if .Err}}<span class="scan-error">{{.Err}}</span>{{else}}OK{{end}}</td>
+        </tr>
+    {{end}}
+    </tbody>
+</table>
+</div>
+{{else}}
+<p class="hint">No scans yet.</p>
+{{end}}
+{{end}}
+
 {{define "content"}}
 <div class="page-head"><h1>Admin panel</h1></div>
 
@@ -14,20 +54,42 @@
 </div>
 {{end}}
 
+{{if .Libraries}}
 <section class="admin-section">
-    <h2>Statistics</h2>
-    <div class="stat-grid">
-        <div class="stat-tile"><span class="stat-label">Series</span><span class="stat-value">{{.Stats.SeriesCount}}</span></div>
-        <div class="stat-tile"><span class="stat-label">One-shots</span><span class="stat-value">{{.Stats.OneShotCount}}</span></div>
-        <div class="stat-tile"><span class="stat-label">Locked series</span><span class="stat-value">{{.Stats.LockedSeriesCount}}</span></div>
-        <div class="stat-tile"><span class="stat-label">Issues</span><span class="stat-value">{{.Stats.IssueCount}}</span></div>
-        <div class="stat-tile"><span class="stat-label">Missing files</span><span class="stat-value">{{.Stats.MissingCount}}</span></div>
-        <div class="stat-tile"><span class="stat-label">Library size</span><span class="stat-value">{{prettySize .Stats.TotalSize}}</span></div>
-        <div class="stat-tile"><span class="stat-label">From ComicVine</span><span class="stat-value">{{.Stats.ComicVineCount}}</span></div>
-        <div class="stat-tile"><span class="stat-label">No ComicVine metadata</span><span class="stat-value">{{.Stats.NoMetadataCount}}</span></div>
-        <div class="stat-tile"><span class="stat-label">Locked issues</span><span class="stat-value">{{.Stats.LockedIssueCount}}</span></div>
+    <h2>All libraries</h2>
+    <div class="scan-area admin-scan-area" id="scan-area-all" hx-get="/scan/status?lib=all" hx-trigger="load" hx-swap="innerHTML">
+        <noscript>
+            <form action="/scan?lib=all" method="post"><button type="submit">Scan All Libraries</button></form>
+        </noscript>
     </div>
 </section>
+{{range .Libraries}}
+<section class="admin-section">
+    <h2>{{libraryName .Info.Path}} <span class="hint">({{.Info.Path}})</span></h2>
+    <form action="/admin/libraries/{{.Info.Index}}/name" method="post" class="edit-form admin-rename-form">
+        <label>Library name
+            <div class="input-group">
+                <input type="text" name="name" value="{{libraryName .Info.Path}}" placeholder="Library name" maxlength="200" autocomplete="off">
+                <button type="submit" class="btn">Rename</button>
+            </div>
+        </label>
+    </form>
+    <div class="scan-area admin-scan-area" id="scan-area-{{.Info.Index}}" hx-get="/scan/status?lib={{.Info.Index}}" hx-trigger="load" hx-swap="innerHTML">
+        <noscript>
+            <form action="/scan?lib={{.Info.Index}}" method="post"><button type="submit">Scan Library</button></form>
+        </noscript>
+    </div>
+    {{template "stat-grid" .Stats}}
+    <h3>Scan History</h3>
+    {{template "scan-history-table" .ScanHistory}}
+</section>
+{{end}}
+{{else}}
+<section class="admin-section">
+    <h2>Statistics</h2>
+    {{template "stat-grid" .Stats}}
+</section>
+{{end}}
 
 <section class="admin-section">
     <h2>Configuration</h2>
@@ -72,6 +134,7 @@
     </form>
 </section>
 
+{{if not .Libraries}}
 <section class="admin-section">
     <h2>Library</h2>
     <div class="scan-area admin-scan-area" id="scan-area" hx-get="/scan/status" hx-trigger="load" hx-swap="innerHTML">
@@ -79,40 +142,25 @@
             <form action="/scan" method="post"><button type="submit">Scan Library</button></form>
         </noscript>
     </div>
-    {{if .MissingCount}}
+</section>
+{{end}}
+
+{{if .MissingCount}}
+<section class="admin-section">
+    <h2>Missing files</h2>
     <form action="/admin/missing/delete" method="post" class="inline-form admin-missing-form"
           onsubmit="return confirm('Delete all {{.MissingCount}} missing file record(s) from the catalog? This cannot be undone.');">
         <button type="submit" class="btn btn-danger">Delete all missing entries ({{.MissingCount}})</button>
     </form>
-    {{end}}
 </section>
+{{end}}
 
+{{if not .Libraries}}
 <section class="admin-section">
     <h2>Scan History</h2>
-    {{if .ScanHistory}}
-    <div class="admin-users-wrap">
-    <table class="admin-users">
-        <thead>
-            <tr><th>Started</th><th>Duration</th><th>Files</th><th>Missing</th><th>ComicVine</th><th>Result</th></tr>
-        </thead>
-        <tbody>
-        {{range .ScanHistory}}
-            <tr>
-                <td>{{.Started}}</td>
-                <td>{{.Duration}}</td>
-                <td>{{.Processed}} / {{.Found}}</td>
-                <td>{{.Missing}}</td>
-                <td>{{if or .CVUpdated .CVFailed}}{{.CVUpdated}} updated{{if .CVFailed}}, {{.CVFailed}} failed{{end}}{{else}}—{{end}}</td>
-                <td>{{if .Err}}<span class="scan-error">{{.Err}}</span>{{else}}OK{{end}}</td>
-            </tr>
-        {{end}}
-        </tbody>
-    </table>
-    </div>
-    {{else}}
-    <p class="hint">No scans yet.</p>
-    {{end}}
+    {{template "scan-history-table" .ScanHistory}}
 </section>
+{{end}}
 
 <section class="admin-section">
     <h2>Users</h2>

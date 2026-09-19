@@ -7,7 +7,7 @@ import "testing"
 // favorited.
 func TestIssueFavorite(t *testing.T) {
 	st := openTestStore(t)
-	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga")
+	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,11 +70,11 @@ func TestIssueFavorite(t *testing.T) {
 // is the only path that surfaces it.
 func TestSeriesListSurfacesIssueFavorite(t *testing.T) {
 	st := openTestStore(t)
-	favID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga")
+	favID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherID, err := st.FindOrCreateSeriesByFolder("Y", "Y The Last Man")
+	otherID, err := st.FindOrCreateSeriesByFolder("Y", "Y The Last Man", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestSeriesListSurfacesIssueFavorite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	series, err := st.ListSeries("ania", "", SeriesSortName, SeriesFilterFavorite)
+	series, err := st.ListSeries("ania", "", SeriesSortName, SeriesFilterFavorite, "")
 	if err != nil {
 		t.Fatalf("ListSeries favorite filter: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestSeriesListSurfacesIssueFavorite(t *testing.T) {
 		t.Fatalf("ListSeries(favorite) = %+v, want only %q surfaced by its favorited issue", series, "Saga")
 	}
 
-	all, err := st.ListSeries("ania", "", SeriesSortName, SeriesFilterAll)
+	all, err := st.ListSeries("ania", "", SeriesSortName, SeriesFilterAll, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestSeriesListSurfacesIssueFavorite(t *testing.T) {
 	}
 
 	// A different user's favorite must not surface the series for "ania".
-	if series, err := st.ListSeries("bartek", "", SeriesSortName, SeriesFilterFavorite); err != nil || len(series) != 0 {
+	if series, err := st.ListSeries("bartek", "", SeriesSortName, SeriesFilterFavorite, ""); err != nil || len(series) != 0 {
 		t.Fatalf("ListSeries(bartek, favorite) = %+v, %v, want empty (different user)", series, err)
 	}
 }
@@ -120,7 +120,7 @@ func TestSeriesListSurfacesIssueFavorite(t *testing.T) {
 // and other users' favorites.
 func TestFavoriteIssuesCombined(t *testing.T) {
 	st := openTestStore(t)
-	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga")
+	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga", "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,7 +3,7 @@
 {{define "content"}}
 {{if .Msg}}<p class="flash {{if .MsgError}}flash-error{{end}}">{{.Msg}}</p>{{end}}
 <nav class="breadcrumbs">
-    <a href="/">Library</a> <span>/</span>
+    <a href="/">{{libraryName .Series.Library}}</a> <span>/</span>
     <a href="/series/{{.Series.ID}}">{{.Series.Name}}</a> <span>/</span>
     {{if .Issue.IssueNumber}}#{{.Issue.IssueNumber}}{{else}}{{.Filename}}{{end}}
 </nav>

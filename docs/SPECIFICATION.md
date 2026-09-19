@@ -54,7 +54,7 @@ ComicNextClaude/
 │   ├── covers/                  # first-page extraction → JPEG thumbnail → cache
 │   ├── comicvine/                # API client: search volume, get volume, get issue; rate limiter
 │   ├── opds/                    # Atom/OPDS 1.2 types + feed and OpenSearch serialization (no HTTP/DB)
-│   └── server/                  # HTTP handlers, routing, template rendering (+ opds.go: the OPDS catalog)
+│   └── server/                  # HTTP handlers, routing, template rendering (+ library.go: the multi-library switcher; opds.go: the OPDS catalog)
 ├── web/
 │   ├── templates/               # layout.html + views + HTMX partials
 │   └── static/                  # htmx.min.js, styles.css, placeholder.svg, favicon.png, favicon-32.png, favicon.ico, apple-touch-icon.png
@@ -84,6 +84,18 @@ page_size: 60                  # series tiles per library page; 0 = no paginatio
 When the file is missing, the app writes a default config and logs instructions to fill it in.
 User accounts are **not** part of this file — they live in the database and are managed from the
 admin panel in the browser (`/admin`, see below), not by editing YAML.
+
+**Multiple libraries (`libraries`).** An optional `libraries: []string` list of library root
+paths. When set, it takes precedence over `library` and splits the catalog into that many
+independent libraries, one per path; when absent or empty, `library` (if set) is used as the sole
+library, so existing single-folder configs are unaffected. `Config.LibraryPaths()` is the one
+method everything else calls to get the effective list, so the two config styles are
+indistinguishable past that point. Each library gets its own `library.Scanner` instance
+(`cmd/comicnest/main.go`, `Server.scanners map[string]*library.Scanner` keyed by root path) and
+its own `series.library` / `scan_history.library` stamp (§5); a scan of one library never touches
+another's catalog (§6). More than one library also turns on the admin panel's per-library sections
+and the main-menu library switcher (below, and §9). `libraries` has no `COMICNEST_*` override —
+only the single-library `library` key does, via `COMICNEST_LIBRARY`.
 
 **The `config_example.yaml` file** (at the repo root, versioned) is the template shown to users
 and the single full list of options: every key there has a comment saying what it does and what
@@ -128,6 +140,12 @@ counts, present and missing issue counts, total library size on disk, and ComicV
 (from ComicVine / no ComicVine metadata / locked issues). Below it, a Scan History section lists
 the most recent completed scans (`scan_history` table, migration 9; see §6) — when they ran, how
 long they took, files found/processed/missing, ComicVine updates, and any error.
+
+With more than one library configured (`libraries`, above), this becomes one block per library —
+its own Statistics, its own "Scan Library" button and status, and its own Scan History — plus a
+top "Scan All Libraries" button that scans every library (`POST /scan?lib=all`). With 0 or 1
+libraries configured, the panel looks exactly as described above: no visual change for existing
+single-library installs.
 
 **Library pagination (`page_size`).** The home view splits the filtered series list into pages of
 `page_size` tiles (default 60; `?page=N` parameter, sort and filter preserved in pager links). `0`
@@ -245,15 +263,37 @@ touch locked metadata) and fills the column; `''` = the archive was read fine bu
 or an empty `<Series>`, and every PDF. The column exists solely for the folder-splitting rule
 (§6 point 2).
 
+**Multiple libraries** (migration 12): the `series.library` column stamps a series with the root
+path of the library it was scanned from (indexed); `scan_history.library` does the same for a scan
+run. `''` means a pre-upgrade row not yet stamped — it still shows up correctly under "all
+libraries" until its library is next scanned. Written by `FindOrCreateSeriesByFolder`/
+`FindOrCreateSeriesByName` from each `library.Scanner`'s own root; read by `LibraryStats`,
+`ListScanHistory` and `ListSeries` to scope the admin panel and the main-menu library switcher
+(§4, §9) to one library or to all of them.
+
+**Library names** (migration 13): the `library_names` table (`path` primary key, `name`) holds a
+library's display-name override, set from the admin panel's per-library "Rename" field (`POST
+/admin/libraries/{index}/name`, `Store.SetLibraryName`; `Server.libraryName` reads it, falling
+back to the folder's own name — see §9). A runtime preference, not a `config.yaml` setting: a
+rename applies immediately, with no restart and no file edit.
+
 ## 6. Library scanning
 
 Started by a UI button (`POST /scan`), runs in a goroutine; the UI polls status (HTMX polling
-`GET /scan/status` every 2s — a progress bar and file counter). Only one scan at a time (a mutex
-plus an in-memory flag).
+`GET /scan/status` every 2s — a progress bar and file counter). Only one scan at a time per
+library (a mutex plus an in-memory flag on each `library.Scanner`).
+
+With multiple libraries configured (§4), each gets its own `library.Scanner` instance, one per
+root path. `POST /scan?lib=` addresses one of them (a config-order index) or `all` (every library,
+one after another) — what the admin panel's per-library "Scan Library" and top "Scan All
+Libraries" buttons post to. Before deciding which of the store's issues are missing, a scanner
+filters the (store-wide) issue list down to files under its own root (`Scanner.underRoot`), so
+scanning one library can't flag another library's files as missing or otherwise touch its catalog.
 
 Algorithm:
 
-1. `filepath.WalkDir` over `config.library`, filtering by extension: `.cbz`, `.cbr`, `.pdf`.
+1. `filepath.WalkDir` over the scanner's own library root (one of `Config.LibraryPaths()`),
+   filtering by extension: `.cbz`, `.cbr`, `.pdf`.
 2. **Assigning a series** (hybrid mode — folder, falling back to the file name):
    - a file in a subfolder → series = **the name of the nearest parent folder** (folder_path =
      the path relative to the library root); nested folders are allowed, only the immediate
@@ -378,6 +418,17 @@ status live in the admin panel (`/admin`), not the header. HTMX for: edit forms 
 filters, scan progress, the ComicVine match dialog. Every view also works without JS (plain POST
 forms) — HTMX only improves the UX.
 
+**Library switcher.** With more than one library configured (§4), a dropdown in the top
+navigation bar (`web/templates/layout.html`, the `multiLibrary` gate) lets the user pick one
+library or "All libraries". `POST /library` (`lib=` a config-order index — the same scheme
+`?lib=` uses in the admin panel — or empty for "all") stores the choice in a `comicnest_library`
+cookie (1 year; a raw filesystem path isn't a valid cookie value on Windows, hence the index) and
+redirects back to `/`; `Server.selectedLibrary` reads it, falling back to "all" when the index no
+longer names a configured library. The selection
+scopes the home library grid and `/search` results (`Store.ListSeries`); every other view (series/
+issue pages, the admin panel, OPDS) is unaffected. With 0 or 1 libraries configured, the switcher
+is hidden entirely.
+
 | Method and path | View / action |
 |---|---|
 | `GET /login` → `POST /login` (`name`, `password`, `next`) / `POST /logout` | login (only when the `users` table has at least one account; no accounts → redirect to `/`). The `withAuth` middleware: no session, GET → 303 to `/login?next=…`, other methods → 401; `/opds/*`, `/login`, `/logout`, `/static/*` are outside the gate. The username lives in the request context (`userFrom(r)`), shown in the layout as "👤 name" + "Log out" (`currentUser` bound per request on a template clone) |
@@ -399,6 +450,7 @@ forms) — HTMX only improves the UX.
 | `GET /issues/{id}/cover` | the cached thumbnail (Cache-Control; a placeholder when none exists) |
 | `GET /issues/{id}/download` | the comic file (`Content-Disposition: attachment`, the original name, `Content-Type` by extension: `application/vnd.comicbook+zip` / `-rar` / `application/pdf`) |
 | `POST /scan` — admin only / `GET /scan/status` | start a scan / an HTMX progress partial |
+| `POST /library` | set (or clear) the main menu's library selection — a `comicnest_library` cookie — and redirect to `/`; only meaningful with more than one library configured |
 | `GET /search?q=` | results by series name, title and issue numbers (LIKE) |
 | `GET /static/...` | static assets from `embed.FS` |
 | `GET /healthz` | a liveness probe (`ok`, no login) — Docker/orchestrators |
@@ -414,6 +466,10 @@ lives under the `/opds` prefix, so HTTP Basic auth (accounts from the `users` ta
 everything a reader touches; the logged-in user lands in the request context, so `pse:lastRead`,
 "Currently reading" and streaming progress are theirs. With no accounts the catalog is open (an
 anonymous reader). When OPDS is disabled, the routes aren't registered (404 from the catch-all).
+
+With multiple libraries configured (§4), OPDS still serves one combined catalog across all of
+them, regardless of the main menu's library selection — a deliberate scope decision, not a
+limitation slated to be fixed.
 
 Every feed carries an `<icon>` with the absolute address `/static/favicon.png` (192×192) — readers
 show it next to the catalog name. The icon lives under `/static`, i.e. outside Basic auth, so a

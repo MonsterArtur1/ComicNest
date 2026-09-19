@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -17,10 +18,18 @@ type Config struct {
 	// Listen is the interface to bind to. "localhost" keeps the app private to
 	// this machine; "0.0.0.0" exposes it on the LAN (needed for OPDS readers on
 	// phones/tablets — create an admin account then, so the UI is behind a login).
-	Listen          string `yaml:"listen"`
-	Library         string `yaml:"library"`
-	DataDir         string `yaml:"data_dir"`
-	ComicVineAPIKey string `yaml:"comicvine_api_key"`
+	Listen  string `yaml:"listen"`
+	Library string `yaml:"library"`
+	// Libraries, when non-empty, splits the catalog into multiple independent
+	// libraries — one per path — each with its own scan button and stats in
+	// the admin panel, and a switcher in the main menu ("all" aggregates
+	// every library there). It takes precedence over Library; when empty,
+	// Library (if set) is used as the sole library, so existing single-folder
+	// configs keep working unchanged. OPDS is unaffected either way: it
+	// always serves one combined catalog across every configured library.
+	Libraries       []string `yaml:"libraries,omitempty"`
+	DataDir         string   `yaml:"data_dir"`
+	ComicVineAPIKey string   `yaml:"comicvine_api_key"`
 	// OPDSEnabled turns on the OPDS catalog for external comic readers. The
 	// catalog is protected with HTTP Basic auth using the accounts table.
 	OPDSEnabled bool `yaml:"opds_enabled"`
@@ -90,7 +99,42 @@ func Load(path string) (Config, error) {
 	if cfg.PageSize < 0 {
 		return cfg, fmt.Errorf("invalid page_size %d in %s (0 = no pagination)", cfg.PageSize, path)
 	}
+	cfg.Libraries = cleanLibraries(cfg.Libraries)
+	seen := make(map[string]bool, len(cfg.Libraries))
+	for _, p := range cfg.Libraries {
+		key := strings.ToLower(p)
+		if seen[key] {
+			return cfg, fmt.Errorf("duplicate path %q in libraries (%s)", p, path)
+		}
+		seen[key] = true
+	}
 	return cfg, nil
+}
+
+// cleanLibraries trims whitespace and drops blank entries.
+func cleanLibraries(raw []string) []string {
+	out := make([]string, 0, len(raw))
+	for _, p := range raw {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// LibraryPaths returns the configured library roots: Libraries when set,
+// otherwise a single-element slice built from Library (or nil when neither
+// is configured). Every caller that needs to iterate the app's libraries
+// goes through this, so the two config styles are indistinguishable past
+// this point.
+func (c Config) LibraryPaths() []string {
+	if len(c.Libraries) > 0 {
+		return c.Libraries
+	}
+	if c.Library != "" {
+		return []string{c.Library}
+	}
+	return nil
 }
 
 // applyEnv overrides fields from COMICNEST_* environment variables (empty
