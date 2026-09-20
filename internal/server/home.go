@@ -45,7 +45,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	sort := store.ParseSeriesSort(r.FormValue("sort"))
 	filter := store.ParseSeriesFilter(r.FormValue("filter"))
 
-	series, err := s.store.ListSeries(userFrom(r), "", sort, filter)
+	series, err := s.store.ListSeries(userFrom(r), "", sort, filter, s.selectedLibrary(r))
 	if err != nil {
 		s.serverError(w, err)
 		return

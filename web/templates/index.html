@@ -2,7 +2,7 @@
 
 {{define "content"}}
 <div class="page-head">
-    <h1>Library</h1>
+    <h1>Library{{if multiLibrary}}{{$current := currentLibrary}}{{if ne $current ""}} — {{libraryName $current}}{{else}} — all libraries{{end}}{{end}}</h1>
     <div class="page-head-tools">
         <form action="/" method="get">
             {{if ne .Filter "all"}}<input type="hidden" name="filter" value="{{.Filter}}">{{end}}

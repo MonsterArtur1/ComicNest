@@ -104,6 +104,9 @@ All options live in `config.yaml`. A fully commented example is in the repositor
 port: 8080                    # HTTP port of the server
 listen: localhost             # "localhost" = this computer only; "0.0.0.0" = the whole local network (needed for OPDS reader apps)
 library: "D:/Comics"          # root folder of your comics (scanned recursively: cbz / cbr / pdf)
+# libraries:                   # optional: several independent libraries instead of one — see below
+#   - "D:/Comics/Marvel"
+#   - "D:/Comics/DC"
 data_dir: ./data              # runtime data: SQLite database and cover cache
 comicvine_api_key: ""         # key from https://comicvine.gamespot.com/api/ — leave empty to disable ComicVine features
 opds_enabled: false           # OPDS catalog at http://<host>:8080/opds for reader apps
@@ -112,6 +115,12 @@ page_size: 60                 # series tiles per page in the library grid; 0 = e
 
 User accounts are **not** in this file — you create them from the browser, in the admin panel
 at `/admin`. A few things worth knowing:
+
+- **Multiple libraries.** Set `libraries` to a list of folders instead of a single `library` to
+  keep separate collections apart (e.g. Marvel/DC, or your comics vs. someone else's) — it takes
+  precedence over `library` when set, so leave `library` in place. Each library gets its own scan
+  button, statistics and scan history in the admin panel, plus a dropdown in the top bar to browse
+  one library or all of them. OPDS is unaffected either way: it always serves one combined catalog.
 
 - **Opening the server to your network.** By default ComicNest listens on `localhost` only.
   Set `listen: 0.0.0.0` to reach it from phones, tablets and other computers. If you do that,

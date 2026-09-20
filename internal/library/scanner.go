@@ -135,6 +135,7 @@ func (sc *Scanner) run() {
 		CVUpdated:  final.CVUpdated,
 		CVFailed:   final.CVFailed,
 		Err:        final.Err,
+		Library:    sc.root,
 	}
 	if err := sc.store.RecordScanHistory(entry); err != nil {
 		log.Printf("scan: recording history: %v", err)
@@ -176,9 +177,19 @@ func (sc *Scanner) scan() error {
 	}
 	sc.setStatus(func(st *Status) { st.Found = len(files) })
 
-	existing, err := sc.store.AllIssuePaths()
+	// AllIssuePaths spans every configured library, not just this one — scope
+	// it to files under this scan's own root before treating anything absent
+	// from it as missing, or a concurrent/earlier scan of a sibling library
+	// would have every one of its issues wrongly flagged missing here.
+	allExisting, err := sc.store.AllIssuePaths()
 	if err != nil {
 		return err
+	}
+	existing := make(map[string]int64, len(allExisting))
+	for path, id := range allExisting {
+		if sc.underRoot(path) {
+			existing[path] = id
+		}
 	}
 
 	// Pass 2: sync each file with the store.
@@ -282,7 +293,7 @@ func (sc *Scanner) splitMixedFolders() error {
 			}
 			target, ok := existing[key]
 			if !ok {
-				if target, err = sc.store.FindOrCreateSeriesByName(name); err != nil {
+				if target, err = sc.store.FindOrCreateSeriesByName(name, sc.root); err != nil {
 					return err
 				}
 				existing[key] = target
@@ -320,6 +331,13 @@ func comicInfoSeriesName(v sql.NullString) string {
 		return ""
 	}
 	return strings.TrimSpace(v.String)
+}
+
+// underRoot reports whether path lies within this scanner's own library root
+// (used to scope the store-wide issue list to just this library — see scan).
+func (sc *Scanner) underRoot(path string) bool {
+	rel, err := filepath.Rel(sc.root, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 func isComicFile(path string) bool {
@@ -466,7 +484,7 @@ func (sc *Scanner) resolveSeries(path string, parsed Parsed, ci *ComicInfo) (int
 	}
 	relDir := filepath.Dir(rel)
 	if relDir != "." {
-		return sc.store.FindOrCreateSeriesByFolder(filepath.ToSlash(relDir), filepath.Base(relDir))
+		return sc.store.FindOrCreateSeriesByFolder(filepath.ToSlash(relDir), filepath.Base(relDir), sc.root)
 	}
 
 	name := ""
@@ -477,7 +495,7 @@ func (sc *Scanner) resolveSeries(path string, parsed Parsed, ci *ComicInfo) (int
 	} else {
 		name = parsed.Title
 	}
-	return sc.store.FindOrCreateSeriesByName(name)
+	return sc.store.FindOrCreateSeriesByName(name, sc.root)
 }
 
 // applyComicInfo overrides issue fields with the non-empty ComicInfo values.

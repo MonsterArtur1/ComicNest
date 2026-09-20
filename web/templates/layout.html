@@ -24,6 +24,17 @@
     <form class="search" action="/search" method="get">
         <input type="search" name="q" placeholder="Search series or issue…" value="{{block "searchQuery" .}}{{end}}">
     </form>
+    {{if multiLibrary}}
+    {{$current := currentLibrary}}
+    <form class="library-switcher" action="/library" method="post">
+        <select name="lib" onchange="this.form.submit()" title="Switch library">
+            <option value="" {{if eq $current ""}}selected{{end}}>All libraries</option>
+            {{range libraries}}
+            <option value="{{.Index}}" {{if eq .Path $current}}selected{{end}}>{{libraryName .Path}}</option>
+            {{end}}
+        </select>
+    </form>
+    {{end}}
     {{if opdsEnabled}}<a class="opds-badge" href="/opds" title="OPDS catalog address — paste it into your comic reader (Panels, Chunky, Moon+ Reader, Librera…)">OPDS</a>{{end}}
     {{if isAdmin}}<a class="btn btn-mini admin-link" href="/admin" title="Admin panel">⚙ <span>Admin</span></a>{{end}}
     {{with currentUser}}

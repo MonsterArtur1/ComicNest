@@ -55,7 +55,7 @@ func newTestServer(t *testing.T, opdsEnabled bool) (*Server, string) {
 	}
 	t.Cleanup(func() { st.Close() })
 
-	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga")
+	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga", dir)
 	if err != nil {
 		t.Fatalf("create series: %v", err)
 	}
@@ -84,7 +84,8 @@ func newTestServer(t *testing.T, opdsEnabled bool) (*Server, string) {
 	cache := covers.New(coversDir)
 	cfg := config.Config{Port: 8080, Listen: "localhost", Library: dir, DataDir: dir, OPDSEnabled: opdsEnabled}
 	configPath := filepath.Join(dir, "config.yaml")
-	srv, err := New(cfg, configPath, st, cache, library.NewScanner(st, cache, dir), comicvine.New(""))
+	scanners := map[string]*library.Scanner{dir: library.NewScanner(st, cache, dir)}
+	srv, err := New(cfg, configPath, st, cache, scanners, comicvine.New(""))
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
 	}
@@ -445,7 +446,7 @@ func TestHomeFiltersAndReadMark(t *testing.T) {
 
 	// A second series whose issues are all present and untouched: every
 	// aggregate over it is computed from NULL progress rows only.
-	batmanID, err := srv.store.FindOrCreateSeriesByFolder("Batman", "Batman")
+	batmanID, err := srv.store.FindOrCreateSeriesByFolder("Batman", "Batman", "")
 	if err != nil {
 		t.Fatal(err)
 	}

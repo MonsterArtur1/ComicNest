@@ -1,7 +1,7 @@
 {{define "title"}}{{.Series.Name}} — ComicNest{{end}}
 
 {{define "content"}}
-<nav class="breadcrumbs"><a href="/">Library</a> <span>/</span> {{.Series.Name}}</nav>
+<nav class="breadcrumbs"><a href="/">{{libraryName .Series.Library}}</a> <span>/</span> {{.Series.Name}}</nav>
 
 <div class="series-head">
     <div>

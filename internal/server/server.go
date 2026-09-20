@@ -9,6 +9,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -56,25 +57,86 @@ type Server struct {
 	activeComicVineAPIKey string
 	store                 *store.Store
 	covers                *covers.Cache
-	scanner               *library.Scanner
-	cv                    *comicvine.Client
-	scrape                *scrapeJob
-	templates             map[string]*template.Template
-	partials              *template.Template
-	reader                *template.Template // standalone full-screen reader page
-	login                 *template.Template // standalone login page
-	sessions              *sessions
-	mux                   *http.ServeMux
+	// libraries lists the configured libraries in config order (empty when
+	// none is configured yet). scanners holds one Scanner per library, keyed
+	// by its Path — the same key stamped on series.library (see
+	// Store.FindOrCreateSeriesBy*). OPDS ignores both: it always serves one
+	// combined catalog across every library (see handleOPDSSeriesList).
+	libraries []libraryInfo
+	scanners  map[string]*library.Scanner
+	cv        *comicvine.Client
+	scrape    *scrapeJob
+	templates map[string]*template.Template
+	partials  *template.Template
+	reader    *template.Template // standalone full-screen reader page
+	login     *template.Template // standalone login page
+	sessions  *sessions
+	mux       *http.ServeMux
 }
 
-func New(cfg config.Config, configPath string, st *store.Store, cv *covers.Cache, sc *library.Scanner, cvc *comicvine.Client) (*Server, error) {
+// libraryInfo identifies one configured library for the admin panel and the
+// main-menu switcher. Index is its position in config order, used as the
+// compact, URL-safe identifier in query strings (?lib=0) since Path itself
+// (an arbitrary filesystem path) is not; Path doubles as the scanners map key
+// and as the value stamped on series.library. Its display name is not stored
+// here — see Server.libraryName — since a rename (admin panel) must take
+// effect immediately, and this slice is built once at startup.
+type libraryInfo struct {
+	Index int
+	Path  string
+}
+
+// buildLibraries pairs every configured library path with its config-order
+// index.
+func buildLibraries(paths []string) []libraryInfo {
+	out := make([]libraryInfo, len(paths))
+	for i, p := range paths {
+		out[i] = libraryInfo{Index: i, Path: p}
+	}
+	return out
+}
+
+// libraryFolderName is a library's folder name ("D:/Comics/Marvel" ->
+// "Marvel"), falling back to the full path for a root-y path with no base
+// name of its own (e.g. "C:/" or "/").
+func libraryFolderName(path string) string {
+	name := filepath.Base(filepath.Clean(path))
+	if name == "" || name == "." || name == string(filepath.Separator) {
+		return path
+	}
+	return name
+}
+
+// libraryName is a library's display name: the admin's override (database —
+// see Store.GetLibraryName/SetLibraryName, edited from the admin panel's
+// per-library "Rename" field, no restart needed) if set, else its folder's
+// own name. Used for a series' library in the series/issue breadcrumb, the
+// admin panel's per-library headings, and the main-menu switcher. path == ""
+// (a series that predates the library column, never yet rescanned) falls
+// back to the literal word "Library".
+func (s *Server) libraryName(path string) string {
+	if path == "" {
+		return "Library"
+	}
+	name, err := s.store.GetLibraryName(path)
+	if err != nil {
+		log.Printf("libraryName %q: %v", path, err)
+	}
+	if name != "" {
+		return name
+	}
+	return libraryFolderName(path)
+}
+
+func New(cfg config.Config, configPath string, st *store.Store, cv *covers.Cache, scanners map[string]*library.Scanner, cvc *comicvine.Client) (*Server, error) {
 	s := &Server{
 		cfg:                   cfg,
 		configPath:            configPath,
 		activeComicVineAPIKey: cfg.ComicVineAPIKey,
 		store:                 st,
 		covers:                cv,
-		scanner:               sc,
+		libraries:             buildLibraries(cfg.LibraryPaths()),
+		scanners:              scanners,
 		cv:                    cvc,
 		scrape:                &scrapeJob{},
 		sessions:              newSessions(),
@@ -86,7 +148,9 @@ func New(cfg config.Config, configPath string, st *store.Store, cv *covers.Cache
 	s.routes()
 	// After every file scan, issues of matched series missing ComicVine data
 	// get scraped automatically.
-	sc.SetCVUpdater(s.autoScrapeCV)
+	for _, sc := range scanners {
+		sc.SetCVUpdater(s.autoScrapeCV)
+	}
 	return s, nil
 }
 
@@ -116,18 +180,22 @@ func (s *Server) setEditableConfig(comicVineAPIKey string, opdsEnabled bool, pag
 // funcMap holds helpers available in every template.
 func (s *Server) funcMap() template.FuncMap {
 	return template.FuncMap{
-		"prettySize":  prettySize,
-		"sourceLabel": sourceLabel,
-		"truncate":    truncateText,
-		"inc":         func(n int) int { return n + 1 },
-		"dec":         func(n int) int { return n - 1 },
-		"opdsEnabled": func() bool { return s.opdsRoutesRegistered },
-		"appVersion":  displayVersion,
-		"canRead":     canStreamPages, // in-browser reader works for CBZ/CBR only
-		// currentUser/isAdmin are overridden per request in renderStatus; these
-		// defaults only satisfy parse-time resolution.
-		"currentUser": func() string { return "" },
-		"isAdmin":     func() bool { return false },
+		"prettySize":   prettySize,
+		"sourceLabel":  sourceLabel,
+		"truncate":     truncateText,
+		"inc":          func(n int) int { return n + 1 },
+		"dec":          func(n int) int { return n - 1 },
+		"opdsEnabled":  func() bool { return s.opdsRoutesRegistered },
+		"appVersion":   displayVersion,
+		"canRead":      canStreamPages, // in-browser reader works for CBZ/CBR only
+		"libraries":    func() []libraryInfo { return s.libraries },
+		"multiLibrary": func() bool { return len(s.libraries) > 1 },
+		"libraryName":  s.libraryName,
+		// currentUser/isAdmin/currentLibrary are overridden per request in
+		// renderStatus; these defaults only satisfy parse-time resolution.
+		"currentUser":    func() string { return "" },
+		"isAdmin":        func() bool { return false },
+		"currentLibrary": func() string { return "" },
 	}
 }
 
@@ -271,6 +339,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /issues/{id}/cover", s.handleIssueCover)
 	s.mux.HandleFunc("GET /issues/{id}/download", s.handleIssueDownload)
 	s.mux.HandleFunc("GET /search", s.handleSearch)
+	s.mux.HandleFunc("POST /library", s.handleSetLibrary)
 	s.mux.HandleFunc("POST /scan", s.requireAdmin(s.handleScanStart))
 	s.mux.HandleFunc("GET /scan/status", s.handleScanStatus)
 	s.mux.HandleFunc("GET /admin", s.requireAdmin(s.handleAdmin))
@@ -281,6 +350,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /admin/missing/delete", s.requireAdmin(s.handleAdminDeleteMissing))
 	s.mux.HandleFunc("POST /admin/config", s.requireAdmin(s.handleAdminSaveConfig))
 	s.mux.HandleFunc("POST /admin/config/test-comicvine", s.requireAdmin(s.handleAdminTestComicVine))
+	s.mux.HandleFunc("POST /admin/libraries/{index}/name", s.requireAdmin(s.handleAdminRenameLibrary))
 	s.opdsRoutesRegistered = s.cfg.OPDSEnabled
 	if s.opdsRoutesRegistered {
 		s.opdsRoutes()
@@ -403,9 +473,11 @@ func (s *Server) renderStatus(w http.ResponseWriter, r *http.Request, status int
 	}
 	user := userFrom(r)
 	admin := s.isAdmin(r)
+	lib := s.selectedLibrary(r)
 	t.Funcs(template.FuncMap{
-		"currentUser": func() string { return user },
-		"isAdmin":     func() bool { return admin },
+		"currentUser":    func() string { return user },
+		"isAdmin":        func() bool { return admin },
+		"currentLibrary": func() string { return lib },
 	})
 
 	var buf bytes.Buffer
@@ -439,9 +511,11 @@ func (s *Server) errorPage(w http.ResponseWriter, r *http.Request, status int, m
 	}
 	user := userFrom(r)
 	admin := s.isAdmin(r)
+	lib := s.selectedLibrary(r)
 	t.Funcs(template.FuncMap{
-		"currentUser": func() string { return user },
-		"isAdmin":     func() bool { return admin },
+		"currentUser":    func() string { return user },
+		"isAdmin":        func() bool { return admin },
+		"currentLibrary": func() string { return lib },
 	})
 
 	var buf bytes.Buffer

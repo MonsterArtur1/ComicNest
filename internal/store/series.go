@@ -3,6 +3,8 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 )
 
 // Series is a comic series row plus aggregates used by list views.
@@ -15,7 +17,8 @@ type Series struct {
 	ComicVineVolumeID sql.NullInt64
 	ComicVineURL      string // comicvine.gamespot.com page, set together with ComicVineVolumeID
 	MetadataLocked    bool
-	OneShot           bool // single publication, not part of any series
+	OneShot           bool   // single publication, not part of any series
+	Library           string // root path of the library this series was scanned from ("" if not yet stamped)
 	CreatedAt         string
 	UpdatedAt         string
 
@@ -51,12 +54,12 @@ func (s *Store) GetSeries(id int64) (*Series, error) {
 	var sr Series
 	err := s.db.QueryRow(`
 		SELECT s.id, s.name, s.folder_path, s.publisher, s.description,
-		       s.comicvine_volume_id, s.comicvine_url, s.metadata_locked, s.one_shot,
+		       s.comicvine_volume_id, s.comicvine_url, s.metadata_locked, s.one_shot, s.library,
 		       s.created_at, s.updated_at,
 		       (SELECT COUNT(*) FROM issues i WHERE i.series_id = s.id)
 		FROM series s WHERE s.id = ?`, id).
 		Scan(&sr.ID, &sr.Name, &sr.FolderPath, &sr.Publisher, &sr.Description,
-			&sr.ComicVineVolumeID, &sr.ComicVineURL, &sr.MetadataLocked, &sr.OneShot,
+			&sr.ComicVineVolumeID, &sr.ComicVineURL, &sr.MetadataLocked, &sr.OneShot, &sr.Library,
 			&sr.CreatedAt, &sr.UpdatedAt, &sr.IssueCount)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -223,28 +226,77 @@ func (s *Store) MergeSeries(fromID, intoID int64) error {
 	return tx.Commit()
 }
 
+// stampSeriesLibrary records which library a series belongs to, whenever a
+// scan touches it — including on every rescan, not just at creation — so
+// that a series catalogued before this field existed (library = ”) picks up
+// its real value the first time its library is scanned again, and a series
+// whose configured library path changed follows it.
+func (s *Store) stampSeriesLibrary(id int64, library string) error {
+	if library == "" {
+		return nil
+	}
+	_, err := s.db.Exec(`UPDATE series SET library = ? WHERE id = ? AND library != ?`, library, id, library)
+	return err
+}
+
+// MarkOrphanedLibrariesMissing flags every present issue whose series is
+// stamped with a library no longer in configured as missing — the same flag
+// a scan sets when a file vanishes from disk, but here for an entire library
+// that vanished from config.yaml instead (which, since no Scanner exists for
+// it anymore, no scan will ever do on its own). A series stamped ” (never
+// scanned since the library column was introduced) is left alone: it isn't
+// orphaned, just not yet attributed to its still-configured library.
+//
+// With configured empty (nothing configured at all, as opposed to something
+// having been removed), this is a no-op — a momentarily blank config.yaml
+// shouldn't flag an entire catalog missing. Returns the number of issues
+// newly flagged.
+func (s *Store) MarkOrphanedLibrariesMissing(configured []string) (int, error) {
+	if len(configured) == 0 {
+		return 0, nil
+	}
+	placeholders := make([]string, len(configured))
+	args := make([]any, len(configured))
+	for i, p := range configured {
+		placeholders[i] = "?"
+		args[i] = p
+	}
+	query := fmt.Sprintf(`
+		UPDATE issues SET file_missing = 1, updated_at = datetime('now')
+		WHERE file_missing = 0 AND series_id IN (
+			SELECT id FROM series WHERE library != '' AND library NOT IN (%s)
+		)`, strings.Join(placeholders, ","))
+	res, err := s.db.Exec(query, args...)
+	if err != nil {
+		return 0, err
+	}
+	n, err := res.RowsAffected()
+	return int(n), err
+}
+
 // FindOrCreateSeriesByFolder returns the series backed by the given library
 // folder (relative path), creating it with the folder's base name when
 // absent. A folder that used to back its own series, merged away since (see
 // MergeSeries), resolves to the merge target instead of creating a fresh
-// series and silently undoing the merge.
-func (s *Store) FindOrCreateSeriesByFolder(folderPath, name string) (int64, error) {
+// series and silently undoing the merge. library is the root path of the
+// library doing the scan (see Series.Library); pass "" if unknown.
+func (s *Store) FindOrCreateSeriesByFolder(folderPath, name, library string) (int64, error) {
 	var id int64
 	err := s.db.QueryRow(`SELECT id FROM series WHERE folder_path = ?`, folderPath).Scan(&id)
 	if err == nil {
-		return id, nil
+		return id, s.stampSeriesLibrary(id, library)
 	}
 	if err != sql.ErrNoRows {
 		return 0, err
 	}
 	err = s.db.QueryRow(`SELECT series_id FROM series_folder_aliases WHERE folder_path = ?`, folderPath).Scan(&id)
 	if err == nil {
-		return id, nil
+		return id, s.stampSeriesLibrary(id, library)
 	}
 	if err != sql.ErrNoRows {
 		return 0, err
 	}
-	res, err := s.db.Exec(`INSERT INTO series (name, folder_path) VALUES (?, ?)`, name, folderPath)
+	res, err := s.db.Exec(`INSERT INTO series (name, folder_path, library) VALUES (?, ?, ?)`, name, folderPath, library)
 	if err != nil {
 		return 0, err
 	}
@@ -255,26 +307,28 @@ func (s *Store) FindOrCreateSeriesByFolder(folderPath, name string) (int64, erro
 // with the given name, creating it when absent. Name match is
 // case-insensitive. A name that used to back its own virtual series, merged
 // away since (see MergeSeries), resolves to the merge target instead of
-// creating a fresh series and silently undoing the merge.
-func (s *Store) FindOrCreateSeriesByName(name string) (int64, error) {
+// creating a fresh series and silently undoing the merge. library is the
+// root path of the library doing the scan (see Series.Library); pass "" if
+// unknown.
+func (s *Store) FindOrCreateSeriesByName(name, library string) (int64, error) {
 	var id int64
 	err := s.db.QueryRow(`
 		SELECT id FROM series
 		WHERE folder_path IS NULL AND name = ? COLLATE NOCASE`, name).Scan(&id)
 	if err == nil {
-		return id, nil
+		return id, s.stampSeriesLibrary(id, library)
 	}
 	if err != sql.ErrNoRows {
 		return 0, err
 	}
 	err = s.db.QueryRow(`SELECT series_id FROM series_name_aliases WHERE name = ?`, name).Scan(&id)
 	if err == nil {
-		return id, nil
+		return id, s.stampSeriesLibrary(id, library)
 	}
 	if err != sql.ErrNoRows {
 		return 0, err
 	}
-	res, err := s.db.Exec(`INSERT INTO series (name) VALUES (?)`, name)
+	res, err := s.db.Exec(`INSERT INTO series (name, library) VALUES (?, ?)`, name, library)
 	if err != nil {
 		return 0, err
 	}
@@ -356,8 +410,9 @@ func (f SeriesFilter) having() string {
 // ListSeries returns series that have at least one issue, optionally filtered
 // by a case-insensitive substring matched against the series name/publisher
 // or any of its issues' writer/artist/publisher, and a SeriesFilter, with the
-// given user's reading aggregates filled in.
-func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter SeriesFilter) ([]Series, error) {
+// given user's reading aggregates filled in. library scopes the result to
+// series stamped with that root path; "" means every library ("all").
+func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter SeriesFilter, library string) ([]Series, error) {
 	order := "s.name COLLATE NOCASE ASC"
 	switch sort {
 	case SeriesSortNameDesc:
@@ -397,7 +452,7 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 	// favorited issues instead of a 0/1 flag.
 	query := `
 		SELECT s.id, s.name, s.folder_path, s.publisher, s.description,
-		       s.comicvine_volume_id, s.metadata_locked, s.one_shot,
+		       s.comicvine_volume_id, s.metadata_locked, s.one_shot, s.library,
 		       s.created_at, s.updated_at,
 		       COUNT(i.id),
 		       COALESCE((
@@ -417,7 +472,8 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 		JOIN issues i ON i.series_id = s.id
 		LEFT JOIN reading_progress rp ON rp.issue_id = i.id AND rp.user = ?
 		LEFT JOIN issue_favorites fi ON fi.issue_id = i.id AND fi.user = ?
-		WHERE (? = '' OR s.name LIKE '%' || ? || '%' OR s.publisher LIKE '%' || ? || '%'
+		WHERE (? = '' OR s.library = ?)
+		  AND (? = '' OR s.name LIKE '%' || ? || '%' OR s.publisher LIKE '%' || ? || '%'
 		       OR EXISTS (
 		           SELECT 1 FROM issues i2 WHERE i2.series_id = s.id
 		           AND (i2.writer LIKE '%' || ? || '%' OR i2.artist LIKE '%' || ? || '%' OR i2.publisher LIKE '%' || ? || '%')
@@ -426,7 +482,7 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 		` + filter.having() + `
 		ORDER BY ` + order
 
-	rows, err := s.db.Query(query, user, user, nameFilter, nameFilter, nameFilter, nameFilter, nameFilter, nameFilter)
+	rows, err := s.db.Query(query, user, user, library, library, nameFilter, nameFilter, nameFilter, nameFilter, nameFilter, nameFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -436,7 +492,7 @@ func (s *Store) ListSeries(user, nameFilter string, sort SeriesSort, filter Seri
 	for rows.Next() {
 		var sr Series
 		err := rows.Scan(&sr.ID, &sr.Name, &sr.FolderPath, &sr.Publisher, &sr.Description,
-			&sr.ComicVineVolumeID, &sr.MetadataLocked, &sr.OneShot,
+			&sr.ComicVineVolumeID, &sr.MetadataLocked, &sr.OneShot, &sr.Library,
 			&sr.CreatedAt, &sr.UpdatedAt, &sr.IssueCount, &sr.CoverIssueID,
 			&sr.IssuesPresent, &sr.IssuesStarted, &sr.IssuesRead, &sr.PageCount, &sr.ReleaseYear,
 			&sr.IsFavorite)

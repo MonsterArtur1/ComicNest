@@ -22,7 +22,7 @@ func TestResetIssueMetadataFilenameOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
-	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga")
+	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestResetIssueMetadataFallsBackToComicInfo(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
-	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga")
+	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga", "")
 	if err != nil {
 		t.Fatal(err)
 	}

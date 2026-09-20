@@ -16,7 +16,7 @@ func TestScanHistory(t *testing.T) {
 		}
 	}
 
-	got, err := st.ListScanHistory(10)
+	got, err := st.ListScanHistory(10, "")
 	if err != nil {
 		t.Fatalf("ListScanHistory: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestScanHistory(t *testing.T) {
 		t.Errorf("got[2] = %+v, want the first (oldest) entry", got[2])
 	}
 
-	limited, err := st.ListScanHistory(2)
+	limited, err := st.ListScanHistory(2, "")
 	if err != nil {
 		t.Fatalf("ListScanHistory(2): %v", err)
 	}
@@ -40,5 +40,36 @@ func TestScanHistory(t *testing.T) {
 	}
 	if limited[0].StartedAt != "2024-01-03 10:00:00" || limited[1].StartedAt != "2024-01-02 10:00:00" {
 		t.Errorf("limited entries not newest-first: %+v", limited)
+	}
+}
+
+func TestScanHistoryPerLibrary(t *testing.T) {
+	st := openTestStore(t)
+
+	if err := st.RecordScanHistory(ScanHistoryEntry{
+		StartedAt: "2024-01-01 10:00:00", FinishedAt: "2024-01-01 10:00:05", Found: 1, Processed: 1, Library: "/libA",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RecordScanHistory(ScanHistoryEntry{
+		StartedAt: "2024-01-02 10:00:00", FinishedAt: "2024-01-02 10:00:05", Found: 2, Processed: 2, Library: "/libB",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	a, err := st.ListScanHistory(10, "/libA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(a) != 1 || a[0].Library != "/libA" || a[0].Found != 1 {
+		t.Errorf("ListScanHistory(/libA) = %+v, want just libA's entry", a)
+	}
+
+	all, err := st.ListScanHistory(10, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 {
+		t.Errorf("ListScanHistory(\"\") = %d entries, want 2 (both libraries)", len(all))
 	}
 }

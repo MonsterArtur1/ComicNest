@@ -62,7 +62,7 @@ func newTestScanner(t *testing.T, root string) (*Scanner, *store.Store) {
 // visibleSeries returns the series shown in the UI (those with issues).
 func visibleSeries(t *testing.T, st *store.Store) []store.Series {
 	t.Helper()
-	series, err := st.ListSeries("", "", store.SeriesSortName, store.SeriesFilterAll)
+	series, err := st.ListSeries("", "", store.SeriesSortName, store.SeriesFilterAll, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestScanSplitsFolderWithMixedComicInfoSeries(t *testing.T) {
 	assertSeries(t, st, want)
 
 	// The folder series row still exists (hidden: no issues), the new ones are virtual.
-	folder, err := st.FindOrCreateSeriesByFolder("Mad Max", "Mad Max")
+	folder, err := st.FindOrCreateSeriesByFolder("Mad Max", "Mad Max", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +193,7 @@ func TestScanBackfillsComicInfoSeriesForOldRows(t *testing.T) {
 
 	// Simulate rows catalogued before the comicinfo_series column existed:
 	// inserted directly, NULL in the new column, locked metadata on one of them.
-	folder, err := st.FindOrCreateSeriesByFolder("Mixed", "Mixed")
+	folder, err := st.FindOrCreateSeriesByFolder("Mixed", "Mixed", "")
 	if err != nil {
 		t.Fatal(err)
 	}

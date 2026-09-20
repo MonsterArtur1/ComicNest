@@ -13,6 +13,17 @@
 port: 8080                    # HTTP server port
 listen: 0.0.0.0               # listen interface: "localhost" = this computer only, "0.0.0.0" = the whole local network (needed by OPDS readers)
 library: "D:/Library"         # comic library root (scanned recursively: cbz/cbr/pdf)
+# libraries: multiple independent libraries instead of one — each gets its own
+# scan button and statistics in the admin panel, and a switcher in the main
+# menu ("all libraries" aggregates them there). Takes precedence over
+# `library` above when set (leave `library` in place, it's just ignored).
+# OPDS is unaffected: it always serves one combined catalog across all of them.
+# libraries:
+#   - "D:/Library/Marvel"
+#   - "D:/Library/DC"
+# A library's display name (else its folder's own name) can be changed from
+# the admin panel's per-library "Rename" field — that's stored in the
+# database, not here, and applies right away with no restart.
 data_dir: ./data              # runtime data: the SQLite database (database.sqlite, including user accounts) and cover cache (covers/)
 comicvine_api_key: ""         # key from https://comicvine.gamespot.com/api/; empty = ComicVine matching/scraping disabled (the UI says so)
 opds_enabled: true            # OPDS catalog under /opds (see §9a); logs in with the same accounts as the web UI

@@ -176,6 +176,29 @@ var migrations = []string{
 	`
 	DROP TABLE series_favorites;
 	`,
+
+	// 12: multi-library support. Every series is stamped with the root path
+	// of the library it was scanned from (see Store.FindOrCreateSeriesBy*),
+	// so the admin panel and main menu can scope stats/listings to one
+	// library or "all". '' means not yet stamped (pre-upgrade rows) — they
+	// get their real value the next time their library is scanned; until
+	// then they still show up correctly under "all libraries".
+	`
+	ALTER TABLE series ADD COLUMN library TEXT NOT NULL DEFAULT '';
+	CREATE INDEX idx_series_library ON series(library);
+	ALTER TABLE scan_history ADD COLUMN library TEXT NOT NULL DEFAULT '';
+	`,
+
+	// 13: a library's display-name override (admin panel "Rename"), keyed by
+	// its root path — a runtime preference, not a config.yaml setting, so
+	// renaming needs no restart and no file edit either (see
+	// Store.SetLibraryName / Server.libraryName).
+	`
+	CREATE TABLE library_names (
+		path TEXT PRIMARY KEY,
+		name TEXT NOT NULL
+	);
+	`,
 }
 
 func migrate(db *sql.DB) error {

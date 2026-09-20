@@ -17,7 +17,7 @@ func addSeries(t *testing.T, st *store.Store, dir string, n int) {
 	t.Helper()
 	for i := 1; i <= n; i++ {
 		name := fmt.Sprintf("S%02d", i)
-		id, err := st.FindOrCreateSeriesByFolder(name, name)
+		id, err := st.FindOrCreateSeriesByFolder(name, name, dir)
 		if err != nil {
 			t.Fatal(err)
 		}

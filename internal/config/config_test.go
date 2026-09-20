@@ -66,6 +66,36 @@ func TestPageSize(t *testing.T) {
 	}
 }
 
+func TestLibraryPaths(t *testing.T) {
+	cfg, err := load(t, "library: /comics\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.LibraryPaths(); len(got) != 1 || got[0] != "/comics" {
+		t.Errorf("LibraryPaths() with only `library` set = %v", got)
+	}
+
+	cfg, err = load(t, "library: /ignored\nlibraries:\n  - /a\n  - /b\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.LibraryPaths(); len(got) != 2 || got[0] != "/a" || got[1] != "/b" {
+		t.Errorf("LibraryPaths() with `libraries` set = %v, want [/a /b]", got)
+	}
+
+	cfg, err = load(t, "port: 8080\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.LibraryPaths(); got != nil {
+		t.Errorf("LibraryPaths() with nothing set = %v, want nil", got)
+	}
+
+	if _, err := load(t, "libraries:\n  - /a\n  - /A\n"); err == nil {
+		t.Error("duplicate library paths (case-insensitive) should be a config error")
+	}
+}
+
 func TestEnvOverrides(t *testing.T) {
 	t.Setenv("COMICNEST_LISTEN", "0.0.0.0")
 	t.Setenv("COMICNEST_LIBRARY", "/comics")

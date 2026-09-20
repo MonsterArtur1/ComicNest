@@ -61,7 +61,23 @@ func main() {
 	}
 	defer st.Close()
 
-	log.Printf("library: %s", cfg.Library)
+	libPaths := cfg.LibraryPaths()
+	if len(libPaths) > 1 {
+		log.Printf("libraries: %d configured", len(libPaths))
+		for _, p := range libPaths {
+			log.Printf("  - %s", p)
+		}
+	} else {
+		log.Printf("library: %s", cfg.Library)
+	}
+	// A library removed from config.yaml has no Scanner anymore, so nothing
+	// would ever notice its files are no longer reachable — flag its issues
+	// missing now, the same way a scan flags a file that vanished from disk.
+	if n, err := st.MarkOrphanedLibrariesMissing(libPaths); err != nil {
+		log.Printf("startup: marking orphaned library issues missing: %v", err)
+	} else if n > 0 {
+		log.Printf("startup: %d issue(s) from a library no longer in config.yaml marked missing (see the admin panel's Missing files section)", n)
+	}
 	log.Printf("database: %s", dbPath)
 	if cfg.ComicVineAPIKey == "" {
 		log.Printf("comicvine: disabled (no API key in config.yaml)")
@@ -90,9 +106,19 @@ func main() {
 	}
 
 	coverCache := covers.New(coversDir)
-	scanner := library.NewScanner(st, coverCache, cfg.Library)
+	// A scanner per configured library; with none configured, a single
+	// placeholder scanner (root "") keeps the "set the library path" error
+	// surfacing in the UI exactly as before multi-library support existed.
+	scanners := make(map[string]*library.Scanner)
+	if len(libPaths) == 0 {
+		scanners[""] = library.NewScanner(st, coverCache, "")
+	} else {
+		for _, p := range libPaths {
+			scanners[p] = library.NewScanner(st, coverCache, p)
+		}
+	}
 
-	srv, err := server.New(cfg, *configPath, st, coverCache, scanner, comicvine.New(cfg.ComicVineAPIKey))
+	srv, err := server.New(cfg, *configPath, st, coverCache, scanners, comicvine.New(cfg.ComicVineAPIKey))
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}

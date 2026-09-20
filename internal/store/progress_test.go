@@ -6,7 +6,7 @@ import "testing"
 // to their last page count, scoped to the requesting user.
 func TestFinishedAtTimes(t *testing.T) {
 	st := openTestStore(t)
-	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga")
+	seriesID, err := st.FindOrCreateSeriesByFolder("Saga", "Saga", "")
 	if err != nil {
 		t.Fatal(err)
 	}

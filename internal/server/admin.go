@@ -63,16 +63,31 @@ type cvTestResult struct {
 	Message string
 }
 
+// libraryPanel is one configured library's own Statistics/Scan/History block,
+// shown only in multi-library mode (see adminData.Libraries).
+type libraryPanel struct {
+	Info        libraryInfo
+	Stats       store.LibraryStats
+	ScanHistory []scanHistoryRow
+}
+
 type adminData struct {
 	Users []adminUserRow
 	// IsFirstRun is true when no account exists yet: the add-user form force
 	// the new account to be an admin (there is no other way back in).
 	IsFirstRun bool
 	// MissingCount is the number of catalog records whose file has
-	// disappeared from disk (drives the "delete all missing" button).
+	// disappeared from disk, across every library (drives the "delete all
+	// missing" button).
 	MissingCount int
-	// Stats is the library-wide health snapshot shown in the Statistics
-	// section.
+	// Libraries holds one panel per configured library — its own stats, scan
+	// button and history — when more than one is configured. Templates
+	// switch on `len .Libraries` to pick this per-library layout over the
+	// single-library one below.
+	Libraries []libraryPanel
+	// Stats/ScanHistory are the single combined library's health snapshot
+	// and scan history, used instead of Libraries when at most one library
+	// is configured — the admin panel then looks exactly as it always has.
 	Stats store.LibraryStats
 	// ScanHistory is the most recent completed scans, newest first.
 	ScanHistory []scanHistoryRow
@@ -109,22 +124,40 @@ func (s *Server) adminPageData() (adminData, error) {
 	if err != nil {
 		return adminData{}, err
 	}
-	stats, err := s.store.LibraryStats()
-	if err != nil {
-		return adminData{}, err
-	}
-	history, err := s.store.ListScanHistory(20)
-	if err != nil {
-		return adminData{}, err
-	}
-	return adminData{
+	data := adminData{
 		Users:        rows,
 		IsFirstRun:   len(rows) == 0,
 		MissingCount: missing,
-		Stats:        stats,
-		ScanHistory:  scanHistoryRows(history),
 		Config:       s.adminConfigView(),
-	}, nil
+	}
+
+	if len(s.libraries) > 1 {
+		for _, lib := range s.libraries {
+			stats, err := s.store.LibraryStats(lib.Path)
+			if err != nil {
+				return adminData{}, err
+			}
+			history, err := s.store.ListScanHistory(10, lib.Path)
+			if err != nil {
+				return adminData{}, err
+			}
+			data.Libraries = append(data.Libraries, libraryPanel{
+				Info: lib, Stats: stats, ScanHistory: scanHistoryRows(history),
+			})
+		}
+	} else {
+		stats, err := s.store.LibraryStats("")
+		if err != nil {
+			return adminData{}, err
+		}
+		history, err := s.store.ListScanHistory(20, "")
+		if err != nil {
+			return adminData{}, err
+		}
+		data.Stats = stats
+		data.ScanHistory = scanHistoryRows(history)
+	}
+	return data, nil
 }
 
 // adminConfigView reads the current admin-editable settings, noting which
@@ -390,6 +423,29 @@ func (s *Server) handleAdminSaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	updated := s.setEditableConfig(apiKey, opdsEnabled, pageSize)
 	if err := config.Save(s.configPath, updated); err != nil {
+		s.serverError(w, err)
+		return
+	}
+	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+}
+
+// handleAdminRenameLibrary sets or clears a library's display-name override,
+// stored in the database (not config.yaml — see Store.SetLibraryName).
+// Submitting the folder's own default name (or a blank name) clears the
+// override instead of storing a redundant one. Takes effect immediately, no
+// restart needed (see Server.libraryName).
+func (s *Server) handleAdminRenameLibrary(w http.ResponseWriter, r *http.Request) {
+	idx, err := strconv.Atoi(r.PathValue("index"))
+	if err != nil || idx < 0 || idx >= len(s.libraries) {
+		s.notFound(w, r)
+		return
+	}
+	path := s.libraries[idx].Path
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == libraryFolderName(path) {
+		name = ""
+	}
+	if err := s.store.SetLibraryName(path, name); err != nil {
 		s.serverError(w, err)
 		return
 	}
