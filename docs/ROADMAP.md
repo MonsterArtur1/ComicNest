@@ -83,3 +83,8 @@ Design details: [SPECIFICATION.md](SPECIFICATION.md).
 - Watching the library for changes (fsnotify)
 - Deadpool Polska — ComicVine has nothing but a cover for it, so it gets ignored; it shouldn't be
 - Collections / reading lists
+- Reading progress sync over OPDS-PSE (Page Streaming Extension), so progress made in Panels/Chunky/other OPDS readers flows back into ComicNest
+- Database backup from the admin panel: download the SQLite database, export reading progress to JSON
+- Series gap detection: flag missing issues in a series (e.g. "missing #12–14") from issue numbers and the ComicVine volume's issue list
+- Creator pages: click a writer/artist to see all of their issues in the library
+- Offline reading (PWA): download an issue into the service worker cache to read it without a connection
