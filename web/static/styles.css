@@ -276,6 +276,65 @@ code {
     color: var(--text-dim);
 }
 .stats-strip strong { color: var(--text); }
+.stats-strip .stats-more { color: var(--text-dim); text-decoration: none; }
+.stats-strip .stats-more:hover { color: var(--accent); }
+
+.stats-section { margin-bottom: 28px; }
+.stats-section h2 { font-size: 16px; margin: 0 0 12px; }
+.stats-section h2 .dim { font-weight: normal; color: var(--text-dim); }
+.stats-charts, .stats-rankings {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 0 28px;
+}
+.stats-section .stat-tile { background: var(--bg-raised); }
+.stat-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 160px;
+    padding: 12px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+.stat-bar {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: stretch;
+    text-align: center;
+}
+.stat-bar-fill {
+    display: block;
+    min-height: 2px;
+    background: var(--accent);
+    border-radius: 3px 3px 0 0;
+}
+.stat-bar-count, .stat-bar-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.stat-ranking { margin: 0; padding: 0; list-style: none; counter-reset: rank; }
+.stat-ranking li {
+    counter-increment: rank;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+}
+.stat-ranking li::before { content: counter(rank) "."; color: var(--text-dim); min-width: 1.5em; }
+.stat-ranking li > :first-of-type { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stat-ranking a { color: var(--text); text-decoration: none; }
+.stat-ranking a:hover { color: var(--accent); }
 
 select, button, .btn {
     background: var(--bg-raised);

@@ -1,0 +1,90 @@
+{{define "title"}}ComicNest — your stats{{end}}
+
+{{define "content"}}
+<div class="page-head">
+    <h1>Your stats</h1>
+</div>
+
+{{if or .User.IssuesRead .User.InProgress}}
+<section class="stats-section">
+    <h2>Reading</h2>
+    <div class="stat-grid">
+        <div class="stat-tile"><span class="stat-value">{{.User.IssuesRead}}</span><span class="stat-label">issues read</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.User.PagesRead}}</span><span class="stat-label">pages read</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.User.InProgress}}</span><span class="stat-label">in progress</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.User.SeriesStarted}}</span><span class="stat-label">series started</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.User.SeriesCompleted}}</span><span class="stat-label">series completed</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.User.Favorites}}</span><span class="stat-label">favorite issues</span></div>
+    </div>
+</section>
+
+<section class="stats-section">
+    <h2>Activity</h2>
+    <div class="stat-grid">
+        <div class="stat-tile"><span class="stat-value">{{.Reading.ReadThisWeek}}</span><span class="stat-label">read this week</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.Reading.ReadThisMonth}}</span><span class="stat-label">read this month</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.Reading.ReadThisYear}}</span><span class="stat-label">read this year</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.Reading.CurrentStreak}}</span><span class="stat-label">day streak{{if .Reading.CurrentStreak}} 🔥{{end}}</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.Reading.LongestStreak}}</span><span class="stat-label">longest streak (days)</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.Reading.ReadingDays}}</span><span class="stat-label">days with a finished issue</span></div>
+    </div>
+</section>
+
+{{if .User.IssuesRead}}
+<div class="stats-charts">
+    <section class="stats-section">
+        <h2>Last 12 months</h2>
+        {{template "stat-bars" .Reading.Months}}
+    </section>
+    <section class="stats-section">
+        <h2>By weekday{{with .Reading.BusiestWeekday}} <span class="dim">— busiest: {{.}}</span>{{end}}</h2>
+        {{template "stat-bars" .Reading.Weekdays}}
+    </section>
+</div>
+
+<div class="stats-rankings">
+    {{with .User.TopSeries}}
+    <section class="stats-section">
+        <h2>Most read series</h2>
+        <ol class="stat-ranking">
+            {{range .}}<li><a href="/series/{{.ID}}">{{.Name}}</a><span class="dim">{{.Count}}</span></li>{{end}}
+        </ol>
+    </section>
+    {{end}}
+    {{with .User.TopPublishers}}
+    <section class="stats-section">
+        <h2>Most read publishers</h2>
+        <ol class="stat-ranking">
+            {{range .}}<li><span>{{.Name}}</span><span class="dim">{{.Count}}</span></li>{{end}}
+        </ol>
+    </section>
+    {{end}}
+    {{with .User.TopWriters}}
+    <section class="stats-section">
+        <h2>Most read writers</h2>
+        <ol class="stat-ranking">
+            {{range .}}<li><span>{{.Name}}</span><span class="dim">{{.Count}}</span></li>{{end}}
+        </ol>
+    </section>
+    {{end}}
+</div>
+{{end}}
+{{else}}
+<div class="empty-state">
+    <p>Nothing here yet — finish an issue and your stats will show up.</p>
+    <p class="hint"><a href="/">Back to the library</a></p>
+</div>
+{{end}}
+{{end}}
+
+{{define "stat-bars"}}
+<div class="stat-bars">
+    {{range .}}
+    <div class="stat-bar" title="{{.Label}}: {{.Count}}">
+        <span class="stat-bar-count">{{if .Count}}{{.Count}}{{end}}</span>
+        <span class="stat-bar-fill" style="height: {{.Pct}}%"></span>
+        <span class="stat-bar-label">{{.Label}}</span>
+    </div>
+    {{end}}
+</div>
+{{end}}

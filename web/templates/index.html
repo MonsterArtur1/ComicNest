@@ -27,6 +27,7 @@
     {{if .Stats.ReadThisMonth}}<span class="stat"><strong>{{.Stats.ReadThisMonth}}</strong> read this month</span>{{end}}
     {{if .Stats.CurrentStreak}}<span class="stat">🔥 <strong>{{.Stats.CurrentStreak}}</strong>-day streak</span>{{end}}
     {{if gt .Stats.LongestStreak .Stats.CurrentStreak}}<span class="stat dim">best: {{.Stats.LongestStreak}} days</span>{{end}}
+    <a class="stat stats-more" href="/stats">all stats →</a>
 </div>
 {{end}}
 

@@ -248,7 +248,7 @@ func sourceLabel(source string) string {
 // shared layout plus that view's blocks.
 func (s *Server) parseTemplates() error {
 	pages := []string{"index.html", "series.html", "issue.html", "search.html",
-		"series_edit.html", "issue_edit.html", "comicvine_match.html", "error.html", "admin.html"}
+		"series_edit.html", "issue_edit.html", "comicvine_match.html", "error.html", "admin.html", "stats.html"}
 
 	s.templates = make(map[string]*template.Template)
 	for _, page := range pages {
@@ -339,6 +339,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /issues/{id}/cover", s.handleIssueCover)
 	s.mux.HandleFunc("GET /issues/{id}/download", s.handleIssueDownload)
 	s.mux.HandleFunc("GET /search", s.handleSearch)
+	s.mux.HandleFunc("GET /stats", s.handleStats)
 	s.mux.HandleFunc("POST /library", s.handleSetLibrary)
 	s.mux.HandleFunc("POST /scan", s.requireAdmin(s.handleScanStart))
 	s.mux.HandleFunc("GET /scan/status", s.handleScanStatus)
