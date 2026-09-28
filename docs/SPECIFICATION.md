@@ -130,7 +130,16 @@ is rendered outside the normal template set) hide the corresponding buttons, so 
 them at all. Reading, marking progress, browsing and searching stay available to any logged-in
 user — those aren't admin functions.
 
-*Account management* (`/admin`, admin only): an account table (login, ✓ for admins, last login —
+*Tabs.* The panel is split into three tabs — **Library** (`/admin`: scan buttons, statistics,
+missing files, scan history; per library in multi-library mode), **Users** (`/admin?tab=users`) and
+**Configuration** (`/admin?tab=config`) — plain links, no script: each tab is its own render of the
+panel (`adminData.Tab`, picked by `adminTabFor`). A form post redirects back to its tab
+(`adminURL`), and a validation error re-renders the tab owning the endpoint (`/admin/users…` →
+Users, `/admin/config…` → Configuration). The tab strip carries small badges: the missing-file count
+on Library, the account count on Users, and "!" on Configuration while a restart is pending (the
+restart banner itself shows on every tab).
+
+*Account management* (Users tab, admin only): an account table (login, ✓ for admins, last login —
 "never" when empty, creation date) with grant/revoke admin, change password and delete actions,
 plus an add-account form. The last remaining administrator cannot have their privileges revoked or
 be deleted (`Store.CountAdmins`) — that would lock everyone out of the panel permanently.

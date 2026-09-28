@@ -761,6 +761,43 @@ details.desc .series-desc { margin: 12px 0 4px; }
 }
 .restart-banner-icon { color: var(--accent); margin-right: 4px; }
 
+.admin-tabs {
+    max-width: 900px;
+    display: flex;
+    gap: 4px;
+    margin: -4px 0 20px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.admin-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    margin-bottom: -1px;
+    border-bottom: 2px solid transparent;
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+}
+.admin-tab:hover { color: var(--text); border-bottom-color: var(--border); }
+.admin-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-badge {
+    min-width: 18px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--bg-hover);
+    color: var(--text-dim);
+    font-size: 11px;
+    line-height: 18px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+.tab-badge-warn { background: #e8a33d22; color: var(--accent); }
+
 .admin-section {
     max-width: 900px;
     margin-bottom: 20px;

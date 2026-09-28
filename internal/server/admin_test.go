@@ -18,7 +18,7 @@ func TestAdminCreateUserFirstAccountIsAdmin(t *testing.T) {
 	// Anonymous (no accounts yet) can create the first account, even without
 	// checking "is_admin" — it becomes an admin regardless.
 	rec := postForm(t, h, "/admin/users", "name=ania&password=secret&password_confirm=secret")
-	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/admin" {
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/admin?tab=users" {
 		t.Fatalf("create first user: %d -> %q\n%s", rec.Code, rec.Header().Get("Location"), rec.Body)
 	}
 	u, err := srv.store.GetUserByName("ania")
@@ -34,9 +34,51 @@ func TestAdminCreateUserFirstAccountIsAdmin(t *testing.T) {
 		t.Errorf("admin panel should require login now: %d", rec.Code)
 	}
 	c := login(t, h, "ania", "secret")
-	body := get(t, h, "/admin", asUser(c)).Body.String()
-	if !strings.Contains(body, "ania") {
+	body := get(t, h, "/admin?tab=users", asUser(c)).Body.String()
+	if !strings.Contains(body, "<td>ania</td>") {
 		t.Errorf("admin panel should list ania:\n%s", body)
+	}
+}
+
+// TestAdminTabs checks that each tab of the admin panel shows only its own
+// sections, that an unknown ?tab= falls back to Library, and that a form
+// error re-renders the tab whose form was submitted.
+func TestAdminTabs(t *testing.T) {
+	srv, _ := newTestServer(t, false)
+	h := srv.Handler()
+	mustCreateUser(t, srv.store, "admin", "adminpass", true)
+	c := login(t, h, "admin", "adminpass")
+
+	markers := map[string]string{
+		"library": `id="scan-area"`,
+		"users":   `action="/admin/users"`,
+		"config":  `action="/admin/config"`,
+	}
+	for _, tc := range []struct{ url, tab string }{
+		{"/admin", "library"},
+		{"/admin?tab=library", "library"},
+		{"/admin?tab=bogus", "library"},
+		{"/admin?tab=users", "users"},
+		{"/admin?tab=config", "config"},
+	} {
+		body := get(t, h, tc.url, asUser(c)).Body.String()
+		for tab, marker := range markers {
+			if got := strings.Contains(body, marker); got != (tab == tc.tab) {
+				t.Errorf("%s: %s section shown = %v, want %v", tc.url, tab, got, tab == tc.tab)
+			}
+		}
+		if n := strings.Count(body, `aria-current="page"`); n != 1 {
+			t.Errorf("%s: %d tabs marked current, want 1", tc.url, n)
+		}
+	}
+
+	body := postAs(t, h, c, "/admin/users", "name=&password=x&password_confirm=x").Body.String()
+	if !strings.Contains(body, "cannot be empty") || !strings.Contains(body, markers["users"]) || strings.Contains(body, markers["library"]) {
+		t.Errorf("a user form error should re-render the Users tab:\n%s", body)
+	}
+	body = postAs(t, h, c, "/admin/config", "page_size=-1").Body.String()
+	if !strings.Contains(body, "non-negative") || !strings.Contains(body, markers["config"]) {
+		t.Errorf("a config form error should re-render the Configuration tab:\n%s", body)
 	}
 }
 
@@ -272,7 +314,7 @@ func TestAdminSaveConfig(t *testing.T) {
 	c := login(t, h, "admin", "adminpass")
 
 	rec := postAs(t, h, c, "/admin/config", "comicvine_api_key=abc123&opds_enabled=1&page_size=15")
-	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/admin" {
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/admin?tab=config" {
 		t.Fatalf("save config: %d -> %q\n%s", rec.Code, rec.Header().Get("Location"), rec.Body)
 	}
 
@@ -289,7 +331,7 @@ func TestAdminSaveConfig(t *testing.T) {
 	if saved.ComicVineAPIKey != "abc123" || !saved.OPDSEnabled || saved.PageSize != 15 {
 		t.Errorf("config.yaml not updated as expected: %+v", saved)
 	}
-	body := get(t, h, "/admin", asUser(c)).Body.String()
+	body := get(t, h, "/admin?tab=config", asUser(c)).Body.String()
 	if !strings.Contains(body, `value="abc123"`) {
 		t.Errorf("admin panel should reflect the saved key:\n%s", body)
 	}

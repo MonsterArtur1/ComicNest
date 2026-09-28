@@ -134,7 +134,42 @@ type libraryPanel struct {
 	ScanHistory scanHistoryView
 }
 
+// The admin panel's tabs, picked with ?tab= (see adminTabFor).
+const (
+	tabLibrary = "library"
+	tabUsers   = "users"
+	tabConfig  = "config"
+)
+
+// adminTabFor picks the tab a request renders: GET /admin's ?tab= value, else
+// the tab owning the POST endpoint, so a validation error re-renders the
+// panel on the tab whose form was submitted.
+func adminTabFor(r *http.Request) string {
+	switch t := r.URL.Query().Get("tab"); t {
+	case tabLibrary, tabUsers, tabConfig:
+		return t
+	}
+	switch {
+	case strings.HasPrefix(r.URL.Path, "/admin/users"):
+		return tabUsers
+	case strings.HasPrefix(r.URL.Path, "/admin/config"):
+		return tabConfig
+	}
+	return tabLibrary
+}
+
+// adminURL is the address of an admin panel tab (the Library tab is the bare
+// /admin), used to redirect back to it after a form post.
+func adminURL(tab string) string {
+	if tab == tabLibrary {
+		return "/admin"
+	}
+	return "/admin?tab=" + tab
+}
+
 type adminData struct {
+	// Tab is the tab being shown: tabLibrary, tabUsers or tabConfig.
+	Tab   string
 	Users []adminUserRow
 	// IsFirstRun is true when no account exists yet: the add-user form force
 	// the new account to be an admin (there is no other way back in).
@@ -163,8 +198,8 @@ type adminData struct {
 }
 
 // adminPageData loads the current account list and library status for the
-// admin panel.
-func (s *Server) adminPageData() (adminData, error) {
+// admin panel, showing the given tab.
+func (s *Server) adminPageData(tab string) (adminData, error) {
 	users, err := s.store.ListUsers()
 	if err != nil {
 		return adminData{}, err
@@ -188,6 +223,7 @@ func (s *Server) adminPageData() (adminData, error) {
 		return adminData{}, err
 	}
 	data := adminData{
+		Tab:          tab,
 		Users:        rows,
 		IsFirstRun:   len(rows) == 0,
 		MissingCount: missing,
@@ -338,7 +374,7 @@ func timeAgo(d time.Duration) string {
 }
 
 func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
-	data, err := s.adminPageData()
+	data, err := s.adminPageData(adminTabFor(r))
 	if err != nil {
 		s.serverError(w, err)
 		return
@@ -349,7 +385,7 @@ func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 // renderAdminError redraws the panel with a flash error, keeping the
 // (still valid) account list visible.
 func (s *Server) renderAdminError(w http.ResponseWriter, r *http.Request, msg string) {
-	data, err := s.adminPageData()
+	data, err := s.adminPageData(adminTabFor(r))
 	if err != nil {
 		s.serverError(w, err)
 		return
@@ -419,7 +455,7 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 			log.Printf("admin: %d reading-progress record(s) assigned to %s", moved, name)
 		}
 	}
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	http.Redirect(w, r, adminURL(tabUsers), http.StatusSeeOther)
 }
 
 // getUserFromPath resolves the {id} path value to an account, writing the
@@ -463,7 +499,7 @@ func (s *Server) handleAdminSetPassword(w http.ResponseWriter, r *http.Request) 
 		s.serverError(w, err)
 		return
 	}
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	http.Redirect(w, r, adminURL(tabUsers), http.StatusSeeOther)
 }
 
 // handleAdminSetAdmin toggles an account's admin flag, refusing to demote
@@ -489,7 +525,7 @@ func (s *Server) handleAdminSetAdmin(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	http.Redirect(w, r, adminURL(tabUsers), http.StatusSeeOther)
 }
 
 // handleAdminDeleteUser removes an account, refusing to delete the last
@@ -514,7 +550,7 @@ func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	http.Redirect(w, r, adminURL(tabUsers), http.StatusSeeOther)
 }
 
 // handleAdminDeleteMissing removes every catalog record whose file has
@@ -554,7 +590,7 @@ func (s *Server) handleAdminSaveConfig(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	http.Redirect(w, r, adminURL(tabConfig), http.StatusSeeOther)
 }
 
 // handleAdminRenameLibrary sets or clears a library's display-name override,
@@ -591,7 +627,7 @@ func (s *Server) handleAdminTestComicVine(w http.ResponseWriter, r *http.Request
 		s.renderPartial(w, "cv_test_result.html", "cv-test-result", result)
 		return
 	}
-	data, err := s.adminPageData()
+	data, err := s.adminPageData(tabConfig)
 	if err != nil {
 		s.serverError(w, err)
 		return
