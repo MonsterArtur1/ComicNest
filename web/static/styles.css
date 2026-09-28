@@ -820,6 +820,215 @@ details.desc .series-desc { margin: 12px 0 4px; }
     white-space: nowrap;
 }
 .admin-users tbody tr:hover { background: var(--bg-hover); }
+
+/* --- scan history: activity chart, change deltas, result badges --- */
+:root {
+    --scan-add: #7bc47f;
+    --scan-restore: #6fa8dc;
+    --scan-miss: #e06c60;
+    --scan-warn: var(--accent);
+}
+.scan-activity {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px 10px;
+    margin-bottom: 12px;
+}
+.scan-activity-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    margin-bottom: 10px;
+}
+.scan-activity-summary .hint { font-size: 13px; }
+.scan-warn-text { color: var(--scan-warn); }
+
+.scan-chart {
+    display: flex;
+    gap: 4px;
+    height: 96px;
+}
+.scan-col-wrap {
+    position: relative;
+    flex: 1 1 0;
+    max-width: 36px;
+    display: grid;
+}
+.scan-col {
+    display: grid;
+    grid-template-rows: 64fr 10px 26fr;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.scan-col:hover { background: var(--bg-hover); }
+.scan-up, .scan-down { display: flex; justify-content: center; min-height: 0; }
+.scan-up { align-items: flex-end; }
+.scan-down { align-items: flex-start; }
+.scan-bar-up, .scan-bar-down {
+    width: 60%;
+    min-width: 6px;
+    transition: height 0.4s ease, filter 0.15s;
+}
+.scan-bar-up {
+    display: flex;
+    flex-direction: column;
+    border-radius: 3px 3px 0 0;
+    overflow: hidden;
+}
+.seg-add { background: var(--scan-add); flex-basis: 0; }
+.seg-restore { background: var(--scan-restore); flex-basis: 0; }
+.scan-bar-down { background: var(--scan-miss); border-radius: 0 0 3px 3px; }
+.scan-col:hover .scan-bar-up, .scan-col:hover .scan-bar-down { filter: brightness(1.2); }
+
+/* Hover card above a chart column: centered on it, except near the ends of
+   the chart where it's pinned to the column's outer edge so it can't spill
+   off the page. */
+.scan-col-tip {
+    display: none;
+    position: absolute;
+    z-index: 5;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 260px;
+    pointer-events: none;
+}
+.scan-col-wrap:hover .scan-col-tip { display: block; }
+.scan-col-wrap:nth-child(-n+3) .scan-col-tip { left: 0; transform: none; }
+.scan-col-wrap:nth-last-child(-n+3):not(:nth-child(-n+3)) .scan-col-tip { left: auto; right: 0; transform: none; }
+.scan-axis {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.scan-axis::before {
+    content: "";
+    position: absolute;
+    left: -2px; right: -2px; top: 50%;
+    border-top: 1px solid var(--border);
+}
+.scan-dot {
+    position: relative;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+}
+.outcome-warn .scan-dot { background: var(--scan-warn); width: 8px; height: 8px; }
+.outcome-error .scan-dot { background: var(--scan-miss); width: 8px; height: 8px; box-shadow: 0 0 0 3px #e06c6033; }
+
+.scan-deltas { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.delta {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 1px 8px;
+    border-radius: 999px;
+    border: 1px solid;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.delta-add     { color: var(--scan-add);     border-color: #7bc47f55; background: #7bc47f14; }
+.delta-restore { color: var(--scan-restore); border-color: #6fa8dc55; background: #6fa8dc14; }
+.delta-miss    { color: var(--scan-miss);    border-color: #e06c6055; background: #e06c6014; }
+.delta-series  { color: var(--text-dim);     border-color: var(--border); }
+
+.scan-history td { vertical-align: top; }
+.scan-when { display: block; }
+.scan-ago { display: block; font-size: 11px; }
+.scan-history tr:target { animation: scan-flash 1.6s ease-out; }
+@keyframes scan-flash {
+    from { background: #e8a33d33; }
+    to   { background: transparent; }
+}
+.scan-history tr.outcome-error td:first-child { box-shadow: inset 3px 0 0 var(--scan-miss); }
+.scan-history tr.outcome-warn td:first-child { box-shadow: inset 3px 0 0 var(--scan-warn); }
+
+.scan-badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: 999px;
+    border: 1px solid;
+    white-space: nowrap;
+}
+.badge-ok    { color: var(--scan-add);  border-color: #7bc47f44; }
+.badge-warn  { color: var(--scan-warn); border-color: #e8a33d66; background: #e8a33d14; }
+.badge-error { color: var(--scan-miss); border-color: #e06c6066; background: #e06c6014; }
+button.scan-badge { font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+button.scan-badge:hover { filter: brightness(1.2); }
+
+/* Cards: the chart's hover card and the problems popover. */
+.tip-card {
+    padding: 10px 12px;
+    background: var(--bg-raised);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px #0008;
+    font-size: 13px;
+    text-align: left;
+    white-space: normal;
+}
+.tip-card p { margin: 0 0 4px; }
+.tip-card .scan-deltas { margin: 4px 0; }
+/* The problems popover: centered on screen by default (the UA's popover
+   placement), anchored under its badge where CSS anchor positioning exists. */
+.tip-pop { width: max-content; max-width: min(560px, calc(100vw - 16px)); }
+@supports (position-area: bottom) {
+    .tip-pop {
+        inset: auto;
+        margin: 6px 0;
+        position-area: bottom span-left;
+        position-try-fallbacks: flip-block, flip-inline;
+    }
+}
+.tip-title { font-weight: 600; }
+.tip-error { color: var(--scan-miss); font-weight: 600; overflow-wrap: anywhere; }
+.tip-problems {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+    max-height: 300px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.tip-problems li {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 8px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+}
+.tip-path { font-family: ui-monospace, Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; }
+.tip-msg { grid-column: 2; color: var(--text-dim); font-size: 12px; overflow-wrap: anywhere; }
+.stage {
+    grid-row: span 2;
+    align-self: start;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--bg-hover);
+    color: var(--text-dim);
+}
+.stage-add, .stage-refresh { color: var(--scan-miss); }
+.stage-comicinfo { color: var(--scan-restore); }
+.stage-cover { color: var(--scan-warn); }
+
+@media (prefers-reduced-motion: reduce) {
+    .scan-bar-up, .scan-bar-down, .scan-col { transition: none; }
+    .scan-history tr:target { animation: none; }
+}
 .admin-row-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .inline-form { display: inline-flex; }
 .admin-password-toggle { position: relative; }

@@ -138,8 +138,19 @@ be deleted (`Store.CountAdmins`) — that would lock everyone out of the panel p
 The panel also shows a Statistics section (`Store.LibraryStats`): series/one-shot/locked-series
 counts, present and missing issue counts, total library size on disk, and ComicVine coverage
 (from ComicVine / no ComicVine metadata / locked issues). Below it, a Scan History section lists
-the most recent completed scans (`scan_history` table, migration 9; see §6) — when they ran, how
-long they took, files found/processed/missing, ComicVine updates, and any error.
+the most recent completed scans (`scan_history` table, migrations 9 and 14; see §6) — when they ran,
+how long they took, what changed (new files and their size, files back from missing, newly missing
+files, new series — as colored deltas), files processed/found, ComicVine updates, and the outcome:
+OK, a warning badge with the number of per-file problems, or the scan's error. Clicking a problem/error
+badge opens a card listing each problem (stage, library-relative path, message) — no JavaScript: it's
+a `popover` (top layer, so the table's overflow wrapper can't clip it; Esc or a click elsewhere closes
+it) placed under its badge with CSS anchor positioning, or centered on screen where that's unsupported.
+Above the table an activity chart draws one column per listed scan, oldest to newest: a bar up for
+files that arrived (new in green, restored in blue), a bar down for newly missing ones, log-scaled so a
+first big import doesn't flatten later scans, and a dot on the axis colored by outcome; hovering a
+column shows that scan's summary (pure CSS), clicking jumps to its table row (`#scan-<id>`, flashed via
+`:target`).
+Rows recorded before migration 14 show "—" for changes (their counters are unknown, not zero).
 
 With more than one library configured (`libraries`, above), this becomes one block per library —
 its own Statistics, its own "Scan Library" button and status, and its own Scan History — plus a
@@ -352,7 +363,13 @@ Algorithm:
 
 Once the goroutine finishes (`Scanner.run`, after the optional ComicVine follow-up phase — see §8),
 it records the outcome as one row in `scan_history` (migration 9: started/finished time, found/
-processed/missing counts, ComicVine updated/failed counts, the error if any) — best-effort, a
+processed/missing counts, ComicVine updated/failed counts, the error if any; migration 14 adds
+`added`/`added_bytes`, `restored` (was `file_missing`, seen again), `newly_missing` (not yet flagged,
+now absent — `missing` stays the library's total), `series_added` (series of this library with an id
+above `MAX(id)` taken before the walk), and the per-file problems the scan logged and carried on past —
+walk/stat, add, refresh, ComicInfo and cover failures — as a JSON list in `problems`, capped at
+`store.MaxScanProblems` (100) with the real total in `problem_count`; messages have the absolute path
+stripped since the problem carries the relative one) — best-effort, a
 write failure is logged but never fails the scan. This is what backs the admin panel's Scan History
 section (§4); the in-memory `Status` struct alone would lose everything on restart.
 

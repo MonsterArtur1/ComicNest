@@ -136,6 +136,10 @@ func combineScanStatus(scanners []*library.Scanner) library.Status {
 		out.CVTotal += st.CVTotal
 		out.CVUpdated += st.CVUpdated
 		out.CVFailed += st.CVFailed
+		out.Added += st.Added
+		out.Restored += st.Restored
+		out.NewlyMissing += st.NewlyMissing
+		out.Problems += st.Problems
 		out.Running = out.Running || st.Running
 		out.CVPhase = out.CVPhase || st.CVPhase
 		out.Finished = out.Finished || st.Finished

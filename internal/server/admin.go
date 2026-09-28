@@ -2,6 +2,7 @@ package server
 
 import (
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -27,7 +28,9 @@ type adminUserRow struct {
 // scanHistoryRow is one past scan shaped for the admin panel's Scan History
 // table.
 type scanHistoryRow struct {
+	ID        int64
 	Started   string // "2006-01-02 15:04" local time
+	Ago       string // "3h ago", "" when the start time doesn't parse
 	Duration  string // e.g. "12s", or "-" when the timestamps don't parse
 	Found     int
 	Processed int
@@ -35,6 +38,66 @@ type scanHistoryRow struct {
 	CVUpdated int
 	CVFailed  int
 	Err       string
+
+	// Detailed is false for scans recorded before the change counters
+	// existed; the template then shows "—" instead of misleading zeros.
+	Detailed     bool
+	Added        int
+	AddedSize    string // prettySize of the added files, "" when none
+	Restored     int
+	NewlyMissing int
+	SeriesAdded  int
+	ProblemCount int
+	Problems     []store.ScanProblem
+	// MoreProblems is how many problems were counted but not kept (the
+	// stored list is capped at store.MaxScanProblems).
+	MoreProblems int
+}
+
+// Outcome classifies the scan for the Result badge and the activity chart:
+// "error" (the scan itself failed), "warn" (it finished but some files had
+// problems) or "ok".
+func (r scanHistoryRow) Outcome() string {
+	switch {
+	case r.Err != "":
+		return "error"
+	case r.ProblemCount > 0:
+		return "warn"
+	}
+	return "ok"
+}
+
+// HasChanges reports whether the scan changed anything worth a chip.
+func (r scanHistoryRow) HasChanges() bool {
+	return r.Added > 0 || r.Restored > 0 || r.NewlyMissing > 0 || r.SeriesAdded > 0
+}
+
+// scanActivityBar is one scan in the activity chart above the history table:
+// a bar up for files that arrived (new + restored), one down for files that
+// went missing. Heights are log-scaled percentages so a big first import
+// doesn't flatten every later scan to nothing; the tooltip has exact numbers.
+type scanActivityBar struct {
+	Row     scanHistoryRow
+	UpPct   int
+	DownPct int
+	// AddedShare is the new files' share of the up bar in percent (the rest
+	// is restored files, drawn in a different color: RestoredShare).
+	AddedShare    int
+	RestoredShare int
+}
+
+// scanHistoryView is everything the scan-history template renders for one
+// library (or the single combined one): the chart, its totals and the table.
+type scanHistoryView struct {
+	Rows []scanHistoryRow
+	// Bars run oldest → newest (left → right), unlike Rows.
+	Bars []scanActivityBar
+	// Totals over the listed scans, for the summary line.
+	TotalAdded     int
+	TotalRestored  int
+	TotalMissing   int // newly missing
+	TotalAddedSize string
+	ProblemScans   int // scans with problems or an error
 }
 
 // adminConfig is the subset of config.yaml the admin panel can edit, plus
@@ -68,7 +131,7 @@ type cvTestResult struct {
 type libraryPanel struct {
 	Info        libraryInfo
 	Stats       store.LibraryStats
-	ScanHistory []scanHistoryRow
+	ScanHistory scanHistoryView
 }
 
 type adminData struct {
@@ -90,7 +153,7 @@ type adminData struct {
 	// is configured — the admin panel then looks exactly as it always has.
 	Stats store.LibraryStats
 	// ScanHistory is the most recent completed scans, newest first.
-	ScanHistory []scanHistoryRow
+	ScanHistory scanHistoryView
 	// Config feeds the Configuration section's form.
 	Config adminConfig
 	// CVTest is set after a "Test Connection" click that fell back to a
@@ -137,12 +200,12 @@ func (s *Server) adminPageData() (adminData, error) {
 			if err != nil {
 				return adminData{}, err
 			}
-			history, err := s.store.ListScanHistory(10, lib.Path)
+			history, err := s.store.ListScanHistory(15, lib.Path)
 			if err != nil {
 				return adminData{}, err
 			}
 			data.Libraries = append(data.Libraries, libraryPanel{
-				Info: lib, Stats: stats, ScanHistory: scanHistoryRows(history),
+				Info: lib, Stats: stats, ScanHistory: newScanHistoryView(history, time.Now()),
 			})
 		}
 	} else {
@@ -155,7 +218,7 @@ func (s *Server) adminPageData() (adminData, error) {
 			return adminData{}, err
 		}
 		data.Stats = stats
-		data.ScanHistory = scanHistoryRows(history)
+		data.ScanHistory = newScanHistoryView(history, time.Now())
 	}
 	return data, nil
 }
@@ -181,32 +244,97 @@ func (s *Server) adminConfigView() adminConfig {
 	}
 }
 
-// scanHistoryRows formats store.ScanHistoryEntry rows for the Scan History
-// table.
-func scanHistoryRows(history []store.ScanHistoryEntry) []scanHistoryRow {
-	rows := make([]scanHistoryRow, len(history))
+// newScanHistoryView formats store.ScanHistoryEntry rows (newest first) for
+// the Scan History section; now anchors the "3h ago" labels.
+func newScanHistoryView(history []store.ScanHistoryEntry, now time.Time) scanHistoryView {
+	var v scanHistoryView
+	var addedBytes int64
+	v.Rows = make([]scanHistoryRow, len(history))
 	for i, h := range history {
 		started := opds.ParseDBTime(h.StartedAt, time.Time{})
 		finished := opds.ParseDBTime(h.FinishedAt, time.Time{})
-		startedStr, duration := "-", "-"
+		row := scanHistoryRow{
+			ID:           h.ID,
+			Started:      "-",
+			Duration:     "-",
+			Found:        h.Found,
+			Processed:    h.Processed,
+			Missing:      h.Missing,
+			CVUpdated:    h.CVUpdated,
+			CVFailed:     h.CVFailed,
+			Err:          h.Err,
+			Detailed:     h.Detailed,
+			Added:        h.Added,
+			Restored:     h.Restored,
+			NewlyMissing: h.NewlyMissing,
+			SeriesAdded:  h.SeriesAdded,
+			ProblemCount: h.ProblemCount,
+			Problems:     h.Problems,
+			MoreProblems: max(h.ProblemCount-len(h.Problems), 0),
+		}
 		if !started.IsZero() {
-			startedStr = started.Local().Format("2006-01-02 15:04")
+			row.Started = started.Local().Format("2006-01-02 15:04")
+			row.Ago = timeAgo(now.Sub(started))
 		}
 		if !started.IsZero() && !finished.IsZero() {
-			duration = finished.Sub(started).Round(time.Second).String()
+			row.Duration = finished.Sub(started).Round(time.Second).String()
 		}
-		rows[i] = scanHistoryRow{
-			Started:   startedStr,
-			Duration:  duration,
-			Found:     h.Found,
-			Processed: h.Processed,
-			Missing:   h.Missing,
-			CVUpdated: h.CVUpdated,
-			CVFailed:  h.CVFailed,
-			Err:       h.Err,
+		if h.AddedBytes > 0 {
+			row.AddedSize = prettySize(h.AddedBytes)
+		}
+		v.Rows[i] = row
+
+		v.TotalAdded += h.Added
+		v.TotalRestored += h.Restored
+		v.TotalMissing += h.NewlyMissing
+		addedBytes += h.AddedBytes
+		if row.Outcome() != "ok" {
+			v.ProblemScans++
 		}
 	}
-	return rows
+	if addedBytes > 0 {
+		v.TotalAddedSize = prettySize(addedBytes)
+	}
+
+	peak := 0
+	for _, r := range v.Rows {
+		peak = max(peak, r.Added+r.Restored, r.NewlyMissing)
+	}
+	scale := func(n int) int {
+		if n <= 0 || peak == 0 {
+			return 0
+		}
+		pct := int(math.Round(100 * math.Log1p(float64(n)) / math.Log1p(float64(peak))))
+		return max(pct, 6) // keep a single file visible
+	}
+	v.Bars = make([]scanActivityBar, len(v.Rows))
+	for i, r := range v.Rows {
+		bar := scanActivityBar{
+			Row:     r,
+			UpPct:   scale(r.Added + r.Restored),
+			DownPct: scale(r.NewlyMissing),
+		}
+		if up := r.Added + r.Restored; up > 0 {
+			bar.AddedShare = 100 * r.Added / up
+			bar.RestoredShare = 100 - bar.AddedShare
+		}
+		v.Bars[len(v.Rows)-1-i] = bar
+	}
+	return v
+}
+
+// timeAgo renders a coarse "how long ago" label for the scan history.
+func timeAgo(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return strconv.Itoa(int(d/time.Minute)) + "m ago"
+	case d < 48*time.Hour:
+		return strconv.Itoa(int(d/time.Hour)) + "h ago"
+	default:
+		return strconv.Itoa(int(d/(24*time.Hour))) + "d ago"
+	}
 }
 
 func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {

@@ -17,7 +17,7 @@
     {{if .Err}}
     <span class="scan-note scan-error" title="{{.Err}}">scan error</span>
     {{else if .Finished}}
-    <span class="scan-note">last scan: {{.Processed}} files{{if .Missing}}, missing: {{.Missing}}{{end}}{{if .CVTotal}}, ComicVine: {{.CVUpdated}} updated{{if .CVFailed}} ({{.CVFailed}} unmatched){{end}}{{end}}</span>
+    <span class="scan-note">last scan: {{.Processed}} files{{if .Added}}, {{.Added}} new{{end}}{{if .Problems}}, <span class="scan-warn-text">{{.Problems}} problem{{if ne .Problems 1}}s{{end}}</span>{{end}}{{if .Missing}}, missing: {{.Missing}}{{end}}{{if .CVTotal}}, ComicVine: {{.CVUpdated}} updated{{if .CVFailed}} ({{.CVFailed}} unmatched){{end}}{{end}}</span>
     {{end}}
 </div>
 {{end}}

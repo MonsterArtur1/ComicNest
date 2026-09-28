@@ -225,6 +225,35 @@ func TestAdminScanHistory(t *testing.T) {
 		"2 updated, 1 failed",
 		"<td>5s</td>",
 		"<td>3s</td>",
+		"✗ Failed",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("admin panel scan history missing %q:\n%s", want, body)
+		}
+	}
+
+	// A detailed row shows what changed and lists its file problems.
+	if err := srv.store.RecordScanHistory(store.ScanHistoryEntry{
+		StartedAt: "2024-01-03 10:00:00", FinishedAt: "2024-01-03 10:00:09",
+		Found: 7, Processed: 7, Missing: 1, Detailed: true,
+		Added: 3, AddedBytes: 3 << 20, Restored: 1, NewlyMissing: 2, SeriesAdded: 1,
+		ProblemCount: 150, Problems: []store.ScanProblem{
+			{Path: "Saga/Saga 003.cbz", Stage: "cover", Message: "zip: not a valid zip file"},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	body = get(t, h, "/admin", asUser(c)).Body.String()
+	for _, want := range []string{
+		"+3 new",
+		"↺ 1 back",
+		"−2 missing",
+		"+1 series",
+		"⚠ 150 problems",
+		"Saga/Saga 003.cbz",
+		"zip: not a valid zip file",
+		"…and 149 more",
+		"scan-chart",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("admin panel scan history missing %q:\n%s", want, body)

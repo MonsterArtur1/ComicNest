@@ -199,6 +199,22 @@ var migrations = []string{
 		name TEXT NOT NULL
 	);
 	`,
+
+	// 14: richer scan history — what a scan actually changed (new files and
+	// their size, files that came back, newly missing ones, new series) and
+	// the per-file problems it ran into (JSON list, capped; problem_count is
+	// the uncapped total). detailed = 0 marks rows recorded before this, whose
+	// zeros mean "unknown" rather than "nothing changed".
+	`
+	ALTER TABLE scan_history ADD COLUMN detailed      INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE scan_history ADD COLUMN added         INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE scan_history ADD COLUMN added_bytes   INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE scan_history ADD COLUMN restored      INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE scan_history ADD COLUMN newly_missing INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE scan_history ADD COLUMN series_added  INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE scan_history ADD COLUMN problem_count INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE scan_history ADD COLUMN problems      TEXT NOT NULL DEFAULT '';
+	`,
 }
 
 func migrate(db *sql.DB) error {

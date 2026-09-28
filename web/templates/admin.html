@@ -14,22 +14,83 @@
 </div>
 {{end}}
 
-{{define "scan-history-table"}}
-{{if .}}
+{{define "scan-changes"}}
+{{if not .Detailed}}<span class="hint" title="Recorded before ComicNest tracked what a scan changed">—</span>
+{{else if .HasChanges}}
+<span class="scan-deltas">
+    {{if .Added}}<span class="delta delta-add" title="{{.Added}} new file(s){{with .AddedSize}}, {{.}}{{end}}">+{{.Added}} new</span>{{end}}
+    {{if .Restored}}<span class="delta delta-restore" title="{{.Restored}} missing file(s) found again">↺ {{.Restored}} back</span>{{end}}
+    {{if .NewlyMissing}}<span class="delta delta-miss" title="{{.NewlyMissing}} file(s) disappeared in this scan">−{{.NewlyMissing}} missing</span>{{end}}
+    {{if .SeriesAdded}}<span class="delta delta-series" title="{{.SeriesAdded}} new series">+{{.SeriesAdded}} series</span>{{end}}
+</span>
+{{else}}<span class="hint">no changes</span>
+{{end}}
+{{end}}
+
+{{define "scan-problem-list"}}
+{{if .Err}}<p class="tip-error">✗ {{.Err}}</p>{{end}}
+{{if .ProblemCount}}
+<p class="tip-title">{{.ProblemCount}} file problem{{if ne .ProblemCount 1}}s{{end}}</p>
+<ul class="tip-problems">
+    {{range .Problems}}
+    <li><span class="stage stage-{{.Stage}}">{{.Stage}}</span><span class="tip-path">{{.Path}}</span><span class="tip-msg">{{.Message}}</span></li>
+    {{end}}
+</ul>
+{{if .MoreProblems}}<p class="hint">…and {{.MoreProblems}} more — see the server log.</p>{{end}}
+{{end}}
+{{end}}
+
+{{define "scan-history"}}
+{{if .Rows}}
+<div class="scan-activity">
+    <div class="scan-activity-summary">
+        {{if .TotalAdded}}<span class="delta delta-add">+{{.TotalAdded}} new{{with .TotalAddedSize}} · {{.}}{{end}}</span>{{end}}
+        {{if .TotalRestored}}<span class="delta delta-restore">↺ {{.TotalRestored}} back</span>{{end}}
+        {{if .TotalMissing}}<span class="delta delta-miss">−{{.TotalMissing}} missing</span>{{end}}
+        <span class="hint">over the last {{len .Rows}} scan{{if ne (len .Rows) 1}}s{{end}}{{if .ProblemScans}} · <span class="scan-warn-text">{{.ProblemScans}} with problems</span>{{end}}</span>
+    </div>
+    <div class="scan-chart" aria-hidden="true">
+        {{range .Bars}}
+        <div class="scan-col-wrap">
+        <a class="scan-col outcome-{{.Row.Outcome}}" href="#scan-{{.Row.ID}}" tabindex="-1">
+            <span class="scan-up"><span class="scan-bar-up" style="height: {{.UpPct}}%"><span class="seg-restore" style="flex-grow: {{.RestoredShare}}"></span><span class="seg-add" style="flex-grow: {{.AddedShare}}"></span></span></span>
+            <span class="scan-axis"><span class="scan-dot"></span></span>
+            <span class="scan-down"><span class="scan-bar-down" style="height: {{.DownPct}}%"></span></span>
+        </a>
+        <div class="tip-card scan-col-tip">
+            <p class="tip-title">{{.Row.Started}}{{with .Row.Ago}} <span class="hint">· {{.}}</span>{{end}}</p>
+            <p class="hint">{{.Row.Processed}} / {{.Row.Found}} files in {{.Row.Duration}}</p>
+            {{template "scan-changes" .Row}}
+            {{if .Row.AddedSize}}<p class="hint">{{.Row.AddedSize}} added</p>{{end}}
+            {{if .Row.Err}}<p class="tip-error">✗ {{.Row.Err}}</p>{{else if .Row.ProblemCount}}<p class="scan-warn-text">⚠ {{.Row.ProblemCount}} file problem{{if ne .Row.ProblemCount 1}}s{{end}}</p>{{end}}
+        </div>
+        </div>
+        {{end}}
+    </div>
+</div>
 <div class="admin-users-wrap">
-<table class="admin-users">
+<table class="admin-users scan-history">
     <thead>
-        <tr><th>Started</th><th>Duration</th><th>Files</th><th>Missing</th><th>ComicVine</th><th>Result</th></tr>
+        <tr><th>Started</th><th>Duration</th><th>Changes</th><th>Files</th><th>ComicVine</th><th>Result</th></tr>
     </thead>
     <tbody>
-    {{range .}}
-        <tr>
-            <td>{{.Started}}</td>
+    {{range .Rows}}
+        <tr id="scan-{{.ID}}" class="outcome-{{.Outcome}}">
+            <td><span class="scan-when">{{.Started}}</span>{{with .Ago}}<span class="hint scan-ago">{{.}}</span>{{end}}</td>
             <td>{{.Duration}}</td>
-            <td>{{.Processed}} / {{.Found}}</td>
-            <td>{{.Missing}}</td>
+            <td>{{template "scan-changes" .}}</td>
+            <td>{{.Processed}} / {{.Found}}{{if .Missing}}<span class="hint scan-ago" title="Files flagged missing in the catalog after this scan">{{.Missing}} missing total</span>{{end}}</td>
             <td>{{if or .CVUpdated .CVFailed}}{{.CVUpdated}} updated{{if .CVFailed}}, {{.CVFailed}} failed{{end}}{{else}}—{{end}}</td>
-            <td>{{if .Err}}<span class="scan-error">{{.Err}}</span>{{else}}OK{{end}}</td>
+            <td>
+                {{if eq .Outcome "ok"}}<span class="scan-badge badge-ok">✓ OK</span>
+                {{else}}
+                {{/* A popover opens on click with no script, sits in the top layer (so
+                     the table's overflow wrapper can't clip it) and closes on Esc or a
+                     click elsewhere; anchor positioning places it by the badge. */}}
+                <button type="button" class="scan-badge badge-{{.Outcome}}" popovertarget="scan-problems-{{.ID}}" style="anchor-name: --scan-{{.ID}}">{{if .Err}}✗ Failed{{else}}⚠ {{.ProblemCount}} problem{{if ne .ProblemCount 1}}s{{end}}{{end}}</button>
+                <div class="tip-card tip-pop" id="scan-problems-{{.ID}}" popover style="position-anchor: --scan-{{.ID}}">{{template "scan-problem-list" .}}</div>
+                {{end}}
+            </td>
         </tr>
     {{end}}
     </tbody>
@@ -81,7 +142,7 @@
     </div>
     {{template "stat-grid" .Stats}}
     <h3>Scan History</h3>
-    {{template "scan-history-table" .ScanHistory}}
+    {{template "scan-history" .ScanHistory}}
 </section>
 {{end}}
 {{else}}
@@ -158,7 +219,7 @@
 {{if not .Libraries}}
 <section class="admin-section">
     <h2>Scan History</h2>
-    {{template "scan-history-table" .ScanHistory}}
+    {{template "scan-history" .ScanHistory}}
 </section>
 {{end}}
 

@@ -35,6 +35,12 @@ type Status struct {
 	CVTotal   int
 	CVUpdated int
 	CVFailed  int
+
+	// What the file scan changed, kept up to date while it runs.
+	Added        int // files catalogued for the first time
+	Restored     int // previously missing files that reappeared
+	NewlyMissing int // files that went missing in this scan (subset of Missing)
+	Problems     int // per-file problems met so far (see Scanner.problems)
 }
 
 // CVUpdater runs after a successful scan and reports its progress through
@@ -51,6 +57,11 @@ type Scanner struct {
 
 	mu     sync.Mutex
 	status Status
+	// Per-run details that only end up in the scan history row; reset by
+	// Start, guarded by mu.
+	problems    []store.ScanProblem
+	addedBytes  int64
+	seriesAdded int
 }
 
 // SetCVUpdater installs the post-scan ComicVine step (nil disables it).
@@ -88,6 +99,7 @@ func (sc *Scanner) Start() error {
 	}
 
 	sc.status = Status{Running: true, StartedAt: time.Now()}
+	sc.problems, sc.addedBytes, sc.seriesAdded = nil, 0, 0
 	go sc.run()
 	return nil
 }
@@ -96,6 +108,29 @@ func (sc *Scanner) setStatus(update func(*Status)) {
 	sc.mu.Lock()
 	update(&sc.status)
 	sc.mu.Unlock()
+}
+
+// problem logs a per-file failure the scan carries on past and keeps it for
+// the scan history (up to store.MaxScanProblems; the count keeps going).
+func (sc *Scanner) problem(path, stage string, err error) {
+	log.Printf("scan: %s %s: %v", stage, path, err)
+	rel := path
+	if r, relErr := filepath.Rel(sc.root, path); relErr == nil && sc.underRoot(path) {
+		rel = filepath.ToSlash(r)
+	}
+	// Error chains tend to repeat the absolute path at every level; the
+	// problem already carries it, so keep the message to the what.
+	msg := err.Error()
+	for _, lead := range []string{" from ", " in ", " "} {
+		msg = strings.ReplaceAll(msg, lead+path, "")
+	}
+	msg = strings.ReplaceAll(msg, path, rel)
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	sc.status.Problems++
+	if len(sc.problems) < store.MaxScanProblems {
+		sc.problems = append(sc.problems, store.ScanProblem{Path: rel, Stage: stage, Message: msg})
+	}
 }
 
 type foundFile struct {
@@ -125,7 +160,10 @@ func (sc *Scanner) run() {
 		}
 	})
 
-	final := sc.Status()
+	sc.mu.Lock()
+	final := sc.status
+	problems, addedBytes, seriesAdded := sc.problems, sc.addedBytes, sc.seriesAdded
+	sc.mu.Unlock()
 	entry := store.ScanHistoryEntry{
 		StartedAt:  final.StartedAt.UTC().Format("2006-01-02 15:04:05"),
 		FinishedAt: final.FinishedAt.UTC().Format("2006-01-02 15:04:05"),
@@ -136,6 +174,15 @@ func (sc *Scanner) run() {
 		CVFailed:   final.CVFailed,
 		Err:        final.Err,
 		Library:    sc.root,
+
+		Detailed:     true,
+		Added:        final.Added,
+		AddedBytes:   addedBytes,
+		Restored:     final.Restored,
+		NewlyMissing: final.NewlyMissing,
+		SeriesAdded:  seriesAdded,
+		ProblemCount: final.Problems,
+		Problems:     problems,
 	}
 	if err := sc.store.RecordScanHistory(entry); err != nil {
 		log.Printf("scan: recording history: %v", err)
@@ -158,7 +205,7 @@ func (sc *Scanner) scan() error {
 	var files []foundFile
 	err := filepath.WalkDir(sc.root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			log.Printf("scan: skipping %s: %v", path, err)
+			sc.problem(path, "walk", err)
 			return nil
 		}
 		if d.IsDir() || !isComicFile(path) {
@@ -166,7 +213,7 @@ func (sc *Scanner) scan() error {
 		}
 		info, err := d.Info()
 		if err != nil {
-			log.Printf("scan: stat %s: %v", path, err)
+			sc.problem(path, "walk", err)
 			return nil
 		}
 		files = append(files, foundFile{path: path, size: info.Size()})
@@ -185,6 +232,14 @@ func (sc *Scanner) scan() error {
 	if err != nil {
 		return err
 	}
+	wasMissing, err := sc.store.MissingIssueIDs()
+	if err != nil {
+		return err
+	}
+	seriesBefore, err := sc.store.MaxSeriesID()
+	if err != nil {
+		return err
+	}
 	existing := make(map[string]int64, len(allExisting))
 	for path, id := range allExisting {
 		if sc.underRoot(path) {
@@ -198,11 +253,19 @@ func (sc *Scanner) scan() error {
 		seen[f.path] = true
 		if id, ok := existing[f.path]; ok {
 			if err := sc.refreshIssue(id, f); err != nil {
-				log.Printf("scan: refresh %s: %v", f.path, err)
+				sc.problem(f.path, "refresh", err)
+			}
+			if wasMissing[id] {
+				sc.setStatus(func(st *Status) { st.Restored++ })
 			}
 		} else {
 			if err := sc.addIssue(f); err != nil {
-				log.Printf("scan: add %s: %v", f.path, err)
+				sc.problem(f.path, "add", err)
+			} else {
+				sc.mu.Lock()
+				sc.status.Added++
+				sc.addedBytes += f.size
+				sc.mu.Unlock()
 			}
 		}
 		sc.setStatus(func(st *Status) { st.Processed++ })
@@ -210,20 +273,29 @@ func (sc *Scanner) scan() error {
 
 	// Records whose file disappeared get flagged, never deleted (§6.6).
 	var missing []int64
+	newlyMissing := 0
 	for path, id := range existing {
 		if !seen[path] {
 			missing = append(missing, id)
+			if !wasMissing[id] {
+				newlyMissing++
+			}
 		}
 	}
 	if err := sc.store.MarkIssuesMissing(missing); err != nil {
 		return err
 	}
-	sc.setStatus(func(st *Status) { st.Missing = len(missing) })
+	sc.setStatus(func(st *Status) { st.Missing, st.NewlyMissing = len(missing), newlyMissing })
 
 	// Pass 3: a folder whose files name different series in ComicInfo.xml is
 	// really several series sharing a directory.
 	if err := sc.splitMixedFolders(); err != nil {
 		return err
+	}
+	if n, err := sc.store.CountSeriesAfter(seriesBefore, sc.root); err != nil {
+		log.Printf("scan: counting new series: %v", err)
+	} else {
+		sc.setStatus(func(*Status) { sc.seriesAdded = n })
 	}
 
 	return sc.store.ReconcileOneShots()
@@ -380,7 +452,7 @@ func (sc *Scanner) addIssue(f foundFile) error {
 		ci, found, err = ReadComicInfo(f.path)
 		switch {
 		case err != nil:
-			log.Printf("scan: comicinfo %s: %v", f.path, err)
+			sc.problem(f.path, "comicinfo", err)
 		case found:
 			applyComicInfo(&issue, ci)
 			issue.ComicInfoSeries = sql.NullString{String: strings.TrimSpace(ci.Series), Valid: true}
@@ -438,7 +510,7 @@ func (sc *Scanner) refreshIssue(id int64, f foundFile) error {
 		ci, found, err := ReadComicInfo(f.path)
 		switch {
 		case err != nil:
-			log.Printf("scan: comicinfo %s: %v", f.path, err)
+			sc.problem(f.path, "comicinfo", err)
 			inspect = false // unreadable archive: leave NULL, try again next scan
 		case found:
 			if err := sc.recordComicInfoSeries(issue, strings.TrimSpace(ci.Series)); err != nil {
@@ -582,14 +654,14 @@ func (sc *Scanner) cacheCover(issue *store.Issue) {
 	}
 	raw, err := ExtractCover(issue.Path)
 	if err != nil {
-		log.Printf("scan: cover %s: %v", issue.Path, err)
+		sc.problem(issue.Path, "cover", err)
 		return
 	}
 	if err := sc.covers.Save(issue.ID, raw); err != nil {
-		log.Printf("scan: thumbnail %s: %v", issue.Path, err)
+		sc.problem(issue.Path, "cover", err)
 		return
 	}
 	if err := sc.store.SetCoverCached(issue.ID, true); err != nil {
-		log.Printf("scan: cover flag %s: %v", issue.Path, err)
+		sc.problem(issue.Path, "cover", err)
 	}
 }
