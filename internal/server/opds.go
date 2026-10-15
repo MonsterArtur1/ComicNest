@@ -271,6 +271,9 @@ func (s *Server) handleIssuePage(w http.ResponseWriter, r *http.Request) {
 		if err := s.store.SetReadingProgress(userFrom(r), issue.ID, page+1); err != nil {
 			log.Printf("opds: progress for issue %d: %v", issue.ID, err)
 		}
+		if err := s.store.RecordPageRead(userFrom(r), issue.ID, page+1); err != nil {
+			log.Printf("opds: page read for issue %d: %v", issue.ID, err)
+		}
 	}
 
 	w.Header().Set("Content-Type", contentType)

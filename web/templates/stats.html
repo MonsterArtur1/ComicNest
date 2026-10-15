@@ -5,7 +5,7 @@
     <h1>Your stats</h1>
 </div>
 
-{{if or .User.IssuesRead .User.InProgress}}
+{{if or .User.IssuesRead .User.InProgress .Pages.Total}}
 <section class="stats-section">
     <h2>Reading</h2>
     <div class="stat-grid">
@@ -29,6 +29,44 @@
         <div class="stat-tile"><span class="stat-value">{{.Reading.ReadingDays}}</span><span class="stat-label">days with a finished issue</span></div>
     </div>
 </section>
+
+<section class="stats-section">
+    <h2>Pages{{with .Pages.Since}} <span class="dim">— tracked since {{.}}</span>{{end}}</h2>
+    {{if .Pages.Total}}
+    <div class="stat-grid">
+        <div class="stat-tile"><span class="stat-value">{{.Pages.Today}}</span><span class="stat-label">pages today</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.Pages.ThisWeek}}</span><span class="stat-label">pages this week</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.Pages.ThisMonth}}</span><span class="stat-label">pages this month</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.Pages.ThisYear}}</span><span class="stat-label">pages this year</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.Pages.Total}}</span><span class="stat-label">pages viewed in total</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.Pages.Days}}</span><span class="stat-label">days with reading</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.Pages.AvgPerDay}}</span><span class="stat-label">pages per reading day</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.Pages.BestDayCount}}</span><span class="stat-label">best day — {{.Pages.BestDay}}</span></div>
+        <div class="stat-tile"><span class="stat-value">{{.Pages.Sessions}}</span><span class="stat-label">reading sessions</span></div>
+        <div class="stat-tile" title="Time between consecutive page turns, pauses over 5 minutes excluded"><span class="stat-value">≈ {{.Pages.ReadingTimeText}}</span><span class="stat-label">reading time</span></div>
+        {{with .Pages.SecondsPerPage}}<div class="stat-tile"><span class="stat-value">{{.}} s</span><span class="stat-label">per page on average</span></div>{{end}}
+    </div>
+    {{else}}
+    <p class="dim">Page-by-page tracking is new — read a few pages and they'll show up here.</p>
+    {{end}}
+</section>
+
+{{if .Pages.Total}}
+<section class="stats-section stat-bars-dense">
+    <h2>Pages, last 30 days</h2>
+    {{template "stat-bars" .Pages.Last30}}
+</section>
+<div class="stats-charts">
+    <section class="stats-section">
+        <h2>Pages, last 12 months</h2>
+        {{template "stat-bars" .Pages.Months}}
+    </section>
+    <section class="stats-section">
+        <h2>Pages by hour{{with .Pages.PeakHour}} <span class="dim">— peak: {{.}}</span>{{end}}</h2>
+        <div class="stat-bars-dense">{{template "stat-bars" .Pages.Hours}}</div>
+    </section>
+</div>
+{{end}}
 
 {{if .User.IssuesRead}}
 <div class="stats-charts">
@@ -80,7 +118,7 @@
 {{define "stat-bars"}}
 <div class="stat-bars">
     {{range .}}
-    <div class="stat-bar" title="{{.Label}}: {{.Count}}">
+    <div class="stat-bar" title="{{or .Tip .Label}}: {{.Count}}">
         <span class="stat-bar-count">{{if .Count}}{{.Count}}{{end}}</span>
         <span class="stat-bar-fill" style="height: {{.Pct}}%"></span>
         <span class="stat-bar-label">{{.Label}}</span>

@@ -188,3 +188,41 @@ func TestUserStats(t *testing.T) {
 		t.Errorf("UserStats(nobody) = %+v, %v, want all zero", empty, err)
 	}
 }
+
+func TestRecordPageRead(t *testing.T) {
+	st := openTestStore(t)
+	id, err := st.FindOrCreateSeriesByFolder("Saga", "Saga", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	is := &Issue{SeriesID: id, Path: "Saga 001.cbz", FilePages: 20}
+	if err := st.InsertIssue(is); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []int{1, 2, 3, 2, 3} { // flipping back counts each page once a day
+		if err := st.RecordPageRead("", is.ID, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.RecordPageRead("bartek", is.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, err := st.PageReadTimes(""); err != nil || len(got) != 3 {
+		t.Fatalf("PageReadTimes(\"\") = %v, %v, want 3 pages", got, err)
+	}
+
+	// Adopting anonymous progress hands the page log over too.
+	if _, err := st.AdoptAnonymousProgress("ania"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := st.PageReadTimes("ania"); len(got) != 3 {
+		t.Errorf("PageReadTimes(ania) after adoption = %v, want 3 pages", got)
+	}
+	if got, _ := st.PageReadTimes(""); len(got) != 0 {
+		t.Errorf("PageReadTimes(\"\") after adoption = %v, want none", got)
+	}
+	if got, _ := st.PageReadTimes("bartek"); len(got) != 1 {
+		t.Errorf("PageReadTimes(bartek) = %v, want 1 page", got)
+	}
+}

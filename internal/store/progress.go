@@ -210,9 +210,40 @@ func (s *Store) FinishedAtTimes(user string) ([]string, error) {
 	return out, rows.Err()
 }
 
+// RecordPageRead logs that user looked at page (1-based) of the issue, for
+// the page statistics. Only actual reading should call it (the web reader's
+// progress reports, OPDS page streaming) — not "mark as read". A page counts
+// once per UTC day, so flipping back and forth doesn't inflate the total.
+func (s *Store) RecordPageRead(user string, issueID int64, page int) error {
+	_, err := s.db.Exec(`
+		INSERT OR IGNORE INTO page_reads (user, issue_id, page, day, read_at)
+		VALUES (?, ?, ?, date('now'), datetime('now'))`, user, issueID, page)
+	return err
+}
+
+// PageReadTimes returns the timestamps (SQLite UTC datetime text) of every
+// page read the user has logged, oldest first. Unlike the issue-level stats
+// it keeps reads of files now missing — the reading still happened.
+func (s *Store) PageReadTimes(user string) ([]string, error) {
+	rows, err := s.db.Query(`SELECT read_at FROM page_reads WHERE user = ? ORDER BY read_at`, user)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
 // AdoptAnonymousProgress hands progress recorded before accounts existed
 // (empty user name) to the given user, keeping the user's own rows where
-// both exist. Returns how many rows moved.
+// both exist (page reads included). Returns how many progress rows moved.
 func (s *Store) AdoptAnonymousProgress(user string) (int64, error) {
 	if user == "" {
 		return 0, nil
@@ -224,6 +255,12 @@ func (s *Store) AdoptAnonymousProgress(user string) (int64, error) {
 	moved, _ := res.RowsAffected()
 	// Rows that collided with the user's own progress stay anonymous; drop them.
 	if _, err := s.db.Exec(`DELETE FROM reading_progress WHERE user = ''`); err != nil {
+		return moved, err
+	}
+	if _, err := s.db.Exec(`UPDATE OR IGNORE page_reads SET user = ? WHERE user = ''`, user); err != nil {
+		return moved, err
+	}
+	if _, err := s.db.Exec(`DELETE FROM page_reads WHERE user = ''`); err != nil {
 		return moved, err
 	}
 	return moved, nil

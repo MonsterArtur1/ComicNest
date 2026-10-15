@@ -140,5 +140,8 @@ func (s *Server) handleIssueProgress(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
+	if err := s.store.RecordPageRead(userFrom(r), issue.ID, page); err != nil {
+		log.Printf("reader: page read for issue %d: %v", issue.ID, err)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }

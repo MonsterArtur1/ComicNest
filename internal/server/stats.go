@@ -27,6 +27,7 @@ type readingStats struct {
 // the tallest bar in the same chart (0..100).
 type statBar struct {
 	Label string
+	Tip   string // hover text in place of Label, when the label is abbreviated or blank
 	Count int
 	Pct   int
 }
@@ -67,14 +68,7 @@ func computeReadingStats(rawTimes []string, now time.Time) readingStats {
 	y, m, d := now.Date()
 	weekStart := time.Date(y, m, d, 0, 0, 0, 0, now.Location()).AddDate(0, 0, -mondayIndex(now.Weekday()))
 
-	const monthFormat = "2006-01"
-	months := make([]statBar, 12)
-	monthIndex := make(map[string]int, len(months))
-	for i := range months {
-		start := time.Date(y, m-time.Month(len(months)-1-i), 1, 0, 0, 0, 0, now.Location())
-		months[i].Label = start.Format("Jan")
-		monthIndex[start.Format(monthFormat)] = i
-	}
+	months, monthIndex := lastMonths(now)
 	weekdays := make([]statBar, 7)
 	for i := range weekdays {
 		weekdays[i].Label = time.Weekday((i + 1) % 7).String()[:3]
@@ -109,6 +103,23 @@ func computeReadingStats(rawTimes []string, now time.Time) readingStats {
 	return st
 }
 
+// monthFormat keys the month buckets built by lastMonths.
+const monthFormat = "2006-01"
+
+// lastMonths returns empty bars for the 12 calendar months up to and
+// including now's, oldest first, and an index from monthFormat keys to bars.
+func lastMonths(now time.Time) ([]statBar, map[string]int) {
+	y, m, _ := now.Date()
+	months := make([]statBar, 12)
+	index := make(map[string]int, len(months))
+	for i := range months {
+		start := time.Date(y, m-time.Month(len(months)-1-i), 1, 0, 0, 0, 0, now.Location())
+		months[i].Label = start.Format("Jan")
+		index[start.Format(monthFormat)] = i
+	}
+	return months, index
+}
+
 // mondayIndex maps a weekday to its position in a Monday-first week.
 func mondayIndex(wd time.Weekday) int { return (int(wd) + 6) % 7 }
 
@@ -129,6 +140,7 @@ func scaleBars(bars []statBar) []statBar {
 
 type statsPageData struct {
 	Reading readingStats
+	Pages   pageStats
 	User    store.UserStats
 }
 
@@ -145,7 +157,16 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
-	s.render(w, r, "stats.html", statsPageData{Reading: reading, User: user})
+	pageTimes, err := s.store.PageReadTimes(userFrom(r))
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	s.render(w, r, "stats.html", statsPageData{
+		Reading: reading,
+		Pages:   computePageStats(pageTimes, time.Now()),
+		User:    user,
+	})
 }
 
 // dayStreaks returns the current streak (consecutive days ending today or

@@ -297,6 +297,15 @@ library's display-name override, set from the admin panel's per-library "Rename"
 back to the folder's own name — see §9). A runtime preference, not a `config.yaml` setting: a
 rename applies immediately, with no restart and no file edit.
 
+**Page reads** (migration 15): the `page_reads` table (`user`, `issue_id`, `page`, `day`,
+`read_at`; primary key `(user, issue_id, page, day)`, cascades with the issue) logs individual
+pages read, for the page-level statistics on `/stats`. `Store.RecordPageRead` inserts with `INSERT
+OR IGNORE` keyed on the UTC `date('now')`, so a page counts once per day however often the reader
+flips back to it; `read_at` is the first time that day. Written only by actual reading — the web
+reader's `POST /issues/{id}/progress` and OPDS page streaming without `?track=0` — never by "mark as
+read". OPDS clients that prefetch pages log them at fetch time, which can shorten the estimated
+reading time. History starts with the migration; nothing is backfilled from `reading_progress`.
+
 ## 6. Library scanning
 
 Started by a UI button (`POST /scan`), runs in a goroutine; the UI polls status (HTMX polling

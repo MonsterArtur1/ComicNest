@@ -215,6 +215,25 @@ var migrations = []string{
 	ALTER TABLE scan_history ADD COLUMN problem_count INTEGER NOT NULL DEFAULT 0;
 	ALTER TABLE scan_history ADD COLUMN problems      TEXT NOT NULL DEFAULT '';
 	`,
+
+	// 15: a log of individual page reads, for the page-level half of the
+	// "Your stats" page (reading_progress only keeps the furthest page per
+	// issue, so it can't say when pages were read). One row per user, issue,
+	// page and UTC day — re-reading a page on another day counts again,
+	// flipping back and forth within one day doesn't (see
+	// Store.RecordPageRead). read_at is the first time that day.
+	`
+	CREATE TABLE page_reads (
+		user     TEXT NOT NULL,
+		issue_id INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+		page     INTEGER NOT NULL,
+		day      TEXT NOT NULL,
+		read_at  TEXT NOT NULL DEFAULT (datetime('now')),
+		PRIMARY KEY (user, issue_id, page, day)
+	);
+	CREATE INDEX idx_page_reads_user ON page_reads(user, read_at);
+	CREATE INDEX idx_page_reads_issue ON page_reads(issue_id);
+	`,
 }
 
 func migrate(db *sql.DB) error {

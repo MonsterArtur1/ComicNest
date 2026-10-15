@@ -123,6 +123,48 @@ func TestComputeReadingStats(t *testing.T) {
 	})
 }
 
+func TestComputePageStats(t *testing.T) {
+	now := day(t, "2026-09-10").Add(12 * time.Hour) // Thursday noon UTC
+
+	if st := computePageStats(nil, now); st.Total != 0 || st.Sessions != 0 || st.BestDay != "" {
+		t.Errorf("computePageStats(nil) = %+v, want all zero", st)
+	}
+
+	raw := []string{
+		"2025-12-01 20:00:00", // last year
+		"2026-09-06 21:00:00", // Sunday before this week
+		"2026-09-09 21:00:00", // a session of four pages, 30 s apart
+		"2026-09-09 21:00:30",
+		"2026-09-09 21:01:00",
+		"2026-09-09 21:01:30",
+		"2026-09-10 08:00:00", // today: a new session (gap > 5 min)
+		"2026-09-10 08:01:00",
+	}
+	st := computePageStats(raw, now)
+	if st.Total != 8 || st.Today != 2 || st.ThisWeek != 6 || st.ThisMonth != 7 || st.ThisYear != 7 || st.Days != 4 {
+		t.Errorf("total/today/week/month/year/days = %d/%d/%d/%d/%d/%d, want 8/2/6/7/7/4",
+			st.Total, st.Today, st.ThisWeek, st.ThisMonth, st.ThisYear, st.Days)
+	}
+	if st.BestDay != "9 Sep 2026" || st.BestDayCount != 4 || st.Since != "1 Dec 2025" || st.AvgPerDay() != 2 {
+		t.Errorf("best day %q (%d), since %q, avg %d; want 9 Sep 2026 (4), 1 Dec 2025, 2",
+			st.BestDay, st.BestDayCount, st.Since, st.AvgPerDay())
+	}
+	if st.Sessions != 4 || st.ReadingTime != 150*time.Second || st.SecondsPerPage() != 37 || st.ReadingTimeText() != "2 min" {
+		t.Errorf("sessions %d, time %v (%s), %d s/page; want 4, 2m30s, 37 s/page",
+			st.Sessions, st.ReadingTime, st.ReadingTimeText(), st.SecondsPerPage())
+	}
+	if len(st.Last30) != 30 || st.Last30[29].Count != 2 || st.Last30[28].Count != 4 || st.Last30[28].Pct != 100 ||
+		st.Last30[29].Label != "10" || st.Last30[29].Tip != "Thu 10 Sep" {
+		t.Errorf("Last30 tail = %+v, want 4 (100%%) on 9 Sep and 2 today", st.Last30[27:])
+	}
+	if len(st.Hours) != 24 || st.Hours[21].Count != 5 || st.PeakHour() != "21:00" {
+		t.Errorf("Hours = %+v, want 5 at 21:00 (peak)", st.Hours)
+	}
+	if st.Months[11].Count != 7 || st.Months[2].Label != "Dec" || st.Months[2].Count != 1 {
+		t.Errorf("Months = %+v, want 7 in Sep and 1 in Dec", st.Months)
+	}
+}
+
 func TestStatsPage(t *testing.T) {
 	srv, _ := newTestServer(t, false)
 	h := srv.Handler()
@@ -141,7 +183,14 @@ func TestStatsPage(t *testing.T) {
 	}
 	rec = get(t, h, "/stats", nil)
 	body := rec.Body.String()
-	for _, want := range []string{"issues read", "Most read series", `href="/series/1">Saga</a>`, "Brian K. Vaughan", "Last 12 months"} {
+	if !strings.Contains(body, "Page-by-page tracking is new") {
+		t.Error("/stats without page reads should explain page tracking")
+	}
+	if err := srv.store.RecordPageRead("", issues[0].ID, 1); err != nil {
+		t.Fatal(err)
+	}
+	body = get(t, h, "/stats", nil).Body.String()
+	for _, want := range []string{"issues read", "Most read series", "pages today", "Pages by hour", `href="/series/1">Saga</a>`, "Brian K. Vaughan", "Last 12 months"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("/stats missing %q", want)
 		}

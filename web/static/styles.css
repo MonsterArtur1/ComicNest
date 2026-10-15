@@ -321,6 +321,10 @@ code {
     white-space: nowrap;
     overflow: hidden;
 }
+/* Many thin bars (30 days, 24 hours): tighter spacing, counts only on hover. */
+.stat-bars-dense .stat-bars { gap: 2px; }
+.stat-bars-dense .stat-bar-count { visibility: hidden; }
+.stat-bars-dense .stat-bar-label { overflow: visible; }
 .stat-ranking { margin: 0; padding: 0; list-style: none; counter-reset: rank; }
 .stat-ranking li {
     counter-increment: rank;
