@@ -114,6 +114,35 @@ code {
     letter-spacing: -2px;
 }
 .reader-issue-link:hover { color: var(--accent); border-color: var(--accent); }
+/* guided view: the fitted page is zoomed onto one panel (reader.js placeGuided) */
+.guided-on .reader-page { transform-origin: 0 0; transition: transform 0.3s ease; }
+.guided-on .reader-zone { touch-action: manipulation; }
+.guided-active .reader-stage { overflow: hidden; }
+.reader-panel-mask {
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+    box-shadow: 0 0 0 200vmax rgba(0, 0, 0, 0.82);
+    transition: left 0.3s ease, top 0.3s ease, width 0.3s ease, height 0.3s ease;
+}
+.guided-instant .reader-page, .guided-instant .reader-panel-mask { transition: none; }
+.reader-panel-badge {
+    position: fixed;
+    right: 12px;
+    bottom: 60px;
+    z-index: 4;
+    padding: 3px 9px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(22, 24, 29, 0.8);
+    color: var(--text-dim);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+    .guided-on .reader-page, .reader-panel-mask { transition: none; }
+}
 @media (max-width: 600px) {
     .reader-tools [data-zoom="out"], .reader-tools [data-zoom="in"], .reader-zoom-label { display: none; }
 }
@@ -1255,6 +1284,18 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     /* the browse links (.topnav, below) get their own scrollable row */
     .topnav { order: 6; flex: 1 1 100%; overflow-x: auto; white-space: nowrap; }
 }
+
+/* --- recommendations: /recommendations, home strip, series page --- */
+.foryou-strip, .rec-bucket, .similar-section { margin: 0 0 22px; }
+.foryou-strip h2, .rec-bucket h2, .similar-section h2 { font-size: 18px; margin: 0 0 10px; }
+.rec-intro { margin-bottom: 16px; }
+.rec-card { display: flex; flex-direction: column; }
+.rec-card > a { flex: 1; }
+.rec-reason { white-space: normal; line-height: 1.35; }
+.rec-dismiss { padding: 0 12px 10px; }
+.rec-dismissed-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rec-dismissed-list li { display: flex; align-items: center; gap: 12px; }
+.rec-dismissed-list form { margin: 0; }
 
 /* --- top bar browse links, arcs, characters, creators --- */
 .topnav { display: flex; gap: 14px; flex-shrink: 0; font-size: 14px; }

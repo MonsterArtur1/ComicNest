@@ -29,6 +29,12 @@ comicvine_api_key: ""         # key from https://comicvine.gamespot.com/api/; em
 opds_enabled: true            # OPDS catalog under /opds (see §9a); logs in with the same accounts as the web UI
 # kosync_enabled: true        # KOReader progress sync server under /kosync (default false; see §9b); same accounts as the web UI — log in to the web UI once after enabling
 page_size: 60                 # series tiles per library page; 0 = no pagination
+panel_detection:              # the reader's Guided View (panel-by-panel reading)
+  sensitivity: normal         # low | normal | high — high splits more aggressively (finds more panels, more false splits on busy art); low only cuts along clean gutters (COMICNEST_PANEL_SENSITIVITY)
+  # gutter_tolerance: 0       # advanced: how far (0..128 gray levels) a pixel may be from the gutter colour and still count as gutter; 0 = automatic
+  # min_panel_area: 0         # advanced: smallest panel as a fraction of the page area (e.g. 0.01); 0 = the sensitivity's default
+# Changing panel_detection needs a restart; cached panel layouts are then
+# recomputed as pages are opened.
 
 # comicvine_api_key, opds_enabled, kosync_enabled and page_size can also be edited from the
 # admin panel (/admin) instead of this file — page_size applies right away,

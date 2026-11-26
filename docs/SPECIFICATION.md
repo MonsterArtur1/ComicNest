@@ -44,6 +44,7 @@ kept only as a reference for the idea, no code is copied from it).
 ```
 ComicNextClaude/
 ├── cmd/comicnest/main.go        # wiring: config → db → scanner → server
+├── cmd/panelsdebug/             # developer tool: panel detection overlays + ground-truth evaluation
 ├── internal/
 │   ├── config/                  # loading/saving config.yaml, defaults
 │   ├── store/                   # SQLite schema, migrations, queries (SeriesStore, IssueStore)
@@ -79,11 +80,25 @@ data_dir: "./data"             # sqlite database + cover cache
 comicvine_api_key: ""          # empty = ComicVine features disabled (the UI says so)
 opds_enabled: false            # OPDS catalog under /opds (see §9a)
 page_size: 60                  # series tiles per library page; 0 = no pagination
+panel_detection:               # Guided View panel detector (internal/panels)
+  sensitivity: normal          # low | normal | high (COMICNEST_PANEL_SENSITIVITY)
+  # gutter_tolerance: 0        # advanced: gutter colour tolerance, 0..128 gray levels; 0 = automatic
+  # min_panel_area: 0          # advanced: smallest panel, fraction of the page area; 0 = sensitivity default
 ```
 
 When the file is missing, the app writes a default config and logs instructions to fill it in.
 User accounts are **not** part of this file — they live in the database and are managed from the
 admin panel in the browser (`/admin`, see below), not by editing YAML.
+
+**Panel detection (`panel_detection`).** Maps to `panels.Options` for the guided view (§9, the
+`/issues/{id}/pages/{n}/panels` endpoint). `sensitivity` picks a preset — low: cut bands ≥95% gutter, erosion 1 px, smallest
+panel 2% of the page; normal (default, also empty): ≥85%, 2 px, 1.2%; high: ≥75%, 3 px, 0.8%.
+`gutter_tolerance` and `min_panel_area` override single parameters (0 = preset/automatic);
+`config.Load` rejects unknown sensitivities and out-of-range values. Read at request time, but
+only edited in the file (restart). Cached layouts carry a hash of the effective options, so a
+change recomputes them lazily. For tuning on real comics, `cmd/panelsdebug` (developer tool, not
+shipped) renders overlay PNGs of the detected panels and scores the detector against a
+hand-made ground-truth JSON (`-eval`, precision/recall/F1 at IoU ≥ 0.5, worst pages listed).
 
 **Multiple libraries (`libraries`).** An optional `libraries: []string` list of library root
 paths. When set, it takes precedence over `library` and splits the catalog into that many
@@ -335,6 +350,18 @@ character_id, source; PK (issue_id, character_id, source))`. Arcs and characters
 have no table — they are split from `issues.writer` / `issues.artist` on each request
 (`store.SplitCredits`).
 
+**Recommendation dismissals** (migration 19): `recommendation_dismissals(user, series_id → series
+ON DELETE CASCADE, created_at; PK (user, series_id))` — series a user marked "Not interested"; they
+are left out of that user's recommendations until restored. Recommendations themselves are computed
+on request (cached in memory for 5 minutes), nothing else is stored.
+
+**Guided-view panel cache** (migration 20): `page_panels(issue_id → issues ON DELETE CASCADE, page
+(0-based), rtl (0/1), file_size, mtime (unix s), version (`panels.Options.CacheVersion()` =
+panels.Version×1000 + a 0..999 hash of the effective `panel_detection` parameters), panels (JSON
+list of {x,y,w,h} in 0..1); PK (issue_id, page, rtl))`. A row not matching the archive's current
+size/mtime, the algorithm version or the configured options is recomputed on the next request, and
+the issue's stale rows are dropped.
+
 ## 6. Library scanning
 
 Started by a UI button (`POST /scan`), runs in a goroutine; the UI polls status (HTMX polling
@@ -515,6 +542,7 @@ is hidden entirely.
 | `POST /issues/{id}/unlock` | remove the metadata lock — admin only |
 | `GET /issues/{id}/read?page=N` | the in-browser reader (a separate `reader.html` template with no layout + `static/reader.js`): one page per screen, zoom (fit height / fit width / 20–400% scale with scrolling, remembered in `localStorage`), paging (arrow keys, Space/PageUp/PageDown, Home/End, clicking the left/right 30% of the screen, swipe, wheel when the page fits entirely, a slider), fullscreen, auto-hiding bars, preloading of neighbouring pages, ◂◂/▸▸ links on the bottom bar to the series' previous/next readable issue (no end-of-issue popup — the user leaves on their own; an earlier "End of issue" overlay was removed on request). Start page: `?page=` → progress (if < page count) → 1. CBZ/CBR present on disk only (404 for PDF/missing); no `file_pages` yet → counted and saved |
 | `GET /issues/{id}/pages/{n}?track=0` | the same handler as OPDS; `track=0` (used by the reader, which preloads) does not record progress |
+| `GET /issues/{id}/pages/{n}/panels[?rtl=1]` | guided view: `{"page":n,"panels":[{"x","y","w","h"},…]}` (normalized 0..1, reading order; a single `{0,0,1,1}` panel = no layout found, page normally). Detected on demand by `internal/panels` (gutter-based, no ML: grayscale ≤1200 px long side; gutter shade = dominant shade of the page frame, white/black/coloured, ≥30% of the frame must agree so one-sided bleeds are fine; tolerance tightened for flat digital gutters; flood fill from the frame; content eroded to cut balloon/art bridges over gutters; recursive XY-cut along bands ≥85% gutter (sensitivity-dependent; inside pieces whose art is largely gutter-coloured only clean bands bounded by straight panel edges); unsplittable pieces → solid connected components (overlapping/L layouts), else dark border lines of touching panels (light pages), else inner gutters of another colour; boxes contained in others merged, specks dropped, slivers merged, reading order by an XY-cut over the boxes; 0–1 / >20 panels or <20% coverage → full page; tuned by `panel_detection`, §4) and cached in `page_panels`; same login gate as the page endpoint; 404 for bad pages, unknown issues, missing files and non-CBZ/CBR. In the reader: ▦ / `g` toggles guided view (localStorage, default off); the fitted page is zoomed onto one panel at a time (CSS transform 0.3 s, none for `prefers-reduced-motion`, neighbours dimmed); next/prev step through panels and across pages; "panel i/n" badge, `v` / double-tap middle shows the whole page; zoom controls leave guided view; progress stays per page |
 | `POST /issues/{id}/progress` (`page=`, 1-based) | explicit progress recording from the reader (a fetch after each page change, debounced 400ms, `sendBeacon` on leaving the page); `MAX` against the existing value, as in OPDS; 400 out of range; 204 |
 | `POST /issues/{id}/read` / `POST /issues/{id}/unread` | mark an issue as read (progress = page count; an archive with uncounted pages gets counted now; an unknown page count is a flash error) / unread (clears progress). The `next` field (local paths only) returns to the list page; without it, redirect to the issue page with `?msg=` |
 | `POST /issues/{id}/scrape` | ComicVine for a single issue — admin only |
@@ -532,6 +560,8 @@ is hidden entirely.
 | `POST /arcs/{id}/refresh` | admin only: re-fetch the arc's issue list from ComicVine |
 | `GET /characters` / `GET /characters/{id}` | character index (`?q=`, top 300 by issue count) / every present issue featuring the character, grouped by series |
 | `GET /creators` / `GET /creators/{name}` | creator index (`?q=`) / a creator's issues by role (writer, artist) and series; `{name}` is the normalized name, path-escaped |
+| `GET /recommendations` | "For you": per-user buckets of recommended series/issues with reasons (writers you like, characters you follow, continue a story arc, unfinished series, popular on this server), scoped by the library selector, plus the "Hidden from recommendations" list; the home page (page 1, unfiltered) shows a compact strip, the series page a "More like this" section |
+| `POST /recommendations/dismiss` / `POST /recommendations/restore` | form `series` (+ optional `next`): hide a series from the user's recommendations / undo it; 404 for an unknown series |
 | `GET /search?q=` | results by series name, title and issue numbers (LIKE) |
 | `GET /static/...` | static assets from `embed.FS` |
 | `GET /healthz` | a liveness probe (`ok`, no login) — Docker/orchestrators |

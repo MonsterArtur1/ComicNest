@@ -141,4 +141,13 @@
 {{else}}
 <div class="empty-state"><p>No issues match this filter.</p></div>
 {{end}}
+
+{{if .Similar}}
+<section class="similar-section">
+    <h2>More like this</h2>
+    <ul class="series-grid">
+        {{range .Similar}}{{template "rec-tile" .}}{{end}}
+    </ul>
+</section>
+{{end}}
 {{end}}

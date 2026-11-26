@@ -1,0 +1,44 @@
+{{define "title"}}For you — ComicNest{{end}}
+
+{{define "content"}}
+<div class="page-head">
+    <h1>For you{{if multiLibrary}}{{$current := currentLibrary}}{{if ne $current ""}} — {{libraryName $current}}{{end}}{{end}}</h1>
+</div>
+<p class="hint rec-intro">What to read next, from your own library: based on what you read and favorited — nothing leaves this server.</p>
+
+{{if .Recs.Buckets}}
+{{if .Recs.Fallback}}
+<p class="hint rec-intro">Nothing to go on yet. Read a few issues and this page learns your taste; until then, here are the biggest series.</p>
+{{end}}
+{{range .Recs.Buckets}}
+<section class="rec-bucket" id="{{.Key}}">
+    <h2>{{.Title}}</h2>
+    <ul class="series-grid">
+        {{range .Items}}{{template "rec-tile" .}}{{end}}
+    </ul>
+</section>
+{{end}}
+{{else}}
+<div class="empty-state">
+    <p>No recommendations right now.</p>
+    <p class="hint">Everything suitable is already started, read or hidden{{if multiLibrary}} in this library{{end}}.</p>
+</div>
+{{end}}
+
+{{if .Dismissed}}
+<section class="rec-bucket rec-dismissed" id="dismissed">
+    <h2>Hidden from recommendations</h2>
+    <ul class="rec-dismissed-list">
+        {{range .Dismissed}}
+        <li>
+            <a href="/series/{{.ID}}">{{.Name}}</a>
+            <form action="/recommendations/restore" method="post">
+                <input type="hidden" name="series" value="{{.ID}}">
+                <button type="submit" class="btn btn-mini">Restore</button>
+            </form>
+        </li>
+        {{end}}
+    </ul>
+</section>
+{{end}}
+{{end}}

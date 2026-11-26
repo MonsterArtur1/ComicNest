@@ -373,6 +373,36 @@ var migrations = []string{
 	);
 	CREATE INDEX idx_issue_characters_character ON issue_characters(character_id);
 	`,
+
+	// 19: "not interested" marks of the recommendations
+	// (store/recommend.go), per user.
+	`
+	CREATE TABLE recommendation_dismissals (
+		user       TEXT NOT NULL,
+		series_id  INTEGER NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+		created_at TEXT NOT NULL DEFAULT (datetime('now')),
+		PRIMARY KEY (user, series_id)
+	);
+	`,
+
+	// 20: guided view — cached panel rectangles per
+	// issue page (internal/panels), as the JSON list the reader receives.
+	// file_size/mtime are the archive's state when the page was analysed and
+	// version the detection algorithm's (panels.Version); a row that no longer
+	// matches either is recomputed on the next request (see
+	// Store.GetPagePanels). rtl = the manga (right-to-left) reading order.
+	`
+	CREATE TABLE page_panels (
+		issue_id  INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+		page      INTEGER NOT NULL,
+		rtl       INTEGER NOT NULL DEFAULT 0,
+		file_size INTEGER NOT NULL,
+		mtime     INTEGER NOT NULL,
+		version   INTEGER NOT NULL,
+		panels    TEXT NOT NULL,
+		PRIMARY KEY (issue_id, page, rtl)
+	);
+	`,
 }
 
 func migrate(db *sql.DB) error {

@@ -39,6 +39,40 @@ type Config struct {
 	// PageSize is the number of series tiles per page of the library grid.
 	// 0 disables pagination (everything on one page).
 	PageSize int `yaml:"page_size"`
+	// PanelDetection tunes the reader's Guided View panel detector.
+	PanelDetection PanelDetection `yaml:"panel_detection"`
+}
+
+// PanelDetection tunes the Guided View panel detector (internal/panels).
+// Zero values mean the defaults; changing any of it recomputes cached panel
+// layouts as pages are opened.
+type PanelDetection struct {
+	// Sensitivity is low, normal (default) or high: high splits more
+	// aggressively (finds more panels, more false splits on busy art), low
+	// only cuts along clean gutters.
+	Sensitivity string `yaml:"sensitivity"`
+	// GutterTolerance (advanced) is how far, in 0..255 gray levels, a pixel
+	// may be from the gutter colour and still count as gutter; 0 = automatic.
+	GutterTolerance int `yaml:"gutter_tolerance,omitempty"`
+	// MinPanelArea (advanced) is the smallest panel as a fraction of the page
+	// area (e.g. 0.01); 0 = the sensitivity's default.
+	MinPanelArea float64 `yaml:"min_panel_area,omitempty"`
+}
+
+// validate reports out-of-range panel detection settings.
+func (p PanelDetection) validate() error {
+	switch strings.ToLower(strings.TrimSpace(p.Sensitivity)) {
+	case "", "low", "normal", "high":
+	default:
+		return fmt.Errorf("invalid panel_detection.sensitivity %q (want low, normal or high)", p.Sensitivity)
+	}
+	if p.GutterTolerance < 0 || p.GutterTolerance > 128 {
+		return fmt.Errorf("invalid panel_detection.gutter_tolerance %d (0..128, 0 = automatic)", p.GutterTolerance)
+	}
+	if p.MinPanelArea < 0 || p.MinPanelArea > 0.5 {
+		return fmt.Errorf("invalid panel_detection.min_panel_area %g (0..0.5, 0 = default)", p.MinPanelArea)
+	}
+	return nil
 }
 
 // DefaultPageSize is used when config.yaml does not set page_size.
@@ -53,13 +87,14 @@ func defaults() Config {
 		ComicVineAPIKey: "",
 		OPDSEnabled:     false,
 		PageSize:        DefaultPageSize,
+		PanelDetection:  PanelDetection{Sensitivity: "normal"},
 	}
 }
 
 // EnvPrefix is the prefix of environment variables that override config.yaml
 // (COMICNEST_LISTEN, COMICNEST_PORT, COMICNEST_LIBRARY, COMICNEST_DATA_DIR,
 // COMICNEST_COMICVINE_API_KEY, COMICNEST_OPDS_ENABLED, COMICNEST_KOSYNC_ENABLED,
-// COMICNEST_PAGE_SIZE).
+// COMICNEST_PAGE_SIZE, COMICNEST_PANEL_SENSITIVITY for panel_detection.sensitivity).
 // The Docker image uses them to point at its volumes; they also let the API
 // key live outside the file.
 const EnvPrefix = "COMICNEST_"
@@ -102,6 +137,9 @@ func Load(path string) (Config, error) {
 	}
 	if cfg.PageSize < 0 {
 		return cfg, fmt.Errorf("invalid page_size %d in %s (0 = no pagination)", cfg.PageSize, path)
+	}
+	if err := cfg.PanelDetection.validate(); err != nil {
+		return cfg, fmt.Errorf("%w in %s", err, path)
 	}
 	cfg.Libraries = cleanLibraries(cfg.Libraries)
 	seen := make(map[string]bool, len(cfg.Libraries))
@@ -153,6 +191,7 @@ func (c *Config) applyEnv() error {
 	str("LIBRARY", &c.Library)
 	str("DATA_DIR", &c.DataDir)
 	str("COMICVINE_API_KEY", &c.ComicVineAPIKey)
+	str("PANEL_SENSITIVITY", &c.PanelDetection.Sensitivity)
 
 	for _, f := range []struct {
 		key string

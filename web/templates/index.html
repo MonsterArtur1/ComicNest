@@ -38,6 +38,15 @@
 </section>
 {{end}}
 
+{{if and .ForYou (eq .Filter "all") (eq .Page 1)}}
+<section class="foryou-strip">
+    <h2>For you <a class="releases-more" href="/recommendations">more recommendations →</a></h2>
+    <ul class="series-grid">
+        {{range .ForYou}}{{template "rec-tile" .}}{{end}}
+    </ul>
+</section>
+{{end}}
+
 {{$sort := .Sort}}{{$filter := .Filter}}
 <div class="filter-bar">
     <a class="chip {{if eq $filter "all"}}active{{end}}" href="/?sort={{$sort}}">all</a>

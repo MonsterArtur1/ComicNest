@@ -31,16 +31,19 @@
             <button type="button" data-zoom="out" title="Zoom out (−)">−</button>
             <span id="zoom-label" class="reader-zoom-label">auto</span>
             <button type="button" data-zoom="in" title="Zoom in (+)">+</button>
+            <button type="button" id="guided" title="Guided view: read panel by panel (g)" aria-pressed="false">▦</button>
             <button type="button" id="fullscreen" title="Fullscreen (f)">⛶</button>
         </div>
     </header>
 
     <div id="stage" class="reader-stage">
         <img id="page" class="reader-page" alt="page" draggable="false">
+        <div id="panel-mask" class="reader-panel-mask" hidden></div>
         <div class="reader-zone reader-zone-prev" data-nav="prev" title="Previous page"></div>
         <div class="reader-zone reader-zone-menu" data-nav="menu"></div>
         <div class="reader-zone reader-zone-next" data-nav="next" title="Next page"></div>
         <div id="loading" class="reader-loading" hidden>Loading…</div>
+        <button type="button" id="panel-badge" class="reader-panel-badge" hidden title="Whole page / panels (v, double-tap the middle)"></button>
     </div>
 
     <footer class="reader-bar reader-bottom">

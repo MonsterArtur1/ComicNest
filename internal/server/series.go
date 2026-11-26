@@ -16,6 +16,8 @@ type seriesData struct {
 	Gaps *store.Gaps
 	// Follow is the release-following state (releases.go).
 	Follow followView
+	// Similar is the "More like this" list (recommendations.go).
+	Similar []store.Recommendation
 }
 
 func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
@@ -64,5 +66,5 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 		next += "?filter=" + string(filter)
 	}
 	s.render(w, r, "series.html", seriesData{Series: series, Issues: rows, Filter: string(filter), Next: next,
-		Gaps: s.seriesGapsFor(series), Follow: s.followViewFor(r, series)})
+		Gaps: s.seriesGapsFor(series), Follow: s.followViewFor(r, series), Similar: s.similarSeries(r, id)})
 }

@@ -19,6 +19,9 @@ type homeData struct {
 	Releases  []releaseRow
 	GapCounts map[int64]int
 
+	// ForYou is the compact recommendations strip (recommendations.go).
+	ForYou []store.Recommendation
+
 	// Pagination over the filtered series list (Pages == 1 hides the pager).
 	Page  int
 	Pages int
@@ -85,6 +88,9 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		data.PageLinks = pageLinks(data.Page, data.Pages)
 	}
 	data.Series = series
+	if filter == store.SeriesFilterAll && data.Page == 1 {
+		data.ForYou = s.homeForYou(r)
+	}
 
 	s.render(w, r, "index.html", data)
 }

@@ -22,6 +22,7 @@
 <header class="topbar">
     <a class="brand" href="/"><img class="brand-logo" src="/static/favicon.png" alt="" width="32" height="32"><span class="brand-name">Comic<span>Nest</span></span></a>
     <nav class="topnav" aria-label="Browse">
+        <a href="/recommendations" title="What to read next">For you</a>
         <a href="/arcs">Arcs</a>
         <a href="/characters">Characters</a>
         <a href="/creators">Creators</a>
@@ -56,6 +57,27 @@
 </main>
 </body>
 </html>{{end}}
+
+{{/* A recommendation tile (/recommendations, home strip, series page); data: store.Recommendation */}}
+{{define "rec-tile"}}
+<li class="card rec-card">
+    <a href="{{if .IssueID}}/issues/{{.IssueID}}{{else if .OneShot}}/issues/{{.CoverIssueID}}{{else}}/series/{{.SeriesID}}{{end}}">
+        <div class="card-cover">
+            {{if .CoverIssueID}}<img src="/issues/{{.CoverIssueID}}/cover" alt="" loading="lazy">{{else}}<img src="/static/placeholder.svg" alt="">{{end}}
+        </div>
+        <div class="card-body">
+            <span class="card-title">{{.Name}}</span>
+            <span class="card-meta rec-reason">{{.Reason}}</span>
+        </div>
+    </a>
+    {{if .Dismissable}}
+    <form class="rec-dismiss" action="/recommendations/dismiss" method="post">
+        <input type="hidden" name="series" value="{{.SeriesID}}">
+        <button type="submit" class="btn btn-mini" title="Hide this series from your recommendations">Not interested</button>
+    </form>
+    {{end}}
+</li>
+{{end}}
 
 {{/* A list of releases (home strip and /releases); data: []releaseRow */}}
 {{define "release-list"}}

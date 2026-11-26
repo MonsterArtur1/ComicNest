@@ -28,6 +28,11 @@ file, no cloud account. Your library is **read-only**, the **app didin't modify*
 - **Reads comics in the browser** — a full-screen page reader for CBZ/CBR with zoom, keyboard,
   mouse and touch paging. It resumes where you left off and shares progress with your reader
   apps.
+- **Guided view** — read panel by panel on a phone: the reader finds the panels on each page and
+  zooms and pans from one to the next, then on to the next page. Panel detection runs on the
+  server (pure Go, cached per page); pages without a clear panel layout read normally. Toggle it
+  with ▦ in the reader toolbar or the `g` key. If it misses panels or splits too eagerly on your
+  comics, tune `panel_detection.sensitivity` in `config.yaml`.
 - **Serves an OPDS catalog** for comic reader apps on phones and tablets (Panels, Chunky,
   Moon+ Reader, Librera, KOReader, Thorium…). Readers can browse, search, download, or stream
   pages straight from the server without downloading the file.
@@ -37,6 +42,11 @@ file, no cloud account. Your library is **read-only**, the **app didin't modify*
 - **Character and creator pages** — click a character, writer or artist on an issue page to see
   every issue in your library they appear in, grouped by series, with your read state
   (`/characters`, `/creators`).
+- **Recommends what to read next** — a "For you" page and home-page strip built from your own
+  library, with no external services: more from writers and artists you read, characters you
+  follow, the next issue of a story arc you started, series you left unfinished, and series other
+  readers on the server finished. Every tile says why ("Because you read Saga — same writer: Brian
+  K. Vaughan"); "Not interested" hides a series (restorable). Series pages get "More like this".
 - **Shows what you're missing and what's new** — every series page says "Owned 37 of 42 ·
   Missing: #12–14, #20" (from the ComicVine issue list, or inferred from issue numbers), a
   "has gaps" grid filter and a wishlist page (`/gaps`, plus `/gaps.txt` to take shopping). Series
@@ -124,6 +134,8 @@ data_dir: ./data              # runtime data: SQLite database and cover cache
 comicvine_api_key: ""         # key from https://comicvine.gamespot.com/api/ — leave empty to disable ComicVine features
 opds_enabled: false           # OPDS catalog at http://<host>:8080/opds for reader apps
 page_size: 60                 # series tiles per page in the library grid; 0 = everything on one page
+panel_detection:
+  sensitivity: normal         # Guided View panel detection: low | normal | high (high finds more panels, with more false splits)
 ```
 
 User accounts are **not** in this file — you create them from the browser, in the admin panel
@@ -156,6 +168,13 @@ at `/admin`. A few things worth knowing:
   last remaining admin is protected from demotion/deletion).
 - **ComicVine.** Without a key everything works, but matching and metadata download are
   disabled and the interface says so. Get a free key at comicvine.gamespot.com/api.
+- **Guided View panel detection.** `panel_detection.sensitivity` is `normal` by default; `high`
+  splits more aggressively (more panels found on crowded or borderless pages, more false splits
+  on busy art), `low` only trusts clean gutters. Two advanced overrides, `gutter_tolerance` and
+  `min_panel_area`, are described in `config_example.yaml`. Changes need a restart; cached panel
+  layouts are recomputed automatically. Developers can inspect the detector on their own
+  comics with `go run ./cmd/panelsdebug -out <dir> <archives or folders>` (overlay PNGs; `-eval`
+  scores it against a hand-made ground-truth file).
 - **Environment variables.** Every key can be overridden with `COMICNEST_<KEY>` (for example
   `COMICNEST_LISTEN=0.0.0.0` or `COMICNEST_COMICVINE_API_KEY=…`). `COMICNEST_CONFIG` sets the
   config file path. Values from the environment win over the file. This is what the Docker

@@ -66,6 +66,32 @@ func TestPageSize(t *testing.T) {
 	}
 }
 
+func TestPanelDetection(t *testing.T) {
+	cfg, err := load(t, "port: 8080\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.PanelDetection.Sensitivity != "normal" {
+		t.Errorf("default panel_detection.sensitivity = %q, want normal", cfg.PanelDetection.Sensitivity)
+	}
+	cfg, err = load(t, "panel_detection:\n  sensitivity: high\n  gutter_tolerance: 30\n  min_panel_area: 0.02\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := cfg.PanelDetection; p.Sensitivity != "high" || p.GutterTolerance != 30 || p.MinPanelArea != 0.02 {
+		t.Errorf("panel_detection not parsed: %+v", p)
+	}
+	for _, bad := range []string{
+		"panel_detection:\n  sensitivity: extreme\n",
+		"panel_detection:\n  gutter_tolerance: -1\n",
+		"panel_detection:\n  min_panel_area: 0.9\n",
+	} {
+		if _, err := load(t, bad); err == nil {
+			t.Errorf("%q: want a config error", bad)
+		}
+	}
+}
+
 func TestLibraryPaths(t *testing.T) {
 	cfg, err := load(t, "library: /comics\n")
 	if err != nil {

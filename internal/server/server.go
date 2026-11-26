@@ -70,6 +70,7 @@ type Server struct {
 	scrape    *scrapeJob
 	releases  *releaseJob // the global "check for new releases" job (releases.go)
 	arcFails  arcFailures // recent failed ComicVine arc fetches (zero value ready)
+	recCache  recCache    // cached "For you" recommendations (recommendations.go)
 	templates map[string]*template.Template
 	partials  *template.Template
 	reader    *template.Template // standalone full-screen reader page
@@ -258,7 +259,8 @@ func (s *Server) parseTemplates() error {
 		"series_edit.html", "issue_edit.html", "comicvine_match.html", "error.html", "admin.html", "stats.html",
 		"gaps.html", "releases.html",
 
-		"arcs.html", "arc.html", "characters.html", "character.html", "creators.html", "creator.html"}
+		"arcs.html", "arc.html", "characters.html", "character.html", "creators.html", "creator.html",
+		"recommendations.html"}
 
 	s.templates = make(map[string]*template.Template)
 	for _, page := range pages {
@@ -345,6 +347,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /issues/{id}/favorite", s.handleIssueFavorite)
 	s.mux.HandleFunc("GET /issues/{id}/read", s.handleReader)
 	s.mux.HandleFunc("GET /issues/{id}/pages/{page}", s.handleIssuePage)
+	s.mux.HandleFunc("GET /issues/{id}/pages/{page}/panels", s.handleIssuePanels) // guided view (panels.go)
 	s.mux.HandleFunc("POST /issues/{id}/progress", s.handleIssueProgress)
 	s.mux.HandleFunc("GET /issues/{id}/cover", s.handleIssueCover)
 	s.mux.HandleFunc("GET /issues/{id}/download", s.handleIssueDownload)
@@ -362,6 +365,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /characters/{id}", s.handleCharacter)
 	s.mux.HandleFunc("GET /creators", s.handleCreators)
 	s.mux.HandleFunc("GET /creators/{name}", s.handleCreator)
+	s.mux.HandleFunc("GET /recommendations", s.handleRecommendations)
+	s.mux.HandleFunc("POST /recommendations/dismiss", s.handleRecommendationDismiss)
+	s.mux.HandleFunc("POST /recommendations/restore", s.handleRecommendationRestore)
 	s.mux.HandleFunc("POST /library", s.handleSetLibrary)
 	s.mux.HandleFunc("POST /scan", s.requireAdmin(s.handleScanStart))
 	s.mux.HandleFunc("GET /scan/status", s.handleScanStatus)
