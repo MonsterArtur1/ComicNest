@@ -69,6 +69,7 @@ type Server struct {
 	cv        *comicvine.Client
 	scrape    *scrapeJob
 	releases  *releaseJob // the global "check for new releases" job (releases.go)
+	arcFails  arcFailures // recent failed ComicVine arc fetches (zero value ready)
 	templates map[string]*template.Template
 	partials  *template.Template
 	reader    *template.Template // standalone full-screen reader page
@@ -196,6 +197,7 @@ func (s *Server) funcMap() template.FuncMap {
 		"multiLibrary": func() bool { return len(s.libraries) > 1 },
 		"libraryName":  s.libraryName,
 		"releaseCheck": s.releases.status, // admin panel: the release-check job's state
+		"creatorURL":   creatorURL,
 		// currentUser/isAdmin/currentLibrary are overridden per request in
 		// renderStatus; these defaults only satisfy parse-time resolution.
 		"currentUser":    func() string { return "" },
@@ -254,12 +256,14 @@ func sourceLabel(source string) string {
 func (s *Server) parseTemplates() error {
 	pages := []string{"index.html", "series.html", "issue.html", "search.html",
 		"series_edit.html", "issue_edit.html", "comicvine_match.html", "error.html", "admin.html", "stats.html",
-		"gaps.html", "releases.html"}
+		"gaps.html", "releases.html",
+
+		"arcs.html", "arc.html", "characters.html", "character.html", "creators.html", "creator.html"}
 
 	s.templates = make(map[string]*template.Template)
 	for _, page := range pages {
 		t, err := template.New(page).Funcs(s.funcMap()).
-			ParseFS(web.FS, "templates/layout.html", "templates/"+page)
+			ParseFS(web.FS, "templates/layout.html", "templates/issue_groups.html", "templates/"+page)
 		if err != nil {
 			return fmt.Errorf("parsing template %s: %w", page, err)
 		}
@@ -351,6 +355,13 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /releases", s.handleReleases)
 	s.mux.HandleFunc("POST /releases/check", s.requireAdmin(s.handleReleasesCheck))
 	s.mux.HandleFunc("POST /series/{id}/follow", s.handleSeriesFollow)
+	s.mux.HandleFunc("GET /arcs", s.handleArcs)
+	s.mux.HandleFunc("GET /arcs/{id}", s.handleArc)
+	s.mux.HandleFunc("POST /arcs/{id}/refresh", s.requireAdmin(s.handleArcRefresh))
+	s.mux.HandleFunc("GET /characters", s.handleCharacters)
+	s.mux.HandleFunc("GET /characters/{id}", s.handleCharacter)
+	s.mux.HandleFunc("GET /creators", s.handleCreators)
+	s.mux.HandleFunc("GET /creators/{name}", s.handleCreator)
 	s.mux.HandleFunc("POST /library", s.handleSetLibrary)
 	s.mux.HandleFunc("POST /scan", s.requireAdmin(s.handleScanStart))
 	s.mux.HandleFunc("GET /scan/status", s.handleScanStatus)

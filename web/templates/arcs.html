@@ -1,0 +1,46 @@
+{{define "title"}}ComicNest — story arcs{{end}}
+
+{{define "content"}}
+<div class="page-head">
+    <h1>Story arcs</h1>
+    <div class="page-head-tools">
+        <form class="filter-form" action="/arcs" method="get">
+            <input type="search" name="q" value="{{.Filter}}" placeholder="Filter arcs…">
+            <button type="submit" class="btn">Filter</button>
+        </form>
+    </div>
+</div>
+
+{{if .Arcs}}
+<ul class="series-grid">
+    {{range .Arcs}}
+    <li class="card">
+        <a href="/arcs/{{.ID}}">
+            <div class="card-cover">
+                {{if .CoverIssueID}}
+                <img src="/issues/{{.CoverIssueID}}/cover" alt="" loading="lazy">
+                {{else}}
+                <img src="/static/placeholder.svg" alt="">
+                {{end}}
+                {{if and .Owned (eq .Read .Owned)}}<span class="read-mark" title="read">✓</span>{{end}}
+            </div>
+            <div class="card-body">
+                <span class="card-title" title="{{.Name}}">{{.Name}}</span>
+                <span class="card-meta">own {{.Owned}} of {{.Total}} · read {{.Read}}</span>
+                <span class="progress {{if and .Owned (eq .Read .Owned)}}done{{end}}"><span style="width: {{.ReadPct}}%"></span></span>
+            </div>
+        </a>
+    </li>
+    {{end}}
+</ul>
+{{else}}
+<div class="empty-state">
+    {{if .Filter}}
+    <p>No story arc matches “{{.Filter}}”.</p>
+    {{else}}
+    <p>No story arcs yet.</p>
+    <p class="hint">Arcs come from the <code>StoryArc</code> field of ComicInfo.xml and from ComicVine metadata (match a series in ComicVine, then scan).</p>
+    {{end}}
+</div>
+{{end}}
+{{end}}

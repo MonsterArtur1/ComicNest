@@ -42,8 +42,15 @@
 
         <dl class="meta-table">
             {{if .Issue.ReleaseDate}}<dt>Release date</dt><dd>{{.Issue.ReleaseDate}}</dd>{{end}}
-            {{if .Issue.Writer}}<dt>Writer</dt><dd>{{.Issue.Writer}}</dd>{{end}}
-            {{if .Issue.Artist}}<dt>Art</dt><dd>{{.Issue.Artist}}</dd>{{end}}
+            {{with .Extras.Writers}}<dt>Writer</dt><dd>{{range $i, $c := .}}{{if $i}}, {{end}}<a href="{{$c.URL}}">{{$c.Name}}</a>{{end}}</dd>{{end}}
+            {{with .Extras.Artists}}<dt>Art</dt><dd>{{range $i, $c := .}}{{if $i}}, {{end}}<a href="{{$c.URL}}">{{$c.Name}}</a>{{end}}</dd>{{end}}
+            {{with .Extras.Arcs}}<dt>Story arc</dt><dd>
+                {{range .}}<div class="issue-arc">
+                    Part of: <a href="/arcs/{{.Arc.ID}}">{{.Arc.Name}}</a>{{if .Position}} <span class="dim">(#{{.Position}} of {{.Total}})</span>{{end}}
+                    {{with .Next}}<div class="issue-arc-next">Next in arc: <a href="/issues/{{.ID}}">{{.SeriesName}}{{if .IssueNumber}} #{{.IssueNumber}}{{end}}</a></div>{{end}}
+                </div>{{end}}
+            </dd>{{end}}
+            {{with .Extras.Characters}}<dt>Characters</dt><dd class="issue-characters">{{range $i, $c := .}}{{if $i}}, {{end}}<a href="/characters/{{$c.ID}}">{{$c.Name}}</a>{{end}}</dd>{{end}}
             {{if .Issue.Publisher}}<dt>Publisher</dt><dd>{{.Issue.Publisher}}</dd>{{end}}
             {{if .Issue.TotalPages}}<dt>Pages</dt><dd>{{.Issue.TotalPages}}{{if and .Issue.FilePages .Issue.PageCount (ne .Issue.FilePages .Issue.PageCount)}} <span class="dim">(metadata: {{.Issue.PageCount}})</span>{{end}}</dd>{{end}}
             {{with .Reading}}<dt>Read</dt><dd>{{.Page}}{{if .Total}} of {{.Total}} pages ({{.Percent}}%){{else}} pages{{end}}</dd>{{end}}

@@ -1,0 +1,113 @@
+{{define "title"}}{{.Arc.Name}} — ComicNest{{end}}
+
+{{define "content"}}
+{{if .Msg}}<p class="flash {{if .MsgError}}flash-error{{end}}">{{.Msg}}</p>{{end}}
+<nav class="breadcrumbs"><a href="/arcs">Story arcs</a> <span>/</span> {{.Arc.Name}}</nav>
+
+<div class="series-head">
+    <div>
+        <h1>{{.Arc.Name}}</h1>
+        <p class="series-meta">
+            owned {{.Owned}} of {{.Total}} · read {{.Read}} of {{.Total}}
+            {{if .Arc.Publisher}} · {{.Arc.Publisher}}{{end}}
+            {{if .Arc.ComicVineURL}} · <a href="{{.Arc.ComicVineURL}}" target="_blank" rel="noopener">ComicVine ↗</a>{{end}}
+        </p>
+        {{if .Arc.Description}}
+            {{if gt (len .Arc.Description) 420}}
+            <details class="desc">
+                <summary>
+                    <span class="desc-preview">{{truncate .Arc.Description 300}}</span>
+                    <span class="desc-toggle desc-more">Show full description ▾</span>
+                    <span class="desc-toggle desc-less">Collapse description ▴</span>
+                </summary>
+                <p class="series-desc">{{.Arc.Description}}</p>
+            </details>
+            {{else}}
+            <p class="series-desc">{{.Arc.Description}}</p>
+            {{end}}
+        {{end}}
+    </div>
+    <div class="series-actions">
+        {{if isAdmin}}
+        <form action="/arcs/{{.Arc.ID}}/refresh" method="post">
+            <button type="submit" class="btn"
+                {{if not .CVEnabled}}disabled title="Set comicvine_api_key in config.yaml to refresh from ComicVine"
+                {{else if not .Arc.ComicVineID.Valid}}disabled title="This arc comes from ComicInfo only — no ComicVine arc to refresh from"
+                {{else}}title="Fetch the arc's issue list from ComicVine again"{{end}}>Refresh from ComicVine</button>
+        </form>
+        {{end}}
+    </div>
+</div>
+
+{{if .Next}}
+<div class="arc-continue">
+    <a class="btn btn-primary" href="{{.Next.ReadHref}}">{{if .Started}}Continue reading{{else}}Start reading{{end}}</a>
+    <span class="arc-continue-note">
+        {{.Next.Issue.SeriesName}}{{if .Next.Issue.IssueNumber}} #{{.Next.Issue.IssueNumber}}{{end}}{{with .Next.Reading}} — p. {{.Page}}{{if .Total}} of {{.Total}}{{end}}{{end}}
+        <span class="dim">· entry {{.Next.Position}} of {{.Total}}</span>
+    </span>
+</div>
+{{else if .Owned}}
+<p class="arc-continue"><span class="reading-note">✓ Everything you own from this arc is read.</span></p>
+{{end}}
+
+{{if .Entries}}
+<ol class="issue-list arc-order">
+    {{range .Entries}}
+    <li class="issue-row {{if not .Owned}}arc-gap{{end}}">
+        <span class="arc-pos">{{.Position}}</span>
+        {{if .Owned}}
+        <a class="issue-thumb" href="/issues/{{.Issue.ID}}">
+            <img src="/issues/{{.Issue.ID}}/cover" alt="" loading="lazy">
+            {{with .Reading}}
+            <span class="progress {{if .Finished}}done{{end}}" title="{{if .Finished}}read{{else}}read {{.Page}}{{if .Total}} of {{.Total}}{{end}} pages{{end}}">
+                <span style="width: {{if .Total}}{{.Percent}}{{else}}100{{end}}%"></span>
+            </span>
+            {{end}}
+        </a>
+        <div class="issue-info">
+            <a class="issue-title" href="/issues/{{.Issue.ID}}">
+                <span class="arc-state" title="in your library">✅</span>
+                {{.Issue.SeriesName}}{{if .Issue.IssueNumber}} <span class="issue-num">#{{.Issue.IssueNumber}}</span>{{end}}
+                {{if .Issue.Title}}— {{.Issue.Title}}{{end}}
+            </a>
+            <div class="issue-sub">
+                {{if .Issue.ReleaseDate}}<span>{{.Issue.ReleaseDate}}</span>{{end}}
+                <span class="reading-note">{{with .Reading}}{{if .Finished}}✓ read{{else}}read: p. {{.Page}}{{if .Total}} of {{.Total}} ({{.Percent}}%){{end}}{{end}}{{else}}<span class="dim">unread</span>{{end}}</span>
+            </div>
+        </div>
+        <div class="issue-actions">
+            {{if .CanRead}}<a class="btn download" href="/issues/{{.Issue.ID}}/read">{{if and .Reading (not .Reading.Finished)}}Continue{{else}}Read{{end}}</a>{{end}}
+            {{if .Finished}}
+            <form action="/issues/{{.Issue.ID}}/unread" method="post">
+                <input type="hidden" name="next" value="/arcs/{{$.Arc.ID}}">
+                <button type="submit" class="btn btn-mini" title="Mark as unread">↺ unread</button>
+            </form>
+            {{else}}
+            <form action="/issues/{{.Issue.ID}}/read" method="post">
+                <input type="hidden" name="next" value="/arcs/{{$.Arc.ID}}">
+                <button type="submit" class="btn btn-mini" title="Mark as read">✓ read</button>
+            </form>
+            {{end}}
+        </div>
+        {{else}}
+        <span class="issue-thumb arc-gap-thumb" aria-hidden="true">⬜</span>
+        <div class="issue-info">
+            <span class="issue-title">
+                <span class="arc-state" title="not in your library">⬜</span>
+                {{if .VolumeName}}{{.VolumeName}}{{else}}Unknown volume{{end}}{{if .IssueNumber}} <span class="issue-num">#{{.IssueNumber}}</span>{{end}}
+                {{if .Name}}— {{.Name}}{{end}}
+            </span>
+            <div class="issue-sub">
+                {{if .CoverDate}}<span>{{.CoverDate}}</span>{{end}}
+                <span class="dim">missing from your library</span>
+            </div>
+        </div>
+        {{end}}
+    </li>
+    {{end}}
+</ol>
+{{else}}
+<div class="empty-state"><p>This arc has no entries.</p></div>
+{{end}}
+{{end}}

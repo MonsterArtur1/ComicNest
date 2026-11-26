@@ -21,10 +21,16 @@
 <body>
 <header class="topbar">
     <a class="brand" href="/"><img class="brand-logo" src="/static/favicon.png" alt="" width="32" height="32"><span class="brand-name">Comic<span>Nest</span></span></a>
+    <nav class="topnav" aria-label="Browse">
+        <a href="/arcs">Arcs</a>
+        <a href="/characters">Characters</a>
+        <a href="/creators">Creators</a>
+        <a href="/gaps" title="Series with missing issues">Missing</a>
+        <a href="/releases" title="New releases of the series you follow">Releases</a>
+    </nav>
     <form class="search" action="/search" method="get">
         <input type="search" name="q" placeholder="Search series or issue…" value="{{block "searchQuery" .}}{{end}}">
     </form>
-    <nav class="main-nav"><a href="/gaps" title="Series with missing issues">Missing</a><a href="/releases" title="New releases of the series you follow">Releases</a></nav>
     {{if multiLibrary}}
     {{$current := currentLibrary}}
     <form class="library-switcher" action="/library" method="post">

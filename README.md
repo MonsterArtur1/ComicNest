@@ -31,6 +31,12 @@ file, no cloud account. Your library is **read-only**, the **app didin't modify*
 - **Serves an OPDS catalog** for comic reader apps on phones and tablets (Panels, Chunky,
   Moon+ Reader, Librera, KOReader, Thorium…). Readers can browse, search, download, or stream
   pages straight from the server without downloading the file.
+- **Builds reading orders for events** — story arcs from ComicInfo (`StoryArc`) and ComicVine
+  become reading orders across series (`/arcs`): what you own ✅, what's missing ⬜, how far you've
+  read, and a "Continue reading" button that jumps to the next issue, whichever series it's in.
+- **Character and creator pages** — click a character, writer or artist on an issue page to see
+  every issue in your library they appear in, grouped by series, with your read state
+  (`/characters`, `/creators`).
 - **Shows what you're missing and what's new** — every series page says "Owned 37 of 42 ·
   Missing: #12–14, #20" (from the ComicVine issue list, or inferred from issue numbers), a
   "has gaps" grid filter and a wishlist page (`/gaps`, plus `/gaps.txt` to take shopping). Series

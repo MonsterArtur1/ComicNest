@@ -1,0 +1,18 @@
+{{define "title"}}{{.Character.Name}} — ComicNest{{end}}
+
+{{define "content"}}
+<nav class="breadcrumbs"><a href="/characters">Characters</a> <span>/</span> {{.Character.Name}}</nav>
+
+<div class="series-head">
+    <div>
+        <h1>{{.Character.Name}}</h1>
+        <p class="series-meta">{{.Issues}} {{if eq .Issues 1}}issue{{else}}issues{{end}} in your library · read {{.Read}} of {{.Issues}}</p>
+    </div>
+</div>
+
+{{if .Groups}}
+{{template "issue-groups" .Groups}}
+{{else}}
+<div class="empty-state"><p>No issue with this character is currently in the library.</p></div>
+{{end}}
+{{end}}

@@ -129,6 +129,9 @@ type issueRaw struct {
 	Image         *imageField    `json:"image"`
 	PersonCredits []personCredit `json:"person_credits"`
 	SiteDetailURL string         `json:"site_detail_url"`
+
+	CharacterCredits []Credit `json:"character_credits"`
+	StoryArcCredits  []Credit `json:"story_arc_credits"`
 }
 
 // Volume is a ComicVine volume (roughly: a comic series/run).
@@ -162,6 +165,9 @@ type Issue struct {
 	Artists     string // comma-joined names with penciler/artist/inker role
 	ImageURL    string // medium cover URL preferred, small as fallback
 	URL         string // comicvine.gamespot.com page for this issue
+
+	Characters []Credit // character_credits, deduplicated by id/name
+	StoryArcs  []Credit // story_arc_credits, deduplicated by id/name
 }
 
 // volumeFromRaw converts the wire format into the public Volume type.
@@ -348,7 +354,7 @@ func (c *Client) GetIssue(id int) (*Issue, error) {
 	}
 
 	params := url.Values{}
-	params.Set("field_list", "id,name,issue_number,cover_date,store_date,description,image,person_credits,site_detail_url")
+	params.Set("field_list", "id,name,issue_number,cover_date,store_date,description,image,person_credits,character_credits,story_arc_credits,site_detail_url")
 
 	raw, err := c.doRequest(fmt.Sprintf("/issue/4000-%d/", id), params)
 	if err != nil {
@@ -379,6 +385,8 @@ func (c *Client) GetIssue(id int) (*Issue, error) {
 	}
 
 	issue.Writers, issue.Artists = creditsFromPersons(item.PersonCredits)
+	issue.Characters = cleanCredits(item.CharacterCredits)
+	issue.StoryArcs = cleanCredits(item.StoryArcCredits)
 
 	return issue, nil
 }

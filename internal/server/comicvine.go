@@ -203,6 +203,7 @@ func (s *Server) scrapeOneIssue(issue *store.Issue, volIssues []comicvine.Volume
 	if err := s.store.UpdateIssueMetadata(issue); err != nil {
 		return err
 	}
+	s.saveComicVineExtras(issue.ID, cvIssue) // characters + story arcs
 
 	if cvIssue.ImageURL != "" {
 		if raw, err := s.cv.DownloadImage(cvIssue.ImageURL); err != nil {
@@ -216,19 +217,11 @@ func (s *Server) scrapeOneIssue(issue *store.Issue, volIssues []comicvine.Volume
 	return nil
 }
 
-// autoScrapeCV is the post-scan ComicVine phase (wired into the scanner):
-// it updates every unlocked issue that lacks ComicVine metadata but belongs
-// to a matched series. Cost per scan: one volume fetch per affected series
-// plus one issue fetch per actually matched issue.
-func (s *Server) autoScrapeCV(progress func(done, total, updated, failed int)) {
-	s.autoScrapeIssues(progress)
-	s.syncCVData() // issue-list cache for gap detection + the daily release check
-}
-
-func (s *Server) autoScrapeIssues(progress func(done, total, updated, failed int)) {
-	if !s.cv.Enabled() {
-		return
-	}
+// scrapeMissingCV is the first step of the post-scan ComicVine phase (see
+// autoScrapeCV): it updates every unlocked issue that lacks ComicVine metadata
+// but belongs to a matched series. Cost per scan: one volume fetch per
+// affected series plus one issue fetch per actually matched issue.
+func (s *Server) scrapeMissingCV(progress func(done, total, updated, failed int)) {
 	byVolume, err := s.store.IssuesNeedingComicVine()
 	if err != nil {
 		log.Printf("comicvine: post-scan query: %v", err)

@@ -101,7 +101,7 @@
     <section class="stats-section">
         <h2>Most read writers</h2>
         <ol class="stat-ranking">
-            {{range .}}<li><span>{{.Name}}</span><span class="dim">{{.Count}}</span></li>{{end}}
+            {{range .}}<li><a href="{{creatorURL .Name}}">{{.Name}}</a><span class="dim">{{.Count}}</span></li>{{end}}
         </ol>
     </section>
     {{end}}

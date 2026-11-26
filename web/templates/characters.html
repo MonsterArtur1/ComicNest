@@ -1,0 +1,31 @@
+{{define "title"}}ComicNest — characters{{end}}
+
+{{define "content"}}
+<div class="page-head">
+    <h1>Characters</h1>
+    <div class="page-head-tools">
+        <form class="filter-form" action="/characters" method="get">
+            <input type="search" name="q" value="{{.Filter}}" placeholder="Filter characters…">
+            <button type="submit" class="btn">Filter</button>
+        </form>
+    </div>
+</div>
+
+{{if .Characters}}
+<ul class="name-grid">
+    {{range .Characters}}
+    <li><a href="/characters/{{.ID}}">{{.Name}}</a><span class="dim">{{.Issues}}</span></li>
+    {{end}}
+</ul>
+{{if gt .Total (len .Characters)}}<p class="hint">Showing {{len .Characters}} of {{.Total}} — use the filter to narrow the list.</p>{{end}}
+{{else}}
+<div class="empty-state">
+    {{if .Filter}}
+    <p>No character matches “{{.Filter}}”.</p>
+    {{else}}
+    <p>No characters yet.</p>
+    <p class="hint">Characters come from the <code>Characters</code> field of ComicInfo.xml and from ComicVine metadata.</p>
+    {{end}}
+</div>
+{{end}}
+{{end}}

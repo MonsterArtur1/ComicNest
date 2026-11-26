@@ -479,6 +479,9 @@ func (sc *Scanner) addIssue(f foundFile) error {
 	if err := sc.store.InsertIssue(&issue); err != nil {
 		return err
 	}
+	if issue.ComicInfoSeries.Valid { // inspected (an unreadable archive stays pending, like comicinfo_series)
+		sc.recordComicInfoExtras(f.path, issue.ID, ci)
+	}
 	// Embedded metadata is the strongest scan-time one-shot signal; the
 	// count-based reconciliation runs once at the end of the scan.
 	if ci != nil && ci.IsOneShot() {
@@ -507,16 +510,24 @@ func (sc *Scanner) refreshIssue(id int64, f foundFile) error {
 	// first scan after the upgrade inspects them once (backfill), regardless
 	// of whether their metadata may still be overwritten.
 	inspect := !issue.ComicInfoSeries.Valid
-	if (canApply || inspect) && isArchive(f.path) {
+	// Likewise for characters/story arcs (comicinfo_extras, NULL = never read).
+	extrasPending, err := sc.store.ComicInfoExtrasPending(id)
+	if err != nil {
+		return err
+	}
+	if (canApply || inspect || extrasPending) && isArchive(f.path) {
 		ci, found, err := ReadComicInfo(f.path)
 		switch {
 		case err != nil:
 			sc.problem(f.path, "comicinfo", err)
 			inspect = false // unreadable archive: leave NULL, try again next scan
+			extrasPending = false
 		case found:
 			if err := sc.recordComicInfoSeries(issue, strings.TrimSpace(ci.Series)); err != nil {
 				return err
 			}
+			sc.recordComicInfoExtras(f.path, id, ci)
+			extrasPending = false
 			if canApply {
 				applyComicInfo(issue, ci)
 				if err := sc.store.UpdateIssueMetadata(issue); err != nil {
@@ -530,6 +541,9 @@ func (sc *Scanner) refreshIssue(id int64, f foundFile) error {
 		if err := sc.recordComicInfoSeries(issue, ""); err != nil {
 			return err
 		}
+	}
+	if extrasPending { // no ComicInfo (or not an archive): mark as read, empty
+		sc.recordComicInfoExtras(f.path, id, nil)
 	}
 
 	// Files catalogued before page streaming existed have no page count yet.
@@ -626,6 +640,10 @@ func ResetIssueMetadata(st *store.Store, cache *covers.Cache, issue *store.Issue
 	}
 
 	if err := st.UpdateIssueMetadata(issue); err != nil {
+		return err
+	}
+	// Characters and story arcs the match brought in go with it; ComicInfo's stay.
+	if err := st.ClearComicVineExtras(issue.ID); err != nil {
 		return err
 	}
 

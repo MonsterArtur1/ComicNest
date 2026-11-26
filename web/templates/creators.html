@@ -1,0 +1,34 @@
+{{define "title"}}ComicNest — creators{{end}}
+
+{{define "content"}}
+<div class="page-head">
+    <h1>Creators</h1>
+    <div class="page-head-tools">
+        <form class="filter-form" action="/creators" method="get">
+            <input type="search" name="q" value="{{.Filter}}" placeholder="Filter creators…">
+            <button type="submit" class="btn">Filter</button>
+        </form>
+    </div>
+</div>
+
+{{if .Creators}}
+<ul class="name-grid">
+    {{range .Creators}}
+    <li>
+        <a href="{{creatorURL .Name}}">{{.Name}}</a>
+        <span class="dim" title="{{.Writer}} as writer, {{.Artist}} as artist">{{.Credits}}</span>
+    </li>
+    {{end}}
+</ul>
+{{if gt .Total (len .Creators)}}<p class="hint">Showing {{len .Creators}} of {{.Total}} — use the filter to narrow the list.</p>{{end}}
+{{else}}
+<div class="empty-state">
+    {{if .Filter}}
+    <p>No creator matches “{{.Filter}}”.</p>
+    {{else}}
+    <p>No credits yet.</p>
+    <p class="hint">Writers and artists come from ComicInfo.xml, ComicVine metadata and manual edits.</p>
+    {{end}}
+</div>
+{{end}}
+{{end}}

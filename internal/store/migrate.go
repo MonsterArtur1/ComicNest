@@ -299,6 +299,80 @@ var migrations = []string{
 		value TEXT NOT NULL
 	);
 	`,
+
+	// 18: story arcs / reading orders and characters. See
+	// store/arcs.go and store/characters.go.
+	//   issues.comicinfo_extras  NULL = ComicInfo characters/arcs not read yet
+	//                            (the next scan inspects the file, like
+	//                            comicinfo_series); 1 = read.
+	//   issues.cv_extras_at      NULL = ComicVine character/arc credits not
+	//                            fetched yet (the scan's ComicVine phase
+	//                            backfills issues that already have a
+	//                            comicvine_issue_id).
+	//   arcs / arc_cv_issues     an arc and its full ComicVine issue list in
+	//                            reading order (owned or not); fetched_at NULL =
+	//                            list not fetched, refetched after ~30 days.
+	//   issue_arcs               membership of a catalogued issue (source
+	//                            'comicinfo' or 'comicvine'; arc_number is
+	//                            ComicInfo's StoryArcNumber, NULL when absent).
+	//   characters / issue_characters  one row per character identity (the
+	//                            ComicVine id when known, else the
+	//                            case-insensitive name).
+	`
+	ALTER TABLE issues ADD COLUMN comicinfo_extras INTEGER;
+	ALTER TABLE issues ADD COLUMN cv_extras_at TEXT;
+
+	CREATE TABLE arcs (
+		id            INTEGER PRIMARY KEY,
+		name          TEXT NOT NULL,
+		name_key      TEXT NOT NULL,
+		comicvine_id  INTEGER UNIQUE,
+		description   TEXT NOT NULL DEFAULT '',
+		publisher     TEXT NOT NULL DEFAULT '',
+		image_url     TEXT NOT NULL DEFAULT '',
+		comicvine_url TEXT NOT NULL DEFAULT '',
+		fetched_at    TEXT
+	);
+	CREATE INDEX idx_arcs_name_key ON arcs(name_key);
+
+	CREATE TABLE arc_cv_issues (
+		arc_id             INTEGER NOT NULL REFERENCES arcs(id) ON DELETE CASCADE,
+		comicvine_issue_id INTEGER NOT NULL,
+		position           INTEGER NOT NULL,
+		volume_id          INTEGER NOT NULL DEFAULT 0,
+		volume_name        TEXT NOT NULL DEFAULT '',
+		issue_number       TEXT NOT NULL DEFAULT '',
+		name               TEXT NOT NULL DEFAULT '',
+		cover_date         TEXT NOT NULL DEFAULT '',
+		PRIMARY KEY (arc_id, comicvine_issue_id)
+	);
+	CREATE INDEX idx_arc_cv_issues_issue ON arc_cv_issues(comicvine_issue_id);
+
+	CREATE TABLE issue_arcs (
+		issue_id   INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+		arc_id     INTEGER NOT NULL REFERENCES arcs(id) ON DELETE CASCADE,
+		arc_number INTEGER,
+		source     TEXT NOT NULL,
+		PRIMARY KEY (issue_id, arc_id, source)
+	);
+	CREATE INDEX idx_issue_arcs_arc ON issue_arcs(arc_id);
+
+	CREATE TABLE characters (
+		id           INTEGER PRIMARY KEY,
+		name         TEXT NOT NULL,
+		name_key     TEXT NOT NULL,
+		comicvine_id INTEGER UNIQUE
+	);
+	CREATE INDEX idx_characters_name_key ON characters(name_key);
+
+	CREATE TABLE issue_characters (
+		issue_id     INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+		character_id INTEGER NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+		source       TEXT NOT NULL,
+		PRIMARY KEY (issue_id, character_id, source)
+	);
+	CREATE INDEX idx_issue_characters_character ON issue_characters(character_id);
+	`,
 }
 
 func migrate(db *sql.DB) error {

@@ -1,0 +1,22 @@
+{{/* Shared by the character and creator pages: issues grouped by series, as cover cards with the user's read state. */}}
+{{define "issue-groups"}}
+{{range .}}
+<h2 class="section-title"><a href="/series/{{.SeriesID}}">{{.SeriesName}}</a> <span class="dim">{{len .Issues}}</span></h2>
+<ul class="series-grid">
+    {{range .Issues}}
+    <li class="card">
+        <a href="/issues/{{.ID}}">
+            <div class="card-cover">
+                <img src="/issues/{{.ID}}/cover" alt="" loading="lazy">
+                {{if and .Reading .Reading.Finished}}<span class="read-mark" title="read">✓</span>{{end}}
+            </div>
+            <div class="card-body">
+                <span class="card-title">{{if .IssueNumber}}#{{.IssueNumber}}{{end}}{{if and .IssueNumber .Title}} {{end}}{{.Title}}</span>
+                <span class="card-meta">{{with .Reading}}{{if .Finished}}read{{else}}read p. {{.Page}}{{if .Total}} of {{.Total}}{{end}}{{end}}{{else}}unread{{end}}</span>
+            </div>
+        </a>
+    </li>
+    {{end}}
+</ul>
+{{end}}
+{{end}}

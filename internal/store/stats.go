@@ -150,12 +150,8 @@ func (s *Store) UserStats(user string) (UserStats, error) {
 		}
 		series.add(id, name)
 		publishers.add(0, publisher)
-		seen := make(map[string]bool)
-		for _, w := range strings.Split(writer, ",") {
-			if w = strings.TrimSpace(w); w != "" && !seen[strings.ToLower(w)] {
-				seen[strings.ToLower(w)] = true
-				writers.add(0, w)
-			}
+		for _, w := range SplitCredits(writer) {
+			writers.add(0, w)
 		}
 	}
 	if err := rows.Err(); err != nil {

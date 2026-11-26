@@ -320,6 +320,21 @@ lowest and highest owned number and skipped when they are one-shots, under 80% i
 have fewer than 2 distinct numbers, or more than `2*owned+20` missing. `file_missing` issues count
 as missing and are flagged "file disappeared"; a present copy of the same number wins.
 
+**Story arcs and characters** (migration 18): `issues.comicinfo_extras` (NULL = ComicInfo
+`Characters`/`StoryArc` not read yet, 1 = read; backfilled by the next scan) and
+`issues.cv_extras_at` (NULL = ComicVine character/arc credits not fetched; backfilled in the scan's
+ComicVine phase). `arcs(id, name, name_key, comicvine_id UNIQUE NULL, description, publisher,
+image_url, comicvine_url, fetched_at NULL)` — `name_key` is the lower-cased, whitespace-collapsed
+name; `arc_cv_issues(arc_id → arcs CASCADE, comicvine_issue_id, position, volume_id, volume_name,
+issue_number, name, cover_date; PK (arc_id, comicvine_issue_id))` is the arc's full ComicVine list in
+reading order, owned or not; `issue_arcs(issue_id → issues CASCADE, arc_id → arcs CASCADE,
+arc_number NULL, source 'comicinfo'|'comicvine'; PK (issue_id, arc_id, source))`.
+`characters(id, name, name_key, comicvine_id UNIQUE NULL)` and `issue_characters(issue_id,
+character_id, source; PK (issue_id, character_id, source))`. Arcs and characters merge by
+`name_key`; a ComicInfo-only row adopts the ComicVine id the first time ComicVine names it. Creators
+have no table — they are split from `issues.writer` / `issues.artist` on each request
+(`store.SplitCredits`).
+
 ## 6. Library scanning
 
 Started by a UI button (`POST /scan`), runs in a goroutine; the UI polls status (HTMX polling
@@ -435,6 +450,10 @@ The client, in `internal/comicvine/`:
 - `GetVolumeIssues` (`/issues/?filter=volume:ID`, paginated, with dates — fills the gap-detection
   cache) and `RecentIssues` (`/issues/?filter=volume:ID1|ID2…,store_date:FROM|TO`, 40 volumes per
   request, paginated — the new-releases check, from 21 days back to 60 days ahead).
+- Story arcs: `GET /issue/4000-{id}/` also fetches `character_credits` and `story_arc_credits`;
+  `GET /story_arc/4045-{id}/` (`id,name,description,image,publisher,issues,site_detail_url`) gives the
+  arc's issue list, completed with batched `/issues/?filter=id:1|2|…` (100 ids per request) for cover
+  dates, volume and number. An arc is fetched once, refetched after 30 days or by the admin refresh.
 
 The matching flow — **always with user confirmation** (the old project's biggest weakness: it
 blindly took the first search result):
@@ -508,6 +527,11 @@ is hidden entirely.
 | `POST /releases/check` | admin only: background, single-flight ComicVine release check (also run at most daily at the end of a scan); redirects to `next` or `/releases` |
 | `POST /series/{id}/follow` | toggles the user's follow state of a ComicVine-matched series (explicit; overrides the implicit "started reading" rule); redirects back |
 | `GET /?filter=gaps` | the grid filter "has gaps" (series with missing issues; tiles show the missing count) |
+| `GET /arcs` | story arcs with at least one owned issue (owned / total, read count, first cover); `?q=` filter; spans all libraries |
+| `GET /arcs/{id}` | the arc's reading order: owned entries (reader link, read state) and missing ones (volume + number + cover date), counts, "Continue reading" to the first unread owned issue |
+| `POST /arcs/{id}/refresh` | admin only: re-fetch the arc's issue list from ComicVine |
+| `GET /characters` / `GET /characters/{id}` | character index (`?q=`, top 300 by issue count) / every present issue featuring the character, grouped by series |
+| `GET /creators` / `GET /creators/{name}` | creator index (`?q=`) / a creator's issues by role (writer, artist) and series; `{name}` is the normalized name, path-escaped |
 | `GET /search?q=` | results by series name, title and issue numbers (LIKE) |
 | `GET /static/...` | static assets from `embed.FS` |
 | `GET /healthz` | a liveness probe (`ok`, no login) — Docker/orchestrators |

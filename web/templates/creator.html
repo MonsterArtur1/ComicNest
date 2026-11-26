@@ -1,0 +1,21 @@
+{{define "title"}}{{.Name}} — ComicNest{{end}}
+
+{{define "content"}}
+<nav class="breadcrumbs"><a href="/creators">Creators</a> <span>/</span> {{.Name}}</nav>
+
+<div class="series-head">
+    <div>
+        <h1>{{.Name}}</h1>
+        <p class="series-meta">{{.Credits}} {{if eq .Credits 1}}issue{{else}}issues{{end}} in your library · read {{.Read}} of {{.Credits}}</p>
+    </div>
+</div>
+
+{{if .Writer}}
+<h2 class="role-title">Writer</h2>
+{{template "issue-groups" .Writer}}
+{{end}}
+{{if .Artist}}
+<h2 class="role-title">Artist</h2>
+{{template "issue-groups" .Artist}}
+{{end}}
+{{end}}

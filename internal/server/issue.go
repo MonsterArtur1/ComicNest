@@ -19,6 +19,7 @@ type issueData struct {
 	Filename  string
 	CVEnabled bool
 	CVMatched bool
+	Extras    issueExtras // story arcs, characters, linked credits
 	Msg       string
 	MsgError  bool
 }
@@ -85,7 +86,14 @@ func (s *Server) handleIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	extras, err := s.issueExtras(issue)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+
 	data := issueData{
+		Extras:    extras,
 		Issue:     issue,
 		Series:    series,
 		Reading:   newReadingView(issue, progress),

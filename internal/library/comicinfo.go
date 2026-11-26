@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"strconv"
 	"strings"
+
+	"comicnest/internal/store"
 )
 
 // maxComicInfoSize is the maximum accepted size of a ComicInfo.xml entry.
@@ -28,6 +31,42 @@ type ComicInfo struct {
 	PageCount int    `xml:"PageCount"`
 	Format    string `xml:"Format"` // e.g. "One-Shot", "TPB", "Annual"
 	Count     int    `xml:"Count"`  // total issues in the series, when known
+
+	Characters     string `xml:"Characters"`     // comma-separated
+	StoryArc       string `xml:"StoryArc"`       // one arc name, or a comma-separated list
+	StoryArcNumber string `xml:"StoryArcNumber"` // position(s) in the arc(s), parallel to StoryArc
+}
+
+// StoryArcRef is one story arc named by a ComicInfo.xml, with the issue's
+// position in it (0 = not given).
+type StoryArcRef struct {
+	Name   string
+	Number int
+}
+
+// CharacterList returns the <Characters> names, split on commas/semicolons,
+// trimmed and deduplicated case-insensitively.
+func (c *ComicInfo) CharacterList() []string {
+	return store.SplitList(c.Characters, ",;\n")
+}
+
+// StoryArcs returns the arcs named by <StoryArc> (a list may be comma- or
+// semicolon-separated) paired by index with <StoryArcNumber> (same format;
+// non-numeric or missing entries mean "no position").
+func (c *ComicInfo) StoryArcs() []StoryArcRef {
+	names := store.SplitList(c.StoryArc, ",;\n")
+	numbers := strings.FieldsFunc(c.StoryArcNumber, func(r rune) bool { return r == ',' || r == ';' || r == '\n' })
+	out := make([]StoryArcRef, 0, len(names))
+	for i, name := range names {
+		ref := StoryArcRef{Name: name}
+		if i < len(numbers) {
+			if n, err := strconv.Atoi(strings.TrimSpace(numbers[i])); err == nil && n > 0 {
+				ref.Number = n
+			}
+		}
+		out = append(out, ref)
+	}
+	return out
 }
 
 // IsOneShot reports whether the embedded metadata marks this comic as a
