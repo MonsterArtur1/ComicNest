@@ -1,0 +1,38 @@
+{{define "title"}}Missing issues — ComicNest{{end}}
+
+{{define "content"}}
+<div class="page-head">
+    <h1>Missing issues</h1>
+    <div class="page-head-tools">
+        {{if .Rows}}<a class="btn" href="/gaps.txt" title="Plain-text wishlist, one series per line">Export as text</a>{{end}}
+    </div>
+</div>
+
+{{if .Rows}}
+<p class="hint gaps-total">{{.TotalMissing}} missing issue{{if ne .TotalMissing 1}}s{{end}} in {{len .Rows}} series, most missing first.</p>
+<ul class="gap-list">
+    {{range .Rows}}
+    <li class="gap-row">
+        <a class="gap-cover" href="/series/{{.SeriesID}}">
+            {{if .CoverIssueID}}<img src="/issues/{{.CoverIssueID}}/cover" alt="" loading="lazy">{{else}}<img src="/static/placeholder.svg" alt="">{{end}}
+        </a>
+        <div class="gap-info">
+            <a class="gap-name" href="/series/{{.SeriesID}}">{{.Name}}</a>
+            <div class="gap-ranges">Missing: {{.Gaps.RangeText}}</div>
+            <div class="issue-sub">
+                <span>owned {{.Gaps.Owned}} of {{.Gaps.Total}}</span>
+                <span>{{.Gaps.MissingCount}} missing</span>
+                {{if .Gaps.VanishedCount}}<span title="Records exist but the files disappeared">{{.Gaps.VanishedCount}} file{{if ne .Gaps.VanishedCount 1}}s{{end}} disappeared</span>{{end}}
+                <span>{{if .Gaps.FromComicVine}}per ComicVine{{else}}inferred{{end}}</span>
+            </div>
+        </div>
+    </li>
+    {{end}}
+</ul>
+{{else}}
+<div class="empty-state">
+    <p>No missing issues found.</p>
+    <p class="hint">Gaps are inferred from whole issue numbers (owning #1–5 and #9 means #6–8 are missing), or compared against the ComicVine issue list for series matched to ComicVine{{if not .CVEnabled}} — set <code>comicvine_api_key</code> in <code>config.yaml</code> to enable that{{end}}. One-shots, annuals and non-numeric numbers like "1.5" are ignored.</p>
+</div>
+{{end}}
+{{end}}

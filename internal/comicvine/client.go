@@ -383,6 +383,128 @@ func (c *Client) GetIssue(id int) (*Issue, error) {
 	return issue, nil
 }
 
+// ListedIssue is one entry of an /issues/ listing: an issue with its volume
+// and dates, but without the credits/description GetIssue returns.
+type ListedIssue struct {
+	ID          int
+	VolumeID    int
+	IssueNumber string
+	Name        string
+	CoverDate   string
+	StoreDate   string
+	URL         string
+}
+
+// listPageSize is the /issues/ page size (ComicVine's maximum is 100).
+const listPageSize = 100
+
+// maxListPages bounds how many pages one listing may fetch.
+const maxListPages = 30
+
+// volumeBatch is how many volume ids go into one /issues/ filter.
+const volumeBatch = 40
+
+// listIssues pages through /issues/ with a raw filter expression.
+func (c *Client) listIssues(filter string) ([]ListedIssue, error) {
+	var out []ListedIssue
+	for page := 0; page < maxListPages; page++ {
+		params := url.Values{}
+		params.Set("filter", filter)
+		params.Set("field_list", "id,name,issue_number,cover_date,store_date,volume,site_detail_url")
+		params.Set("sort", "id:asc")
+		params.Set("limit", fmt.Sprint(listPageSize))
+		params.Set("offset", fmt.Sprint(page*listPageSize))
+
+		raw, err := c.doRequest("/issues/", params)
+		if err != nil {
+			return nil, err
+		}
+		var items []struct {
+			ID            int    `json:"id"`
+			Name          string `json:"name"`
+			IssueNumber   string `json:"issue_number"`
+			CoverDate     string `json:"cover_date"`
+			StoreDate     string `json:"store_date"`
+			SiteDetailURL string `json:"site_detail_url"`
+			Volume        *struct {
+				ID int `json:"id"`
+			} `json:"volume"`
+		}
+		if err := json.Unmarshal(raw, &items); err != nil {
+			return nil, fmt.Errorf("comicvine: decode issues list: %w", err)
+		}
+		for _, it := range items {
+			li := ListedIssue{
+				ID:          it.ID,
+				IssueNumber: it.IssueNumber,
+				Name:        it.Name,
+				CoverDate:   normalizeDate(it.CoverDate),
+				StoreDate:   normalizeDate(it.StoreDate),
+				URL:         it.SiteDetailURL,
+			}
+			if it.Volume != nil {
+				li.VolumeID = it.Volume.ID
+			}
+			out = append(out, li)
+		}
+		if len(items) < listPageSize {
+			break
+		}
+	}
+	return out, nil
+}
+
+// GetVolumeIssues fetches every issue of a volume with its dates (the issue
+// list GetVolume embeds carries no dates). Costs one request per 100 issues.
+func (c *Client) GetVolumeIssues(volumeID int) ([]ListedIssue, error) {
+	if !c.Enabled() {
+		return nil, ErrNoKey
+	}
+	issues, err := c.listIssues(fmt.Sprintf("volume:%d", volumeID))
+	if err != nil {
+		return nil, err
+	}
+	for i := range issues {
+		if issues[i].VolumeID == 0 {
+			issues[i].VolumeID = volumeID
+		}
+	}
+	return issues, nil
+}
+
+// RecentIssues fetches issues of the given volumes whose store date lies in
+// [from, to] ("YYYY-MM-DD"), batching many volume ids per request:
+// filter=volume:ID1|ID2|…,store_date:FROM|TO.
+func (c *Client) RecentIssues(volumeIDs []int, from, to string) ([]ListedIssue, error) {
+	if !c.Enabled() {
+		return nil, ErrNoKey
+	}
+	var out []ListedIssue
+	for start := 0; start < len(volumeIDs); start += volumeBatch {
+		end := min(start+volumeBatch, len(volumeIDs))
+		ids := make([]string, 0, end-start)
+		for _, id := range volumeIDs[start:end] {
+			ids = append(ids, fmt.Sprint(id))
+		}
+		filter := fmt.Sprintf("volume:%s,store_date:%s|%s", strings.Join(ids, "|"), from, to)
+		issues, err := c.listIssues(filter)
+		if err != nil {
+			return out, err
+		}
+		out = append(out, issues...)
+	}
+	return out, nil
+}
+
+// NewWithBaseURL is New with a custom API root and request spacing (tests of
+// other packages point it at an httptest server).
+func NewWithBaseURL(apiKey, baseURL string, minInterval time.Duration) *Client {
+	c := New(apiKey)
+	c.baseURL = baseURL
+	c.minInterval = minInterval
+	return c
+}
+
 // DownloadImage fetches a cover image (20 MB limit).
 func (c *Client) DownloadImage(imgURL string) ([]byte, error) {
 	if !c.Enabled() {

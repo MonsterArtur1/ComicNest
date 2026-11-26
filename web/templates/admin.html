@@ -172,6 +172,18 @@
 </section>
 {{end}}
 
+{{with releaseCheck}}
+<section class="admin-section">
+    <h2>New releases</h2>
+    <form action="/releases/check" method="post">
+        <input type="hidden" name="next" value="/admin">
+        <button type="submit" class="btn" {{if .Running}}disabled{{end}}>Check for new releases</button>
+    </form>
+    {{with .Summary}}<p class="hint">{{.}}</p>{{end}}
+    <p class="hint">Asks ComicVine for recent and upcoming issues of the series people follow. Also runs at most once a day at the end of a library scan.</p>
+</section>
+{{end}}
+
 {{if .MissingCount}}
 <section class="admin-section">
     <h2>Missing files</h2>

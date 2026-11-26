@@ -24,6 +24,7 @@
     <form class="search" action="/search" method="get">
         <input type="search" name="q" placeholder="Search series or issue…" value="{{block "searchQuery" .}}{{end}}">
     </form>
+    <nav class="main-nav"><a href="/gaps" title="Series with missing issues">Missing</a><a href="/releases" title="New releases of the series you follow">Releases</a></nav>
     {{if multiLibrary}}
     {{$current := currentLibrary}}
     <form class="library-switcher" action="/library" method="post">
@@ -49,3 +50,18 @@
 </main>
 </body>
 </html>{{end}}
+
+{{/* A list of releases (home strip and /releases); data: []releaseRow */}}
+{{define "release-list"}}
+<ul class="release-list">
+    {{range .}}
+    <li class="release-row {{if .Upcoming}}upcoming{{end}}">
+        <span class="release-date">{{.DateLabel}}</span>
+        <a class="release-series" href="/series/{{.SeriesID}}">{{.SeriesName}}</a>
+        <span class="release-issue">{{if .IssueNumber}}#{{.IssueNumber}}{{end}}{{if .Name}} {{.Name}}{{end}}</span>
+        {{if .InLibrary}}<span class="release-lib" title="This issue is in your library">in library ✓</span>{{else if .Upcoming}}<span class="release-soon">upcoming</span>{{end}}
+        {{with .URL}}<a class="release-cv" href="{{.}}" target="_blank" rel="noopener" title="View on ComicVine">↗</a>{{end}}
+    </li>
+    {{end}}
+</ul>
+{{end}}

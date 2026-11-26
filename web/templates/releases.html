@@ -1,0 +1,48 @@
+{{define "title"}}New releases — ComicNest{{end}}
+
+{{define "content"}}
+<div class="page-head">
+    <h1>New releases</h1>
+    <div class="page-head-tools">
+        {{if and .CVEnabled (isAdmin)}}
+        <form action="/releases/check" method="post">
+            <button type="submit" class="btn" {{if .Status.Running}}disabled{{end}} title="Ask ComicVine now instead of waiting for the daily check during a scan">Check for new releases</button>
+        </form>
+        {{end}}
+    </div>
+</div>
+
+{{if not .CVEnabled}}
+<div class="empty-state">
+    <p>New releases need ComicVine.</p>
+    <p class="hint">Set <code>comicvine_api_key</code> in <code>config.yaml</code> (or in the admin panel), match your series to ComicVine volumes, and the series you follow show up here.</p>
+</div>
+{{else}}
+{{with .Status.Summary}}<p class="hint">{{.}}</p>{{end}}
+<p class="hint">{{if .LastCheck}}Last checked {{.LastCheck}}.{{else}}Not checked yet — an administrator can start a check, or it runs during the next library scan.{{end}} Followed: series matched to ComicVine that you started reading (use Follow / Unfollow on a series page to override).</p>
+
+{{if or .ThisWeek .LastWeek .Upcoming}}
+<section class="releases-section">
+    <h2>This week</h2>
+    {{if .ThisWeek}}{{template "release-list" .ThisWeek}}{{else}}<p class="hint">Nothing this week.</p>{{end}}
+</section>
+<section class="releases-section">
+    <h2>Last week</h2>
+    {{if .LastWeek}}{{template "release-list" .LastWeek}}{{else}}<p class="hint">Nothing last week.</p>{{end}}
+</section>
+<section class="releases-section">
+    <h2>Upcoming</h2>
+    {{if .Upcoming}}{{template "release-list" .Upcoming}}{{else}}<p class="hint">Nothing announced yet.</p>{{end}}
+</section>
+{{else}}
+<div class="empty-state">
+    {{if .Following}}
+    <p>No releases for your followed series in this window.</p>
+    {{else}}
+    <p>You don't follow any series yet.</p>
+    <p class="hint">Series matched to ComicVine that you have started reading are followed automatically; you can also press Follow on a series page.</p>
+    {{end}}
+</div>
+{{end}}
+{{end}}
+{{end}}

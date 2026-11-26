@@ -12,6 +12,10 @@ type seriesData struct {
 	Issues []issueRow
 	Filter string
 	Next   string // this page's URL, for forms that should return here
+	// Gaps lists missing issues (gaps.go), nil when none to show.
+	Gaps *store.Gaps
+	// Follow is the release-following state (releases.go).
+	Follow followView
 }
 
 func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
@@ -59,5 +63,6 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 	if filter != store.IssueFilterAll {
 		next += "?filter=" + string(filter)
 	}
-	s.render(w, r, "series.html", seriesData{Series: series, Issues: rows, Filter: string(filter), Next: next})
+	s.render(w, r, "series.html", seriesData{Series: series, Issues: rows, Filter: string(filter), Next: next,
+		Gaps: s.seriesGapsFor(series), Follow: s.followViewFor(r, series)})
 }

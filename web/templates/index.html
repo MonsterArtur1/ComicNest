@@ -31,6 +31,13 @@
 </div>
 {{end}}
 
+{{if and .Releases (eq .Filter "all") (eq .Page 1)}}
+<section class="releases-strip">
+    <h2>New releases <a class="releases-more" href="/releases">all releases →</a></h2>
+    {{template "release-list" .Releases}}
+</section>
+{{end}}
+
 {{$sort := .Sort}}{{$filter := .Filter}}
 <div class="filter-bar">
     <a class="chip {{if eq $filter "all"}}active{{end}}" href="/?sort={{$sort}}">all</a>
@@ -40,6 +47,7 @@
     <a class="chip {{if eq $filter "nocv"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=nocv">no ComicVine metadata</a>
     <a class="chip {{if eq $filter "missing"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=missing">missing files</a>
     <a class="chip {{if eq $filter "favorite"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=favorite">★ favorites</a>
+    <a class="chip {{if eq $filter "gaps"}}active{{end}}" href="/?sort={{$sort}}&amp;filter=gaps" title="Series with missing issues">has gaps</a>
 </div>
 
 {{if .Series}}
@@ -58,7 +66,7 @@
             </div>
             <div class="card-body">
                 <span class="card-title">{{.Name}}</span>
-                <span class="card-meta">{{if .OneShot}}one-shot{{else}}{{.IssueCount}} {{if eq .IssueCount 1}}issue{{else}}issues{{end}}{{end}}</span>
+                <span class="card-meta">{{if .OneShot}}one-shot{{else}}{{.IssueCount}} {{if eq .IssueCount 1}}issue{{else}}issues{{end}}{{end}}{{with index $.GapCounts .ID}} · <span class="gap-count">{{.}} missing</span>{{end}}</span>
             </div>
         </a>
     </li>

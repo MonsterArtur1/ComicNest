@@ -1193,3 +1193,69 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     font-size: 16px;
 }
 .empty-state .hint { font-size: 14px; }
+
+/* --- top bar navigation: missing issues / releases --- */
+.main-nav { display: flex; gap: 14px; font-size: 14px; }
+.main-nav a { color: var(--text-dim); text-decoration: none; }
+.main-nav a:hover { color: var(--accent); }
+
+/* --- gaps: series page box, /gaps list, grid count --- */
+.gaps-box {
+    margin: 0 0 16px;
+    padding: 10px 14px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.gaps-summary { margin: 0; line-height: 1.6; }
+.gaps-ranges { color: var(--accent); }
+.gaps-detail { margin-top: 8px; font-size: 14px; }
+.gaps-detail summary { cursor: pointer; color: var(--text-dim); }
+.gaps-detail ul { margin: 8px 0 0; padding-left: 20px; columns: 2 280px; }
+.gap-count { color: var(--accent); }
+.gaps-total { margin-bottom: 12px; }
+.gap-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.gap-row {
+    display: flex;
+    gap: 14px;
+    padding: 10px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.gap-cover img { width: 56px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; display: block; }
+.gap-info { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.gap-name { color: var(--text); font-weight: 600; text-decoration: none; }
+.gap-name:hover { color: var(--accent); }
+.gap-ranges { color: var(--accent); overflow-wrap: anywhere; }
+
+/* --- new releases: home strip and /releases --- */
+.releases-strip { margin: 0 0 20px; }
+.releases-strip h2, .releases-section h2 { font-size: 18px; margin: 0 0 8px; }
+.releases-more { font-size: 13px; font-weight: 400; margin-left: 10px; color: var(--text-dim); text-decoration: none; }
+.releases-more:hover { color: var(--accent); }
+.releases-section { margin-bottom: 22px; }
+.release-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-raised); }
+.release-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+}
+.release-row:last-child { border-bottom: 0; }
+.release-row.upcoming { opacity: .8; }
+.release-date { flex: none; width: 84px; color: var(--text-dim); font-size: 13px; }
+.release-series { color: var(--text); font-weight: 600; text-decoration: none; }
+.release-series:hover { color: var(--accent); }
+.release-issue { color: var(--text-dim); min-width: 0; overflow-wrap: anywhere; }
+.release-lib { color: #7bc47f; font-size: 12px; }
+.release-soon { color: var(--accent); font-size: 12px; }
+.release-cv { color: var(--text-dim); text-decoration: none; margin-left: auto; }
+.release-cv:hover { color: var(--accent); }
+
+@media (max-width: 700px) {
+    .main-nav { order: 4; }
+}

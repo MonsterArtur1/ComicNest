@@ -306,6 +306,20 @@ reader's `POST /issues/{id}/progress` and OPDS page streaming without `?track=0`
 read". OPDS clients that prefetch pages log them at fetch time, which can shorten the estimated
 reading time. History starts with the migration; nothing is backfilled from `reading_progress`.
 
+**Gap detection and releases** (migration 17): `cv_volume_issues(volume_id, cv_issue_id,
+issue_number, name, cover_date, store_date, site_url; PK (volume_id, cv_issue_id))` caches ComicVine
+issues; `cv_volume_sync(volume_id PK, synced_at)` marks a volume whose full issue list was fetched —
+gap detection trusts only those, the release check adds partial rows without a stamp.
+`series_follows(user, series_id → series ON DELETE CASCADE, follow; PK (user, series_id))` holds an
+explicit follow (1) or unfollow (0); `app_meta(key, value)` holds `releases_checked_at`. Follow rule:
+a series is followed when it has a `comicvine_volume_id` and the user follows it explicitly, or has
+no explicit row and has any `reading_progress` for it. Gap rule: only plain integer numbers count
+("055" = "55"); ComicVine series are compared against the cached list (issues dated in the future
+are not missing; store date, falling back to cover date); other series are inferred between the
+lowest and highest owned number and skipped when they are one-shots, under 80% integer numbers,
+have fewer than 2 distinct numbers, or more than `2*owned+20` missing. `file_missing` issues count
+as missing and are flagged "file disappeared"; a present copy of the same number wins.
+
 ## 6. Library scanning
 
 Started by a UI button (`POST /scan`), runs in a goroutine; the UI polls status (HTMX polling
@@ -418,6 +432,9 @@ The client, in `internal/comicvine/`:
 - 15s timeout, a custom `User-Agent`, treats `status_code != 1` as an error with a message.
 - Endpoints: `search` (resources=volume), `volume/4050-{id}`, `issue/4000-{id}`. Fields fetched are
   narrowed with `field_list` (smaller responses).
+- `GetVolumeIssues` (`/issues/?filter=volume:ID`, paginated, with dates — fills the gap-detection
+  cache) and `RecentIssues` (`/issues/?filter=volume:ID1|ID2…,store_date:FROM|TO`, 40 volumes per
+  request, paginated — the new-releases check, from 21 days back to 60 days ahead).
 
 The matching flow — **always with user confirmation** (the old project's biggest weakness: it
 blindly took the first search result):
@@ -486,6 +503,11 @@ is hidden entirely.
 | `GET /issues/{id}/download` | the comic file (`Content-Disposition: attachment`, the original name, `Content-Type` by extension: `application/vnd.comicbook+zip` / `-rar` / `application/pdf`) |
 | `POST /scan` — admin only / `GET /scan/status` | start a scan / an HTMX progress partial |
 | `POST /library` | set (or clear) the main menu's library selection — a `comicnest_library` cookie — and redirect to `/`; only meaningful with more than one library configured |
+| `GET /gaps` / `GET /gaps.txt` | series with missing issues, most missing first, scoped by the library selector; `.txt` is a plain-text wishlist, one `Series: #12-14, #20` line per series |
+| `GET /releases` | releases (store date) of followed series: this week (Monday-first), last week, upcoming (60 days); a hint without a ComicVine key |
+| `POST /releases/check` | admin only: background, single-flight ComicVine release check (also run at most daily at the end of a scan); redirects to `next` or `/releases` |
+| `POST /series/{id}/follow` | toggles the user's follow state of a ComicVine-matched series (explicit; overrides the implicit "started reading" rule); redirects back |
+| `GET /?filter=gaps` | the grid filter "has gaps" (series with missing issues; tiles show the missing count) |
 | `GET /search?q=` | results by series name, title and issue numbers (LIKE) |
 | `GET /static/...` | static assets from `embed.FS` |
 | `GET /healthz` | a liveness probe (`ok`, no login) — Docker/orchestrators |

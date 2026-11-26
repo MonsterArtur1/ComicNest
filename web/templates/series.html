@@ -28,8 +28,39 @@
     </div>
     <div class="series-actions">
         {{if isAdmin}}<a class="btn" href="/series/{{.Series.ID}}/edit">Edit</a>{{end}}
+        {{if .Follow.CanFollow}}
+        <form action="/series/{{.Series.ID}}/follow" method="post">
+            <button type="submit" class="btn {{if .Follow.Following}}btn-fav-active{{end}}"
+                    title="{{if .Follow.Following}}You see new releases of this series on the home page and /releases — click to stop{{else}}Show new releases of this series on the home page and /releases{{end}}">{{if .Follow.Following}}🔔 Following{{else}}🔕 Follow{{end}}</button>
+        </form>
+        {{end}}
     </div>
 </div>
+
+{{with .Gaps}}
+<section class="gaps-box">
+    <p class="gaps-summary">
+        <strong>Owned {{.Owned}} of {{.Total}}</strong>
+        {{if .MissingCount}}
+        · <span class="gaps-ranges">Missing: {{.RangeText}}</span>
+        {{if .VanishedCount}}<span class="hint" title="A catalog record exists, but its file disappeared from the library">(file disappeared: {{.VanishedText}})</span>{{end}}
+        {{else}}
+        · complete ✓
+        {{end}}
+        <span class="hint">{{if .FromComicVine}}per ComicVine{{else}}inferred from issue numbers{{end}}</span>
+    </p>
+    {{if and .FromComicVine .MissingCount}}
+    <details class="gaps-detail">
+        <summary>Show the {{.MissingCount}} missing issue{{if ne .MissingCount 1}}s{{end}}</summary>
+        <ul>
+            {{range .Missing}}
+            <li>#{{.Number}}{{if .Name}} — {{.Name}}{{end}}{{if .Date}} <span class="hint">{{.Date}}</span>{{end}}{{if .Vanished}} <span class="badge badge-missing">file disappeared</span>{{end}}</li>
+            {{end}}
+        </ul>
+    </details>
+    {{end}}
+</section>
+{{end}}
 
 <div class="scrape-area" id="scrape-area"
      hx-get="/series/{{.Series.ID}}/scrape/status" hx-trigger="load" hx-swap="innerHTML">

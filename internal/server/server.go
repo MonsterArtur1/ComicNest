@@ -68,6 +68,7 @@ type Server struct {
 	scanners  map[string]*library.Scanner
 	cv        *comicvine.Client
 	scrape    *scrapeJob
+	releases  *releaseJob // the global "check for new releases" job (releases.go)
 	templates map[string]*template.Template
 	partials  *template.Template
 	reader    *template.Template // standalone full-screen reader page
@@ -141,6 +142,7 @@ func New(cfg config.Config, configPath string, st *store.Store, cv *covers.Cache
 		scanners:              scanners,
 		cv:                    cvc,
 		scrape:                &scrapeJob{},
+		releases:              &releaseJob{},
 		sessions:              newSessions(),
 		mux:                   http.NewServeMux(),
 	}
@@ -193,6 +195,7 @@ func (s *Server) funcMap() template.FuncMap {
 		"libraries":    func() []libraryInfo { return s.libraries },
 		"multiLibrary": func() bool { return len(s.libraries) > 1 },
 		"libraryName":  s.libraryName,
+		"releaseCheck": s.releases.status, // admin panel: the release-check job's state
 		// currentUser/isAdmin/currentLibrary are overridden per request in
 		// renderStatus; these defaults only satisfy parse-time resolution.
 		"currentUser":    func() string { return "" },
@@ -250,7 +253,8 @@ func sourceLabel(source string) string {
 // shared layout plus that view's blocks.
 func (s *Server) parseTemplates() error {
 	pages := []string{"index.html", "series.html", "issue.html", "search.html",
-		"series_edit.html", "issue_edit.html", "comicvine_match.html", "error.html", "admin.html", "stats.html"}
+		"series_edit.html", "issue_edit.html", "comicvine_match.html", "error.html", "admin.html", "stats.html",
+		"gaps.html", "releases.html"}
 
 	s.templates = make(map[string]*template.Template)
 	for _, page := range pages {
@@ -342,6 +346,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /issues/{id}/download", s.handleIssueDownload)
 	s.mux.HandleFunc("GET /search", s.handleSearch)
 	s.mux.HandleFunc("GET /stats", s.handleStats)
+	s.mux.HandleFunc("GET /gaps", s.handleGaps)
+	s.mux.HandleFunc("GET /gaps.txt", s.handleGapsText)
+	s.mux.HandleFunc("GET /releases", s.handleReleases)
+	s.mux.HandleFunc("POST /releases/check", s.requireAdmin(s.handleReleasesCheck))
+	s.mux.HandleFunc("POST /series/{id}/follow", s.handleSeriesFollow)
 	s.mux.HandleFunc("POST /library", s.handleSetLibrary)
 	s.mux.HandleFunc("POST /scan", s.requireAdmin(s.handleScanStart))
 	s.mux.HandleFunc("GET /scan/status", s.handleScanStatus)

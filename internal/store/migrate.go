@@ -265,6 +265,40 @@ var migrations = []string{
 		PRIMARY KEY (user, document)
 	);
 	`,
+
+	// 17: cached ComicVine issue lists for gap detection and
+	// the new-releases feed, per-user explicit follow/unfollow of series, and a
+	// tiny key/value table for the daily release-check stamp. A volume with a
+	// cv_volume_sync row has had its full issue list fetched (gap detection
+	// trusts only those); the release check may add partial rows without one.
+	`
+	CREATE TABLE cv_volume_issues (
+		volume_id    INTEGER NOT NULL,
+		cv_issue_id  INTEGER NOT NULL,
+		issue_number TEXT NOT NULL DEFAULT '',
+		name         TEXT NOT NULL DEFAULT '',
+		cover_date   TEXT NOT NULL DEFAULT '',
+		store_date   TEXT NOT NULL DEFAULT '',
+		site_url     TEXT NOT NULL DEFAULT '',
+		PRIMARY KEY (volume_id, cv_issue_id)
+	);
+	CREATE INDEX idx_cv_volume_issues_store ON cv_volume_issues(store_date);
+	CREATE TABLE cv_volume_sync (
+		volume_id INTEGER PRIMARY KEY,
+		synced_at TEXT NOT NULL
+	);
+	CREATE TABLE series_follows (
+		user      TEXT NOT NULL,
+		series_id INTEGER NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+		follow    INTEGER NOT NULL,
+		PRIMARY KEY (user, series_id)
+	);
+	CREATE INDEX idx_series_follows_series ON series_follows(series_id);
+	CREATE TABLE app_meta (
+		key   TEXT PRIMARY KEY,
+		value TEXT NOT NULL
+	);
+	`,
 }
 
 func migrate(db *sql.DB) error {

@@ -375,13 +375,16 @@ const (
 	SeriesFilterNoCV     SeriesFilter = "nocv"     // some issue without ComicVine (or manual) metadata
 	SeriesFilterMissing  SeriesFilter = "missing"  // some issue's file is gone
 	SeriesFilterFavorite SeriesFilter = "favorite" // user has favorited the series
+	// SeriesFilterGaps is applied by the caller (see gaps.go): gap detection
+	// is computed in Go, not SQL, so ListSeries treats it like "all".
+	SeriesFilterGaps SeriesFilter = "gaps"
 )
 
 // ParseSeriesFilter maps a query value to a filter (unknown → all).
 func ParseSeriesFilter(v string) SeriesFilter {
 	switch f := SeriesFilter(v); f {
 	case SeriesFilterUnread, SeriesFilterRead, SeriesFilterReading, SeriesFilterNoCV,
-		SeriesFilterMissing, SeriesFilterFavorite:
+		SeriesFilterMissing, SeriesFilterFavorite, SeriesFilterGaps:
 		return f
 	}
 	return SeriesFilterAll

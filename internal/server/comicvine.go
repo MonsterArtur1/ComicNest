@@ -144,6 +144,7 @@ func (s *Server) runSeriesScrape(seriesID, volumeID int64) {
 		st.Skipped = skipped
 	})
 	if len(todo) == 0 {
+		s.refreshVolumeCache(volumeID) // nothing to scrape, but the user may want fresh gaps
 		finish("")
 		return
 	}
@@ -170,6 +171,7 @@ func (s *Server) runSeriesScrape(seriesID, volumeID int64) {
 		}
 		s.scrape.update(func(st *scrapeStatus) { st.Done++ })
 	}
+	s.refreshVolumeCache(volumeID)
 	finish("")
 }
 
@@ -219,6 +221,11 @@ func (s *Server) scrapeOneIssue(issue *store.Issue, volIssues []comicvine.Volume
 // to a matched series. Cost per scan: one volume fetch per affected series
 // plus one issue fetch per actually matched issue.
 func (s *Server) autoScrapeCV(progress func(done, total, updated, failed int)) {
+	s.autoScrapeIssues(progress)
+	s.syncCVData() // issue-list cache for gap detection + the daily release check
+}
+
+func (s *Server) autoScrapeIssues(progress func(done, total, updated, failed int)) {
 	if !s.cv.Enabled() {
 		return
 	}
@@ -374,6 +381,7 @@ func (s *Server) handleMatchSave(w http.ResponseWriter, r *http.Request) {
 			log.Printf("comicvine: one-shot flag %d: %v", series.ID, err)
 		}
 	}
+	go s.refreshVolumeCache(volumeID) // issue list for gap detection, off the request
 	http.Redirect(w, r, "/series/"+strconv.FormatInt(series.ID, 10), http.StatusSeeOther)
 }
 

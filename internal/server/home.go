@@ -14,6 +14,11 @@ type homeData struct {
 	Filter string
 	Stats  readingStats
 
+	// Releases is the "New releases" strip (releases.go); GapCounts maps a
+	// series id to its missing-issue count under the "has gaps" filter.
+	Releases  []releaseRow
+	GapCounts map[int64]int
+
 	// Pagination over the filtered series list (Pages == 1 hides the pager).
 	Page  int
 	Pages int
@@ -50,13 +55,28 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
+	var gapCounts map[int64]int
+	if filter == store.SeriesFilterGaps {
+		if gapCounts, err = s.gapSeriesIDs(r); err != nil {
+			s.serverError(w, err)
+			return
+		}
+		kept := series[:0]
+		for _, sr := range series {
+			if gapCounts[sr.ID] > 0 {
+				kept = append(kept, sr)
+			}
+		}
+		series = kept
+	}
 	stats, err := s.userReadingStats(r)
 	if err != nil {
 		s.serverError(w, err)
 		return
 	}
 
-	data := homeData{Sort: string(sort), Filter: string(filter), Stats: stats, Total: len(series), Page: 1, Pages: 1}
+	data := homeData{Sort: string(sort), Filter: string(filter), Stats: stats, Total: len(series), Page: 1, Pages: 1,
+		GapCounts: gapCounts, Releases: s.homeReleases(r)}
 	if size := s.config().PageSize; size > 0 {
 		data.Pages = max(1, (len(series)+size-1)/size)
 		data.Page = min(pageParam(r), data.Pages)

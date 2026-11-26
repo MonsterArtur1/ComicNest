@@ -31,6 +31,11 @@ file, no cloud account. Your library is **read-only**, the **app didin't modify*
 - **Serves an OPDS catalog** for comic reader apps on phones and tablets (Panels, Chunky,
   Moon+ Reader, Librera, KOReader, Thorium…). Readers can browse, search, download, or stream
   pages straight from the server without downloading the file.
+- **Shows what you're missing and what's new** — every series page says "Owned 37 of 42 ·
+  Missing: #12–14, #20" (from the ComicVine issue list, or inferred from issue numbers), a
+  "has gaps" grid filter and a wishlist page (`/gaps`, plus `/gaps.txt` to take shopping). Series
+  you follow get a "New releases" strip on the home page and a `/releases` page with this week,
+  last week and upcoming issues. Nothing is ever downloaded — it's a list, not a grabber.
 - **Syncs progress with KOReader** — ComicNest doubles as a KOReader sync server, so your
   page follows you between e-ink readers, the web reader and OPDS apps (and counts in your stats).
 - **Supports several users** — accounts (with separate reading progress) created from an
