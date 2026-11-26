@@ -234,6 +234,37 @@ var migrations = []string{
 	CREATE INDEX idx_page_reads_user ON page_reads(user, read_at);
 	CREATE INDEX idx_page_reads_issue ON page_reads(issue_id);
 	`,
+
+	// 16: KOReader progress sync (kosync, internal/server/kosync.go).
+	// users.kosync_key is the md5 hex of the account password — what KOReader
+	// sends as x-auth-key — stored only while kosync is enabled, refreshed on
+	// each login/password change (NULL = sync not enabled for the account yet).
+	// issue_hashes holds KOReader's two document ids per issue (partial md5 of
+	// the content, md5 of the file name) plus the size/mtime they were computed
+	// at. kosync_progress is the last position each user's KOReader pushed per
+	// document id, whether or not the document is in the library.
+	`
+	ALTER TABLE users ADD COLUMN kosync_key TEXT;
+	CREATE TABLE issue_hashes (
+		issue_id     INTEGER PRIMARY KEY REFERENCES issues(id) ON DELETE CASCADE,
+		md5_partial  TEXT NOT NULL,
+		md5_filename TEXT NOT NULL,
+		file_size    INTEGER NOT NULL,
+		mtime        INTEGER NOT NULL
+	);
+	CREATE INDEX idx_issue_hashes_partial ON issue_hashes(md5_partial);
+	CREATE INDEX idx_issue_hashes_filename ON issue_hashes(md5_filename);
+	CREATE TABLE kosync_progress (
+		user       TEXT NOT NULL,
+		document   TEXT NOT NULL,
+		progress   TEXT NOT NULL,
+		percentage REAL NOT NULL,
+		device     TEXT NOT NULL,
+		device_id  TEXT NOT NULL,
+		timestamp  INTEGER NOT NULL,
+		PRIMARY KEY (user, document)
+	);
+	`,
 }
 
 func migrate(db *sql.DB) error {

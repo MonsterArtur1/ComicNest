@@ -117,6 +117,10 @@ type adminConfig struct {
 	// until the app is restarted and the two converge again.
 	ComicVineRestartPending bool
 	OPDSRestartPending      bool
+	// KOReader sync (kosync): same semantics as the OPDS fields above.
+	KosyncEnabled        bool
+	KosyncEnvPinned      bool
+	KosyncRestartPending bool
 }
 
 // cvTestResult is the outcome of a "Test Connection" check, shown inline
@@ -277,6 +281,9 @@ func (s *Server) adminConfigView() adminConfig {
 		PageSizeEnvPinned:       envSet("PAGE_SIZE"),
 		ComicVineRestartPending: cfg.ComicVineAPIKey != s.activeComicVineAPIKey,
 		OPDSRestartPending:      cfg.OPDSEnabled != s.opdsRoutesRegistered,
+		KosyncEnabled:           cfg.KosyncEnabled,
+		KosyncEnvPinned:         envSet("KOSYNC_ENABLED"),
+		KosyncRestartPending:    cfg.KosyncEnabled != s.kosyncRoutesRegistered,
 	}
 }
 
@@ -446,6 +453,7 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
+	s.rememberKosyncKey(name, password)
 	if firstAccount {
 		// Progress recorded by the anonymous reader before any account
 		// existed belongs to this first account now.
@@ -499,6 +507,11 @@ func (s *Server) handleAdminSetPassword(w http.ResponseWriter, r *http.Request) 
 		s.serverError(w, err)
 		return
 	}
+	// The old KOReader verifier is stale now; store the new one (or none).
+	if err := s.store.ClearUserKosyncKey(u.ID); err != nil {
+		log.Printf("admin: clearing kosync key for %s: %v", u.Name, err)
+	}
+	s.rememberKosyncKey(u.Name, password)
 	http.Redirect(w, r, adminURL(tabUsers), http.StatusSeeOther)
 }
 
@@ -586,6 +599,7 @@ func (s *Server) handleAdminSaveConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	updated := s.setEditableConfig(apiKey, opdsEnabled, pageSize)
+	updated = s.setKosyncEnabled(r.FormValue("kosync_enabled") != "")
 	if err := config.Save(s.configPath, updated); err != nil {
 		s.serverError(w, err)
 		return

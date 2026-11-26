@@ -62,6 +62,7 @@ func (s *Server) opdsAuth(next http.Handler) http.Handler {
 		if err := s.store.TouchUserLogin(u); err != nil {
 			log.Printf("opds auth: recording last login for %q: %v", u, err)
 		}
+		s.rememberKosyncKey(u, p)
 		next.ServeHTTP(w, withUser(r, u))
 	})
 }

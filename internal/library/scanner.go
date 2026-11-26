@@ -268,6 +268,7 @@ func (sc *Scanner) scan() error {
 				sc.mu.Unlock()
 			}
 		}
+		sc.syncDocHashes(f.path)
 		sc.setStatus(func(st *Status) { st.Processed++ })
 	}
 

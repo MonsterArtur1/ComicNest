@@ -50,6 +50,8 @@ type Server struct {
 	// startup — unlike cfg.OPDSEnabled, it never changes at runtime, since an
 	// admin-panel edit to opds_enabled needs a restart to (un)mount routes.
 	opdsRoutesRegistered bool
+	// kosyncRoutesRegistered is the same for the KOReader sync routes.
+	kosyncRoutesRegistered bool
 	// activeComicVineAPIKey is the key s.cv was actually built with at
 	// startup — unlike cfg.ComicVineAPIKey, it never changes at runtime,
 	// since an admin-panel edit needs a restart to rebuild the client. The
@@ -356,6 +358,10 @@ func (s *Server) routes() {
 	if s.opdsRoutesRegistered {
 		s.opdsRoutes()
 	}
+	s.kosyncRoutesRegistered = s.cfg.KosyncEnabled
+	if s.kosyncRoutesRegistered {
+		s.kosyncRoutes()
+	}
 	s.mux.HandleFunc("/", s.handleNotFound) // catch-all: styled 404
 }
 
@@ -407,6 +413,11 @@ func (s *Server) ListenAndServe() error {
 		// (validator.js isURL, THORIUM_ISURL_REQUIRE_TLD_FALSE unset in
 		// official builds), so "localhost" is rejected while IPs pass.
 		fmt.Println("OPDS note: Thorium Reader rejects \"localhost\" — use an IP address (127.0.0.1 or the LAN address above)")
+	}
+	if s.cfg.KosyncEnabled {
+		for _, h := range hosts {
+			fmt.Printf("KOReader sync server: http://%s:%d/kosync\n", h, s.cfg.Port)
+		}
 	}
 	return http.ListenAndServe(addr, s.withLogging(s.withAuth(s.mux)))
 }

@@ -27,9 +27,10 @@ library: "D:/Library"         # comic library root (scanned recursively: cbz/cbr
 data_dir: ./data              # runtime data: the SQLite database (database.sqlite, including user accounts) and cover cache (covers/)
 comicvine_api_key: ""         # key from https://comicvine.gamespot.com/api/; empty = ComicVine matching/scraping disabled (the UI says so)
 opds_enabled: true            # OPDS catalog under /opds (see §9a); logs in with the same accounts as the web UI
+# kosync_enabled: true        # KOReader progress sync server under /kosync (default false; see §9b); same accounts as the web UI — log in to the web UI once after enabling
 page_size: 60                 # series tiles per library page; 0 = no pagination
 
-# comicvine_api_key, opds_enabled and page_size can also be edited from the
+# comicvine_api_key, opds_enabled, kosync_enabled and page_size can also be edited from the
 # admin panel (/admin) instead of this file — page_size applies right away,
-# the other two need a restart. A COMICNEST_<KEY> environment variable, when
+# the others need a restart. A COMICNEST_<KEY> environment variable, when
 # set, always wins over an edit made there.

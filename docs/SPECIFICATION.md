@@ -562,6 +562,26 @@ with no navigation into the catalog. An attempt at a "shelf" view (series as `re
 groups with issues, single releases as publications) was tried and rolled back at the user's
 request — it made a bigger mess than a plain list in Thorium.
 
+## 9b. KOReader progress sync (`kosync_enabled: true`)
+
+A server for KOReader's kosync plugin (the koreader-sync-server API) under `/kosync`; set "Custom sync server" to `http://<host>:<port>/kosync`. The routes exist only when enabled (otherwise the catch-all 404); the toggle needs a restart. The `/kosync` paths are outside the web login gate and carry their own header auth.
+
+| Route | Result |
+|---|---|
+| `GET /kosync/healthcheck` | 200 `{"state":"OK"}` (no auth) |
+| `POST /kosync/users/create` | 403 `{"message":"Registration is disabled; ..."}` — accounts are admin-created |
+| `GET /kosync/users/auth` | 200 `{"authorized":"OK"}` / 401 `{"message":"Unauthorized"}` |
+| `PUT /kosync/syncs/progress` | body `{document, progress, percentage, device, device_id}` → 200 `{document, timestamp}`; 403 `{"message":"Invalid request"}` for a malformed body |
+| `GET /kosync/syncs/progress/{document}` | `{document, progress, percentage, device, device_id, timestamp}` or `{}` |
+
+**Auth.** Headers `x-auth-user` and `x-auth-key` (md5 hex of the password). bcrypt cannot verify an md5, so `users.kosync_key` stores the md5 whenever the plaintext is seen (web login, OPDS Basic auth, admin create / reset password) while kosync is enabled. Compared in constant time, case-insensitive. An account that has not logged in since enabling gets 401. With no accounts the endpoints are open and belong to the anonymous reader. The md5 is unsalted and equivalent to the password for `/kosync` only.
+
+**Documents.** `issue_hashes(issue_id, md5_partial, md5_filename, file_size, mtime)`, filled by the scanner (backfill for issues without a row; recomputed when size or mtime changes). Partial MD5 = md5 over up to 1024 bytes read at offsets 0 and `1024<<(2i)` for i = 0..10, stopping at the first offset at or past EOF (KOReader `util.partialMD5`, whose i = -1 offset is 0 because of LuaJIT's 32-bit shift). Filename MD5 = md5 of the base name. A document id matches an issue by either hash; files present on disk win a collision.
+
+**Progress.** `kosync_progress(user, document, progress, percentage, device, device_id, timestamp)` stores the last push per user and document id, in or out of the library. For a library issue the page (the `progress` string, else derived from `percentage`, clamped to the page total) goes to `reading_progress` (highest page kept) and `page_reads`; page ≥ total means finished. GET returns the user's `reading_progress` (`device` "ComicNest", `device_id` "comicnest", `percentage` = page/total) when it is strictly newer than the last push, else the stored push.
+
+**Config.** `kosync_enabled` (default false), `COMICNEST_KOSYNC_ENABLED`, editable in Admin → Configuration. The startup output prints the sync URL(s).
+
 ## 10. Security and quality notes
 
 - **The old project has a hardcoded ComicVine key in `Old/ComicsNest/apiProcessor.go`, and it's in

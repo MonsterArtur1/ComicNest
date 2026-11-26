@@ -33,6 +33,9 @@ type Config struct {
 	// OPDSEnabled turns on the OPDS catalog for external comic readers. The
 	// catalog is protected with HTTP Basic auth using the accounts table.
 	OPDSEnabled bool `yaml:"opds_enabled"`
+	// KosyncEnabled turns on the KOReader progress-sync server under /kosync,
+	// authenticated with the account name and password (see §9b).
+	KosyncEnabled bool `yaml:"kosync_enabled"`
 	// PageSize is the number of series tiles per page of the library grid.
 	// 0 disables pagination (everything on one page).
 	PageSize int `yaml:"page_size"`
@@ -55,7 +58,8 @@ func defaults() Config {
 
 // EnvPrefix is the prefix of environment variables that override config.yaml
 // (COMICNEST_LISTEN, COMICNEST_PORT, COMICNEST_LIBRARY, COMICNEST_DATA_DIR,
-// COMICNEST_COMICVINE_API_KEY, COMICNEST_OPDS_ENABLED, COMICNEST_PAGE_SIZE).
+// COMICNEST_COMICVINE_API_KEY, COMICNEST_OPDS_ENABLED, COMICNEST_KOSYNC_ENABLED,
+// COMICNEST_PAGE_SIZE).
 // The Docker image uses them to point at its volumes; they also let the API
 // key live outside the file.
 const EnvPrefix = "COMICNEST_"
@@ -170,6 +174,13 @@ func (c *Config) applyEnv() error {
 			return fmt.Errorf("%sOPDS_ENABLED: %q is not a boolean", EnvPrefix, v)
 		}
 		c.OPDSEnabled = b
+	}
+	if v, ok := os.LookupEnv(EnvPrefix + "KOSYNC_ENABLED"); ok && v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return fmt.Errorf("%sKOSYNC_ENABLED: %q is not a boolean", EnvPrefix, v)
+		}
+		c.KosyncEnabled = b
 	}
 	return nil
 }

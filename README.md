@@ -31,6 +31,8 @@ file, no cloud account. Your library is **read-only**, the **app didin't modify*
 - **Serves an OPDS catalog** for comic reader apps on phones and tablets (Panels, Chunky,
   Moon+ Reader, Librera, KOReader, Thorium…). Readers can browse, search, download, or stream
   pages straight from the server without downloading the file.
+- **Syncs progress with KOReader** — ComicNest doubles as a KOReader sync server, so your
+  page follows you between e-ink readers, the web reader and OPDS apps (and counts in your stats).
 - **Supports several users** — accounts (with separate reading progress) created from an
   in-browser admin panel, used by both the web interface and the OPDS catalog. Editing
   metadata, scanning the library and ComicVine search are admin-only; everyone else can
@@ -256,3 +258,25 @@ If you created accounts in the admin panel, the reader will ask for a login and 
 user's progress. On the
 same computer (for example Thorium Reader on a PC) use `http://127.0.0.1:8080/opds` — Thorium
 refuses `localhost`. The server prints all working addresses when it starts.
+
+### KOReader progress sync
+
+ComicNest can act as a KOReader sync server, so your position in a comic follows you between
+KOReader devices and the web reader / OPDS apps (pages you read in KOReader also count in
+"Your stats").
+
+1. Set `kosync_enabled: true` in `config.yaml` (or `COMICNEST_KOSYNC_ENABLED=true`, or tick
+   "Enable KOReader progress sync" in Admin → Configuration) and restart.
+2. Log in to the ComicNest web UI once with your account (existing accounts must do this after
+   enabling sync).
+3. In KOReader: Tools → Progress sync → Custom sync server → enter
+   `http://<host>:8080/kosync`, then Login with your ComicNest username and password.
+   "Register" is disabled — accounts are created by the admin.
+4. Leave document matching on "Binary" (default) or use "Filename"; both are recognized. Files
+   that aren't in the library still sync between your KOReader devices.
+
+Caveats: KOReader authenticates with an MD5 of your password, so while sync is enabled
+ComicNest stores an unsalted MD5 verifier for each account in addition to the normal bcrypt
+hash — use a password you don't reuse, and put ComicNest behind HTTPS if it is reachable from
+the internet. Progress from KOReader only moves ComicNest progress forward; page statistics
+count the page reported at each sync.

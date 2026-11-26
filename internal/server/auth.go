@@ -151,6 +151,7 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 		p := r.URL.Path
 		if !s.authEnabled() ||
 			p == "/opds" || strings.HasPrefix(p, "/opds/") ||
+			p == "/kosync" || strings.HasPrefix(p, "/kosync/") ||
 			p == "/login" || p == "/logout" || p == "/favicon.ico" || p == "/healthz" || strings.HasPrefix(p, "/static/") {
 			next.ServeHTTP(w, r)
 			return
@@ -207,6 +208,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.TouchUserLogin(name); err != nil {
 		log.Printf("login: recording last login for %q: %v", name, err)
 	}
+	s.rememberKosyncKey(name, r.FormValue("password"))
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,
 		Value:    s.sessions.create(name),

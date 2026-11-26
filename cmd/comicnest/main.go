@@ -105,6 +105,12 @@ func main() {
 		log.Printf("opds: listening on localhost only — set listen: 0.0.0.0 to reach the catalog from other devices")
 	}
 
+	if cfg.KosyncEnabled {
+		log.Printf("kosync: enabled (KOReader progress sync at /kosync; accounts log in to the web UI once to enable sync)")
+	} else {
+		log.Printf("kosync: disabled (set kosync_enabled: true in config.yaml)")
+	}
+
 	coverCache := covers.New(coversDir)
 	// A scanner per configured library; with none configured, a single
 	// placeholder scanner (root "") keeps the "set the library path" error

@@ -109,7 +109,7 @@
 <nav class="admin-tabs" aria-label="Admin panel sections">
     <a href="/admin" class="admin-tab{{if eq .Tab "library"}} active{{end}}"{{if eq .Tab "library"}} aria-current="page"{{end}}>Library{{if .MissingCount}} <span class="tab-badge tab-badge-warn" title="{{.MissingCount}} missing file(s)">{{.MissingCount}}</span>{{end}}</a>
     <a href="/admin?tab=users" class="admin-tab{{if eq .Tab "users"}} active{{end}}"{{if eq .Tab "users"}} aria-current="page"{{end}}>Users <span class="tab-badge">{{len .Users}}</span></a>
-    <a href="/admin?tab=config" class="admin-tab{{if eq .Tab "config"}} active{{end}}"{{if eq .Tab "config"}} aria-current="page"{{end}}>Configuration{{if or .Config.ComicVineRestartPending .Config.OPDSRestartPending}} <span class="tab-badge tab-badge-warn" title="Restart required">!</span>{{end}}</a>
+    <a href="/admin?tab=config" class="admin-tab{{if eq .Tab "config"}} active{{end}}"{{if eq .Tab "config"}} aria-current="page"{{end}}>Configuration{{if or .Config.ComicVineRestartPending .Config.OPDSRestartPending .Config.KosyncRestartPending}} <span class="tab-badge tab-badge-warn" title="Restart required">!</span>{{end}}</a>
 </nav>
 
 {{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
@@ -120,6 +120,12 @@
     Restart required — the
     {{if and .Config.ComicVineRestartPending .Config.OPDSRestartPending}}ComicVine API key and OPDS catalog changes{{else if .Config.ComicVineRestartPending}}ComicVine API key change{{else}}OPDS catalog change{{end}}
     you saved won't take effect until the app is restarted.
+</div>
+{{end}}
+{{if .Config.KosyncRestartPending}}
+<div class="restart-banner">
+    <span class="restart-banner-icon">⚠</span>
+    Restart required — the KOReader progress sync change you saved won't take effect until the app is restarted.
 </div>
 {{end}}
 
@@ -285,13 +291,22 @@
         <p class="hint">Overridden by the COMICNEST_OPDS_ENABLED environment variable — edit it there instead.</p>
         {{end}}
 
+        <label class="check-label">
+            <input type="checkbox" name="kosync_enabled" value="1" {{if .Config.KosyncEnabled}}checked{{end}}>
+            Enable KOReader progress sync
+        </label>
+        {{if .Config.KosyncEnvPinned}}
+        <p class="hint">Overridden by the COMICNEST_KOSYNC_ENABLED environment variable — edit it there instead.</p>
+        {{end}}
+        <p class="hint">KOReader: Tools → Progress sync → Custom sync server → <code>http://&lt;this host&gt;:&lt;port&gt;/kosync</code>, then log in with your ComicNest username and password. Accounts must log in to the web UI once after sync is enabled (or have their password reset here). Password verifiers for KOReader are stored as an unsalted MD5, which is weaker than the normal login hash.</p>
+
         <label>Series per page
             <input type="number" name="page_size" min="0" value="{{.Config.PageSize}}">
         </label>
         {{if .Config.PageSizeEnvPinned}}
         <p class="hint">Overridden by the COMICNEST_PAGE_SIZE environment variable — edit it there instead.</p>
         {{end}}
-        <p class="hint">The ComicVine key and OPDS toggle need an app restart to take effect; the page size applies right away. Other settings (port, listen address, library path) still live only in config.yaml.</p>
+        <p class="hint">The ComicVine key, OPDS and KOReader sync toggles need an app restart to take effect; the page size applies right away. Other settings (port, listen address, library path) still live only in config.yaml.</p>
 
         <div class="form-actions">
             <button type="submit" class="btn-primary">Save</button>
